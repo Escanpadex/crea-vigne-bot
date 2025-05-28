@@ -183,7 +183,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 Mis à jour: 29/05/2025 00:05</div>
+    <div class="version">📅 Mis à jour: 29/05/2025 00:10 - Fix prix</div>
     
     <div class="container">
         <div class="header">
@@ -462,7 +462,8 @@
         // Récupérer le prix actuel
         async function getCurrentPrice() {
             try {
-                const response = await fetch(`https://api.bitget.com/api/v2/mix/market/ticker?productType=USDT-FUTURES&symbol=${config.symbol}`);
+                // Correction: productType en minuscules
+                const response = await fetch(`https://api.bitget.com/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${config.symbol}`);
                 const data = await response.json();
                 
                 if (data.code === '00000' && data.data) {
@@ -470,6 +471,8 @@
                     document.getElementById('currentPrice').textContent = `${currentPrice.toLocaleString()} USDT`;
                     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
                     return currentPrice;
+                } else {
+                    log(`Erreur API prix: ${data.msg || 'Réponse invalide'}`, 'ERROR');
                 }
             } catch (error) {
                 log(`Erreur prix: ${error.message}`, 'ERROR');
