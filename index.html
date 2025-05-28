@@ -216,6 +216,7 @@
                 </div>
                 
                 <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
+                <button class="btn" onclick="saveKeys()" style="margin-top: 10px; background: #28a745;">💾 Sauvegarder les clés</button>
             </div>
             
             <!-- Paramètres Trading -->
@@ -303,8 +304,31 @@
         let priceInterval = null;
         let tradingInterval = null;
         
-        // Configuration
-        let config = {
+        // Sauvegarder les clés API (en mémoire seulement)
+        let savedKeys = {
+            apiKey: '',
+            secretKey: '',
+            passphrase: ''
+        };
+        
+        function saveKeys() {
+            savedKeys.apiKey = document.getElementById('apiKey').value;
+            savedKeys.secretKey = document.getElementById('secretKey').value;
+            savedKeys.passphrase = document.getElementById('passphrase').value;
+            
+            if (savedKeys.apiKey && savedKeys.secretKey && savedKeys.passphrase) {
+                log('🔑 Clés sauvegardées pour cette session');
+            }
+        }
+        
+        function loadKeys() {
+            if (savedKeys.apiKey) {
+                document.getElementById('apiKey').value = savedKeys.apiKey;
+                document.getElementById('secretKey').value = savedKeys.secretKey;
+                document.getElementById('passphrase').value = savedKeys.passphrase;
+                log('🔑 Clés restaurées');
+            }
+        }
             apiKey: '',
             secretKey: '',
             passphrase: '',
@@ -524,8 +548,10 @@
             log('🛑 Bot arrêté', 'INFO');
         }
         
-        // Test initial de connexion au proxy
+        // Test initial de connexion au proxy + chargement des clés
         window.onload = async function() {
+            loadKeys(); // Charger les clés sauvegardées
+            
             try {
                 const response = await fetch(`${API_BASE}/test`);
                 const data = await response.json();
