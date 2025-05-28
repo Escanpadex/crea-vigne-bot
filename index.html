@@ -367,7 +367,7 @@
             
             log('Test de connexion à Bitget...');
             
-            const result = await makeRequest('/bitget/api/spot/v1/account/accounts');
+            const result = await makeRequest('/api/bitget/api/v2/spot/account/assets');
             
             if (result && result.code === '00000') {
                 document.getElementById('connectionStatus').classList.add('online');
@@ -380,7 +380,7 @@
         }
         
         async function refreshBalance() {
-            const result = await makeRequest('/bitget/api/spot/v1/account/accounts');
+            const result = await makeRequest('/api/bitget/api/v2/spot/account/assets');
             
             if (result && result.data) {
                 balance = {};
