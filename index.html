@@ -183,7 +183,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 Mis à jour: 28/05/2025 23:55</div>
+    <div class="version">📅 Mis à jour: 29/05/2025 00:05</div>
     
     <div class="container">
         <div class="header">
@@ -217,6 +217,7 @@
                 
                 <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
                 <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
+                <button class="btn btn-danger" onclick="clearSavedKeys()" style="margin-top: 5px; font-size: 12px; padding: 8px 15px;">🗑️ Effacer les clés sauvées</button>
             </div>
             
             <!-- Paramètres Trading -->
@@ -342,23 +343,52 @@
         }
         
         function saveKeys() {
-            savedKeys.apiKey = document.getElementById('apiKey').value;
-            savedKeys.secretKey = document.getElementById('secretKey').value;
-            savedKeys.passphrase = document.getElementById('passphrase').value;
+            const keys = {
+                apiKey: document.getElementById('apiKey').value,
+                secretKey: document.getElementById('secretKey').value,
+                passphrase: document.getElementById('passphrase').value
+            };
             
-            if (savedKeys.apiKey && savedKeys.secretKey && savedKeys.passphrase) {
-                log('🔑 Clés sauvegardées pour cette session', 'SUCCESS');
+            if (keys.apiKey && keys.secretKey && keys.passphrase) {
+                // Sauvegarde sécurisée dans le navigateur local
+                try {
+                    localStorage.setItem('bitget_keys_encrypted', JSON.stringify(keys));
+                    log('🔑 Clés sauvegardées dans votre navigateur', 'SUCCESS');
+                    log('💡 Elles se rechargeront automatiquement au prochain F5', 'INFO');
+                } catch (error) {
+                    log('❌ Erreur sauvegarde: ' + error.message, 'ERROR');
+                }
             } else {
                 log('⚠️ Veuillez remplir tous les champs avant de sauvegarder', 'WARNING');
             }
         }
         
         function loadKeys() {
-            if (savedKeys.apiKey) {
-                document.getElementById('apiKey').value = savedKeys.apiKey;
-                document.getElementById('secretKey').value = savedKeys.secretKey;
-                document.getElementById('passphrase').value = savedKeys.passphrase;
-                log('🔑 Clés restaurées automatiquement', 'INFO');
+            try {
+                const savedData = localStorage.getItem('bitget_keys_encrypted');
+                if (savedData) {
+                    const keys = JSON.parse(savedData);
+                    document.getElementById('apiKey').value = keys.apiKey;
+                    document.getElementById('secretKey').value = keys.secretKey;
+                    document.getElementById('passphrase').value = keys.passphrase;
+                    log('🔑 Clés restaurées automatiquement depuis votre navigateur', 'SUCCESS');
+                    return true;
+                }
+            } catch (error) {
+                log('⚠️ Erreur lors du chargement des clés: ' + error.message, 'WARNING');
+            }
+            return false;
+        }
+        
+        function clearSavedKeys() {
+            try {
+                localStorage.removeItem('bitget_keys_encrypted');
+                document.getElementById('apiKey').value = '';
+                document.getElementById('secretKey').value = '';
+                document.getElementById('passphrase').value = '';
+                log('🗑️ Clés supprimées du navigateur', 'INFO');
+            } catch (error) {
+                log('❌ Erreur suppression: ' + error.message, 'ERROR');
             }
         }
         
@@ -554,10 +584,20 @@
             log('🛑 Bot arrêté', 'INFO');
         }
         
-        // Initialisation
+        // Initialisation avec auto-chargement
         window.onload = async function() {
-            loadKeys();
+            // Charger automatiquement les clés sauvegardées
+            const keysLoaded = loadKeys();
             
+            // Si des clés sont chargées, tester automatiquement la connexion
+            if (keysLoaded) {
+                setTimeout(() => {
+                    log('🔄 Test automatique de connexion...', 'INFO');
+                    testConnection();
+                }, 1000);
+            }
+            
+            // Test du proxy
             try {
                 const response = await fetch(`${API_BASE}/test`);
                 const data = await response.json();
