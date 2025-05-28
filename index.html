@@ -187,8 +187,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Bot Trading Bitget</h1>
-            <p>Crea Vigne - Trading Automatique</p>
+            <h1>🚀 Bot Trading Bitget Futures</h1>
+            <p>Crea Vigne - Trading Automatique Futures</p>
         </div>
         
         <div class="grid">
@@ -365,43 +365,43 @@
                 return;
             }
             
-            log('Test de connexion à Bitget...');
+            log('Test de connexion à Bitget Futures...');
             
-            const result = await makeRequest('/bitget/api/v2/spot/account/assets');
+            const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
             
             if (result && result.code === '00000') {
                 document.getElementById('connectionStatus').classList.add('online');
-                document.getElementById('connectionText').textContent = 'Connecté';
-                log('✅ Connexion réussie à Bitget!', 'SUCCESS');
+                document.getElementById('connectionText').textContent = 'Connecté (Futures)';
+                log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
                 refreshBalance();
             } else {
-                log('❌ Échec de la connexion. Vérifiez vos clés API.', 'ERROR');
+                log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
             }
         }
         
         async function refreshBalance() {
-            const result = await makeRequest('/bitget/api/v2/spot/account/assets');
+            const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
             
             if (result && result.data) {
                 balance = {};
                 result.data.forEach(account => {
-                    balance[account.coin] = parseFloat(account.available);
+                    balance[account.marginCoin] = parseFloat(account.usdtEquity || account.equity || account.available || 0);
                 });
                 
                 document.getElementById('usdtBalance').textContent = (balance.USDT || 0).toFixed(2);
                 document.getElementById('btcBalance').textContent = (balance.BTC || 0).toFixed(6);
                 
-                log('Balance mise à jour');
+                log('Balance Futures mise à jour');
             }
         }
         
         async function getCurrentPrice() {
             try {
-                const response = await fetch(`https://api.bitget.com/api/v2/spot/market/tickers?symbol=${config.symbol}`);
+                const response = await fetch(`https://api.bitget.com/api/v2/mix/market/ticker?symbol=${config.symbol}`);
                 const data = await response.json();
                 
-                if (data.code === '00000' && data.data && data.data.length > 0) {
-                    currentPrice = parseFloat(data.data[0].lastPr);
+                if (data.code === '00000' && data.data) {
+                    currentPrice = parseFloat(data.data.lastPr);
                     document.getElementById('currentPrice').textContent = `${currentPrice.toLocaleString()} USDT`;
                     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
                     return currentPrice;
