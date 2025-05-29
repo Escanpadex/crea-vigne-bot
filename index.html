@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Trading Bitget Futures - Stratégie MACD TOP 20</title>
+    <title>Bot Bitget Simplifié - Debug Trading</title>
     <style>
         * {
             margin: 0;
@@ -12,16 +12,16 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             min-height: 100vh;
             color: #333;
+            padding: 20px;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
         }
         
         .header {
@@ -35,8 +35,7 @@
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
         
         .status {
@@ -71,26 +70,26 @@
         input, select {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e1e5e9;
+            border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 14px;
-            transition: border-color 0.3s;
         }
         
         input:focus, select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #3498db;
         }
         
         .btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
+            background: linear-gradient(45deg, #3498db, #2980b9);
             color: white;
-            padding: 12px 25px;
+            padding: 15px 25px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
             font-weight: 600;
+            margin: 5px;
             transition: transform 0.2s;
         }
         
@@ -99,23 +98,31 @@
         }
         
         .btn:disabled {
-            background: #ccc;
+            background: #bdc3c7;
             cursor: not-allowed;
             transform: none;
         }
         
-        .btn-danger {
-            background: linear-gradient(45deg, #dc3545, #c82333);
-        }
-        
         .btn-success {
-            background: linear-gradient(45deg, #28a745, #1e7e34);
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
         }
         
-        .grid {
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+        
+        .trading-controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .crypto-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
         }
         
         .logs {
@@ -127,212 +134,114 @@
             font-size: 12px;
             max-height: 400px;
             overflow-y: auto;
-        }
-        
-        .balance-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            background: #f8f9fa;
-            margin-bottom: 8px;
-            border-radius: 6px;
-        }
-        
-        .price-display {
-            font-size: 18px;
-            font-weight: bold;
-            color: #667eea;
-            text-align: center;
-            margin: 10px 0;
-        }
-        
-        .indicator {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .indicator.buy {
-            background: #28a745;
-            color: white;
-        }
-        
-        .indicator.sell {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .indicator.hold {
-            background: #ffc107;
-            color: #212529;
+            white-space: pre-wrap;
         }
         
         .version {
             position: fixed;
             top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
+            right: 10px;
+            background: rgba(0,0,0,0.8);
             color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
+            padding: 8px 12px;
+            border-radius: 6px;
             font-size: 12px;
             z-index: 1000;
-        }
-        
-        .top20-list {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        
-        .pair-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px;
-            font-size: 12px;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .pair-item:last-child {
-            border-bottom: none;
-        }
-        
-        .scanning {
-            background: #ffc107;
-            color: black;
-        }
-        
-        .position-item {
-            background: #e8f5e8;
-            border: 1px solid #28a745;
-            border-radius: 6px;
-            padding: 8px;
-            margin-bottom: 8px;
-            font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 15:30 - ADD LEVERAGE</div>
+    <div class="version">🔧 DEBUG v1.0 - 29/05/2025</div>
     
     <div class="container">
         <div class="header">
-            <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 20 Volume - Margin Mode ISOLATED Forcé</p>
+            <h1>🔧 Bot Bitget Simplifié</h1>
+            <p>Debug Margin Mode - Trading Manuel BTC/ETH</p>
         </div>
         
-        <div class="grid">
-            <div class="card">
-                <h3>⚙️ Configuration API</h3>
-                <div class="status">
-                    <div class="status-dot" id="connectionStatus"></div>
-                    <span id="connectionText">Déconnecté</span>
-                </div>
-                
-                <div class="form-group">
-                    <label>API Key:</label>
-                    <input type="password" id="apiKey" placeholder="Votre API Key Bitget">
-                </div>
-                
-                <div class="form-group">
-                    <label>Secret Key:</label>
-                    <input type="password" id="secretKey" placeholder="Votre Secret Key">
-                </div>
-                
-                <div class="form-group">
-                    <label>Passphrase:</label>
-                    <input type="password" id="passphrase" placeholder="Votre Passphrase">
-                </div>
-                
-                <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
-                <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
-            </div>
-            
-            <div class="card">
-                <h3>📊 Paramètres Stratégie MACD</h3>
-                
-                <div class="form-group">
-                    <label>Capital à utiliser (% du total):</label>
-                    <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1">
-                </div>
-                
-                <div class="form-group">
-                    <label>Levier:</label>
-                    <select id="leverage">
-                        <option value="2" selected>2x</option>
-                        <option value="3">3x</option>
-                        <option value="5">5x</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Trailing Stop (%):</label>
-                    <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1">
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn" onclick="startBot()" id="startBtn">▶️ Démarrer Stratégie</button>
-                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter Bot</button>
-                </div>
-                
-                <div style="margin-top: 15px;">
-                    <button class="btn" onclick="scanTop20Volume()" style="width: 100%;">🔍 Scanner TOP 20 Volume</button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <h3>📈 TOP 20 Volume</h3>
-                <div style="margin-bottom: 10px;">
-                    <strong>Paire en cours:</strong> <span id="currentScanPair">--</span>
-                </div>
-                <div class="top20-list" id="top20List">
-                    <div class="pair-item"><span>Chargement...</span><span>--</span></div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h3>💼 Positions Ouvertes</h3>
-                <div id="positionsContainer">
-                    <div style="text-align: center; color: #666; padding: 20px;">Aucune position ouverte</div>
-                </div>
-            </div>
-        </div>
-        
+        <!-- Configuration API -->
         <div class="card">
-            <h3>📝 Logs de Trading</h3>
-            <div class="logs" id="logs">
-                [INFO] Bot MACD TOP 20 avec margin mode ISOLATED forcé<br>
-                [INFO] En attente de configuration API...<br>
+            <h3>⚙️ Configuration API Bitget</h3>
+            <div class="status">
+                <div class="status-dot" id="connectionStatus"></div>
+                <span id="connectionText">Déconnecté</span>
             </div>
+            
+            <div class="form-group">
+                <label>API Key:</label>
+                <input type="password" id="apiKey" placeholder="Votre API Key Bitget">
+            </div>
+            
+            <div class="form-group">
+                <label>Secret Key:</label>
+                <input type="password" id="secretKey" placeholder="Votre Secret Key">
+            </div>
+            
+            <div class="form-group">
+                <label>Passphrase:</label>
+                <input type="password" id="passphrase" placeholder="Votre Passphrase">
+            </div>
+            
+            <button class="btn btn-success" onclick="testConnection()">🔗 Tester Connexion</button>
+        </div>
+        
+        <!-- Trading Simplifié -->
+        <div class="card">
+            <h3>📊 Trading Manuel (10$ - Levier 2x)</h3>
+            
+            <div class="crypto-selector">
+                <label>Crypto:</label>
+                <select id="cryptoSelect">
+                    <option value="BTCUSDT">Bitcoin (BTC)</option>
+                    <option value="ETHUSDT">Ethereum (ETH)</option>
+                </select>
+            </div>
+            
+            <div class="trading-controls">
+                <button class="btn btn-success" onclick="openLongPosition()" id="openBtn">
+                    📈 Ouvrir Position LONG (10$)
+                </button>
+                <button class="btn btn-danger" onclick="closePosition()" id="closeBtn">
+                    📉 Fermer Position
+                </button>
+                <button class="btn" onclick="checkPositions()">
+                    🔍 Vérifier Positions
+                </button>
+                <button class="btn" onclick="setLeverage()">
+                    ⚡ Configurer Levier 2x
+                </button>
+            </div>
+        </div>
+        
+        <!-- Logs -->
+        <div class="card">
+            <h3>📝 Logs de Debug</h3>
+            <div class="logs" id="logs">🔧 Bot simplifié initialisé - Prêt pour debug Bitget
+🎯 Objectif: Résoudre "The margin mode is illegal"
+⚙️ Stratégie: Tests multiples de configurations
+</div>
+            <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer Logs</button>
         </div>
     </div>
 
     <script>
         const API_BASE = 'https://api.crea-vigne.fr/api';
-        let botRunning = false;
-        let top20Pairs = [];
-        let openPositions = [];
-        let config = { apiKey: '', secretKey: '', passphrase: '', capitalPercent: 5, leverage: 2, trailingStop: 1.0 };
-        let balance = { USDT: 0, totalEquity: 0 };
         
-        function log(message, type = 'INFO') {
+        let config = {
+            apiKey: '',
+            secretKey: '',
+            passphrase: ''
+        };
+        
+        function log(message) {
             const logs = document.getElementById('logs');
             const timestamp = new Date().toLocaleTimeString();
-            logs.innerHTML += `[${timestamp}] [${type}] ${message}<br>`;
+            logs.textContent += `\n[${timestamp}] ${message}`;
             logs.scrollTop = logs.scrollHeight;
         }
         
-        function saveKeys() {
-            config.apiKey = document.getElementById('apiKey').value;
-            config.secretKey = document.getElementById('secretKey').value;
-            config.passphrase = document.getElementById('passphrase').value;
-            log('🔑 Clés sauvegardées', 'SUCCESS');
+        function clearLogs() {
+            document.getElementById('logs').textContent = '🔧 Logs effacés\n';
         }
         
         async function makeRequest(endpoint, options = {}) {
@@ -346,114 +255,270 @@
                     ...options.headers
                 };
                 
-                const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-                return await response.json();
+                log(`🔄 Requête: ${endpoint}`);
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
+                
+                const result = await response.json();
+                log(`📡 Réponse API: ${JSON.stringify(result, null, 2)}`);
+                
+                return result;
             } catch (error) {
-                log(`Erreur API: ${error.message}`, 'ERROR');
+                log(`❌ Erreur API: ${error.message}`);
                 return null;
             }
         }
         
         async function testConnection() {
-            saveKeys();
-            log('🔄 Test de connexion...');
+            // Sauvegarder les clés
+            config.apiKey = document.getElementById('apiKey').value;
+            config.secretKey = document.getElementById('secretKey').value;
+            config.passphrase = document.getElementById('passphrase').value;
+            
+            if (!config.apiKey || !config.secretKey || !config.passphrase) {
+                alert('Veuillez remplir tous les champs API');
+                return;
+            }
+            
+            log('🔄 Test de connexion à Bitget Futures...');
             
             const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
             
             if (result && result.code === '00000') {
                 document.getElementById('connectionStatus').classList.add('online');
-                document.getElementById('connectionText').textContent = 'Connecté';
-                log('✅ Connexion réussie!', 'SUCCESS');
+                document.getElementById('connectionText').textContent = 'Connecté ✅';
+                log('✅ Connexion réussie à Bitget Futures!');
+                
+                // Afficher les infos du compte
+                if (result.data && result.data.length > 0) {
+                    const account = result.data[0];
+                    log(`💰 Balance: ${account.available} USDT`);
+                    log(`📊 Équité: ${account.usdtEquity} USDT`);
+                }
+                
                 return true;
             } else {
-                log('❌ Échec de la connexion', 'ERROR');
+                log('❌ Échec de la connexion');
+                log(`📝 Détails: ${result?.msg || 'Erreur inconnue'}`);
                 return false;
             }
         }
         
-        async function scanTop20Volume() {
-            log('🔍 Scan TOP 20...');
-            const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
-            const data = await response.json();
+        async function setLeverage() {
+            const symbol = document.getElementById('cryptoSelect').value;
+            log(`⚡ Configuration du levier 2x pour ${symbol}...`);
             
-            if (data.code === '00000' && data.data) {
-                top20Pairs = data.data
-                    .filter(pair => parseFloat(pair.usdtVolume || 0) > 10000000)
-                    .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                    .slice(0, 20);
-                
-                updateTop20Display();
-                log(`✅ TOP 20 mis à jour: ${top20Pairs.length} paires`, 'SUCCESS');
+            const leverageData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginCoin: "USDT",
+                leverage: "2"
+            };
+            
+            log(`📤 Données levier: ${JSON.stringify(leverageData, null, 2)}`);
+            
+            const result = await makeRequest('/bitget/api/v2/mix/account/set-leverage', {
+                method: 'POST',
+                body: JSON.stringify(leverageData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ Levier 2x configuré avec succès!');
+            } else {
+                log(`❌ Échec configuration levier: ${result?.msg || 'Erreur'}`);
             }
         }
         
-        function updateTop20Display() {
-            const container = document.getElementById('top20List');
-            container.innerHTML = '';
-            top20Pairs.forEach((pair, index) => {
-                const item = document.createElement('div');
-                item.className = 'pair-item';
-                item.innerHTML = `<span>#${index + 1} ${pair.symbol}</span><span>${formatNumber(pair.usdtVolume)}</span>`;
-                container.appendChild(item);
-            });
-        }
-        
-        function formatNumber(num) {
-            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-            return num.toFixed(2);
-        }
-        
-        async function testOrder(symbol) {
-            log(`🧪 TEST avec LEVERAGE + CROSS: ${symbol}`, 'INFO');
+        async function openLongPosition() {
+            const symbol = document.getElementById('cryptoSelect').value;
+            log(`📈 Tentative d'ouverture position LONG sur ${symbol}...`);
             
-            const orderData = {
+            // Test 1: Configuration minimale
+            log('🧪 TEST 1: Configuration minimale');
+            let orderData = {
                 symbol: symbol,
                 productType: "USDT-FUTURES",
-                marginMode: "cross",
-                marginCoin: "USDT",
-                leverage: "2", // 🔧 LEVIER 2x AJOUTÉ
                 size: "10",
                 side: "buy",
-                tradeSide: "open", 
+                tradeSide: "open",
                 orderType: "market",
-                clientOid: `test_${Date.now()}`
+                clientOid: `test1_${Date.now()}`
             };
             
-            log(`🔧 Données: ${JSON.stringify(orderData)}`, 'INFO');
-            
-            const result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+            let result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
                 method: 'POST',
                 body: JSON.stringify(orderData)
             });
             
-            log(`🔧 Réponse: ${JSON.stringify(result)}`, 'INFO');
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS avec configuration minimale!');
+                return;
+            }
+            
+            // Test 2: Avec marginMode = isolated
+            log('🧪 TEST 2: Avec marginMode = isolated');
+            orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "isolated",
+                marginCoin: "USDT",
+                size: "10",
+                side: "buy",
+                tradeSide: "open",
+                orderType: "market",
+                clientOid: `test2_${Date.now()}`
+            };
+            
+            result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
             
             if (result && result.code === '00000') {
-                log(`✅ ORDRE RÉUSSI! ID: ${result.data.orderId}`, 'SUCCESS');
-                log(`🎉 SOLUTION: marginMode=cross + leverage=2`, 'SUCCESS');
-            } else {
-                log(`❌ Échec: ${result?.msg || 'Erreur'}`, 'ERROR');
+                log('✅ SUCCÈS avec marginMode = isolated!');
+                return;
             }
-        }
-        
-        function startBot() {
-            log('🚀 Démarrage du bot avec margin mode ISOLATED forcé', 'SUCCESS');
             
-            // Test immédiat avec la première paire
-            if (top20Pairs.length > 0) {
-                testOrder(top20Pairs[0].symbol);
-            } else {
-                log('⚠️ Scannez d\'abord le TOP 20', 'WARNING');
+            // Test 3: Avec marginMode = cross
+            log('🧪 TEST 3: Avec marginMode = cross');
+            orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "cross",
+                marginCoin: "USDT",
+                size: "10",
+                side: "buy",
+                tradeSide: "open",
+                orderType: "market",
+                clientOid: `test3_${Date.now()}`
+            };
+            
+            result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS avec marginMode = cross!');
+                return;
+            }
+            
+            // Test 4: Avec quantity au lieu de size
+            log('🧪 TEST 4: Avec quantity au lieu de size');
+            
+            // D'abord récupérer le prix actuel
+            const tickerResult = await makeRequest(`/bitget/api/v2/mix/market/ticker?symbol=${symbol}`);
+            if (tickerResult && tickerResult.code === '00000' && tickerResult.data) {
+                const price = parseFloat(tickerResult.data.lastPr);
+                const quantity = (10 / price).toFixed(6); // 10$ / prix = quantité
+                
+                log(`💰 Prix ${symbol}: ${price} USDT`);
+                log(`📊 Quantité calculée: ${quantity}`);
+                
+                orderData = {
+                    symbol: symbol,
+                    productType: "USDT-FUTURES",
+                    marginMode: "cross",
+                    marginCoin: "USDT",
+                    size: quantity,
+                    side: "buy",
+                    tradeSide: "open",
+                    orderType: "market",
+                    clientOid: `test4_${Date.now()}`
+                };
+                
+                result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                    method: 'POST',
+                    body: JSON.stringify(orderData)
+                });
+                
+                if (result && result.code === '00000') {
+                    log('✅ SUCCÈS avec quantité calculée!');
+                    log(`🎉 Position ouverte: ${quantity} ${symbol.replace('USDT', '')} (~10$)`);
+                    return;
+                }
+            }
+            
+            log('❌ Tous les tests ont échoué. Problème API ou configuration compte.');
+        }
+        
+        async function closePosition() {
+            const symbol = document.getElementById('cryptoSelect').value;
+            log(`📉 Fermeture de toutes les positions ${symbol}...`);
+            
+            // D'abord vérifier les positions ouvertes
+            const posResult = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+            
+            if (posResult && posResult.code === '00000' && posResult.data) {
+                const positions = posResult.data.filter(pos => 
+                    pos.symbol === symbol && parseFloat(pos.total) > 0
+                );
+                
+                if (positions.length === 0) {
+                    log(`⚠️ Aucune position ouverte sur ${symbol}`);
+                    return;
+                }
+                
+                for (const position of positions) {
+                    log(`🔄 Fermeture position: ${position.total} ${symbol}`);
+                    
+                    const closeData = {
+                        symbol: symbol,
+                        productType: "USDT-FUTURES",
+                        marginMode: position.marginMode,
+                        marginCoin: "USDT",
+                        size: Math.abs(parseFloat(position.total)).toString(),
+                        side: position.side === "long" ? "sell" : "buy",
+                        tradeSide: "close",
+                        orderType: "market",
+                        clientOid: `close_${Date.now()}`
+                    };
+                    
+                    const result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                        method: 'POST',
+                        body: JSON.stringify(closeData)
+                    });
+                    
+                    if (result && result.code === '00000') {
+                        log('✅ Position fermée avec succès!');
+                    } else {
+                        log(`❌ Échec fermeture: ${result?.msg || 'Erreur'}`);
+                    }
+                }
             }
         }
         
-        function stopBot() {
-            log('🛑 Bot arrêté', 'INFO');
+        async function checkPositions() {
+            log('🔍 Vérification des positions...');
+            
+            const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+            
+            if (result && result.code === '00000' && result.data) {
+                const openPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+                
+                if (openPositions.length === 0) {
+                    log('📊 Aucune position ouverte');
+                } else {
+                    log(`📊 ${openPositions.length} position(s) ouverte(s):`);
+                    openPositions.forEach(pos => {
+                        log(`   • ${pos.symbol}: ${pos.total} (${pos.side}) - PnL: ${pos.unrealizedPL} USDT`);
+                    });
+                }
+            }
         }
         
+        // Initialisation
         window.onload = function() {
-            log('✅ Bot initialisé - Version ISOLATED FORCÉ', 'SUCCESS');
+            log('🚀 Bot simplifié chargé - Prêt pour les tests!');
+            log('📋 Instructions:');
+            log('1. Configurez vos clés API Bitget');
+            log('2. Testez la connexion');
+            log('3. Configurez le levier 2x');
+            log('4. Tentez d\'ouvrir une position');
+            log('');
         };
     </script>
 </body>
