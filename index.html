@@ -217,12 +217,12 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 v2.1 - MACD TOP 20 Cycle Complet - 29/05/2025</div>
+    <div class="version">📅 v3.0 - MACD TOP 20 + Trailing Stop Bitget Natif - 29/05/2025</div>
     
     <div class="container">
         <div class="header">
             <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - Cycle complet TOP 20 Volume - Levier 2x - Trailing Stop 1%</p>
+            <p>Stratégie MACD - TOP 20 Volume - Trailing Stop Bitget Natif - Levier 2x</p>
         </div>
         
         <div class="grid">
@@ -826,13 +826,13 @@
                 const item = document.createElement('div');
                 item.className = 'position-item';
                 
-                const pnlPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice * 100).toFixed(2);
-                const pnlClass = pnlPercent >= 0 ? 'color: #28a745' : 'color: #dc3545';
+                const timeAgo = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
                 
                 item.innerHTML = `
                     <div><strong>${position.symbol}</strong> ${position.side} - ${position.size.toFixed(2)} USDT</div>
-                    <div>Entrée: ${position.entryPrice.toFixed(2)} | Actuel: ${position.currentPrice.toFixed(2)}</div>
-                    <div>P&L: <span style="${pnlClass}">${pnlPercent}%</span> | Stop: ${position.trailingStopPrice.toFixed(2)}</div>
+                    <div>Prix d'entrée: ${position.entryPrice.toFixed(4)} | Ouvert il y a ${timeAgo}min</div>
+                    <div>🔒 <span style="color: #28a745">Trailing Stop Bitget actif (${config.trailingStop}%)</span></div>
+                    <div style="font-size: 10px; color: #666;">ID: ${position.orderId || 'N/A'}</div>
                 `;
                 
                 container.appendChild(item);
@@ -915,63 +915,48 @@
             }
         }
         
-        async function updateTrailingStops() {
+        async function checkPositionsStatus() {
             if (openPositions.length === 0) return;
             
-            for (let position of openPositions) {
-                if (position.status !== 'OPEN') continue;
+            try {
+                // Vérifier le statut des positions via l'API Bitget
+                const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
                 
-                try {
-                    const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${position.symbol}`);
-                    const data = await response.json();
+                if (result && result.code === '00000' && result.data) {
+                    const apiPositions = result.data;
+                    const currentSymbols = apiPositions.filter(pos => parseFloat(pos.total) > 0).map(pos => pos.symbol);
                     
-                    if (data.code === '00000' && data.data && data.data.length > 0) {
-                        const currentPrice = parseFloat(data.data[0].lastPr);
-                        position.currentPrice = currentPrice;
+                    // Identifier les positions fermées (présentes localement mais plus dans l'API)
+                    const closedPositions = openPositions.filter(localPos => 
+                        !currentSymbols.includes(localPos.symbol)
+                    );
+                    
+                    // Traiter les positions fermées
+                    for (const closedPos of closedPositions) {
+                        log(`🔚 Position fermée détectée: ${closedPos.symbol} (Trailing Stop Bitget)`, 'SUCCESS');
                         
-                        if (currentPrice > position.highestPrice) {
-                            position.highestPrice = currentPrice;
-                            
-                            const newStopPrice = currentPrice * (1 - config.trailingStop / 100);
-                            if (newStopPrice > position.trailingStopPrice) {
-                                position.trailingStopPrice = newStopPrice;
-                                log(`📈 Trailing stop mis à jour pour ${position.symbol}: ${newStopPrice.toFixed(2)}`, 'INFO');
-                            }
-                        }
+                        // Calculer le P&L estimé (on ne peut pas avoir le prix exact de fermeture via cette API)
+                        log(`💰 Position ${closedPos.symbol} fermée par trailing stop à ${config.trailingStop}%`, 'SUCCESS');
                         
-                        if (currentPrice <= position.trailingStopPrice) {
-                            await closePosition(position, 'TRAILING_STOP');
-                        }
+                        // Retirer de la liste locale
+                        openPositions = openPositions.filter(pos => pos.id !== closedPos.id);
                     }
-                } catch (error) {
-                    log(`❌ Erreur mise à jour trailing stop ${position.symbol}: ${error.message}`, 'ERROR');
+                    
+                    if (closedPositions.length > 0) {
+                        updatePositionsDisplay();
+                        await refreshBalance();
+                        log(`📊 ${closedPositions.length} position(s) fermée(s) - Analyse reprendra sur ces paires`, 'INFO');
+                    }
                 }
+            } catch (error) {
+                log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
             }
-            
-            updatePositionsDisplay();
         }
         
         async function closePosition(position, reason) {
-            try {
-                position.status = 'CLOSED';
-                position.closePrice = position.currentPrice;
-                position.closeTime = new Date().toISOString();
-                position.closeReason = reason;
-                
-                const pnl = ((position.closePrice - position.entryPrice) / position.entryPrice) * 100;
-                const pnlColor = pnl >= 0 ? 'SUCCESS' : 'ERROR';
-                
-                log(`🔚 Position fermée: ${position.symbol} - Raison: ${reason}`, 'INFO');
-                log(`💰 P&L: ${pnl.toFixed(2)}% | Entrée: ${position.entryPrice.toFixed(2)} | Sortie: ${position.closePrice.toFixed(2)}`, pnlColor);
-                
-                openPositions = openPositions.filter(pos => pos.id !== position.id);
-                
-                updatePositionsDisplay();
-                await refreshBalance();
-                
-            } catch (error) {
-                log(`❌ Erreur fermeture position: ${error.message}`, 'ERROR');
-            }
+            // Cette fonction n'est plus utilisée car Bitget gère automatiquement
+            // le trailing stop. On garde juste pour compatibilité.
+            log(`🔚 Position fermée automatiquement par Bitget: ${position.symbol}`, 'SUCCESS');
         }
         
         async function startBot() {
@@ -1005,11 +990,12 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 Volume (CYCLE COMPLET)', 'SUCCESS');
-            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop`, 'INFO');
+            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 avec Trailing Stop Bitget', 'SUCCESS');
+            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop NATIF`, 'INFO');
             log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
-            log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume (cycle complet)`, 'INFO');
+            log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
             log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
+            log(`🔒 Trailing Stop: Géré automatiquement par l'API Bitget`, 'SUCCESS');
             
             tradingLoopInterval = setInterval(tradingLoop, 60000);
             volumeScanInterval = setInterval(scanTop20Volume, 300000);
