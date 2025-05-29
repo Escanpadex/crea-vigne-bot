@@ -217,12 +217,12 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 12:56 - TEST ISOLATED</div>
+    <div class="version">📅 29/05/2025 - 13:30 - ISOLATED FORCED</div>
     
     <div class="container">
         <div class="header">
             <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 20 Volume - Trailing Stop Bitget Natif - Levier 2x</p>
+            <p>Stratégie MACD - TOP 20 Volume - Margin Mode ISOLATED Forcé</p>
         </div>
         
         <div class="grid">
@@ -250,7 +250,6 @@
                 
                 <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
                 <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
-                <button class="btn btn-danger" onclick="clearSavedKeys()" style="margin-top: 5px; font-size: 12px; padding: 8px 15px;">🗑️ Effacer les clés sauvées</button>
             </div>
             
             <div class="card">
@@ -259,23 +258,20 @@
                 <div class="form-group">
                     <label>Capital à utiliser (% du total):</label>
                     <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1">
-                    <small>5% du capital × levier 2x par position</small>
                 </div>
                 
                 <div class="form-group">
                     <label>Levier:</label>
                     <select id="leverage">
-                        <option value="2" selected>2x (Recommandé)</option>
+                        <option value="2" selected>2x</option>
                         <option value="3">3x</option>
                         <option value="5">5x</option>
-                        <option value="10">10x</option>
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label>Trailing Stop (%):</label>
                     <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1">
-                    <small>Recul maximum autorisé</small>
                 </div>
                 
                 <div style="display: flex; gap: 10px;">
@@ -291,68 +287,19 @@
         
         <div class="grid">
             <div class="card">
-                <h3>📈 TOP 20 Volume (Surveillance)</h3>
+                <h3>📈 TOP 20 Volume</h3>
                 <div style="margin-bottom: 10px;">
-                    <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
+                    <strong>Paire en cours:</strong> <span id="currentScanPair">--</span>
                 </div>
                 <div class="top20-list" id="top20List">
-                    <div class="pair-item">
-                        <span>Chargement...</span>
-                        <span>--</span>
-                    </div>
-                </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <strong>Dernière MAJ:</strong> <span id="lastScanTime">--</span>
+                    <div class="pair-item"><span>Chargement...</span><span>--</span></div>
                 </div>
             </div>
             
             <div class="card">
                 <h3>💼 Positions Ouvertes</h3>
                 <div id="positionsContainer">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        Aucune position ouverte
-                    </div>
-                </div>
-                <div style="margin-top: 10px;">
-                    <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
-                    <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <h3>💳 Balance Futures</h3>
-                <div id="balanceContainer">
-                    <div class="balance-item">
-                        <span>USDT Total:</span>
-                        <span id="usdtBalance">--</span>
-                    </div>
-                    <div class="balance-item">
-                        <span>Équité:</span>
-                        <span id="totalEquity">--</span>
-                    </div>
-                </div>
-                <button class="btn" onclick="refreshBalance()" style="width: 100%; margin-top: 10px;">🔄 Actualiser</button>
-            </div>
-            
-            <div class="card">
-                <h3>📊 Statistiques Bot</h3>
-                <div class="balance-item">
-                    <span>Scans effectués:</span>
-                    <span id="totalScans">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>Signaux détectés:</span>
-                    <span id="totalSignals">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>Positions ouvertes:</span>
-                    <span id="totalOpenPositions">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>Uptime:</span>
-                    <span id="botUptime">00:00:00</span>
+                    <div style="text-align: center; color: #666; padding: 20px;">Aucune position ouverte</div>
                 </div>
             </div>
         </div>
@@ -360,120 +307,46 @@
         <div class="card">
             <h3>📝 Logs de Trading</h3>
             <div class="logs" id="logs">
-                [INFO] Bot de trading MACD TOP 20 initialisé...<br>
-                [INFO] Stratégie: Cycle complet - 5% capital × 2x levier × 1% trailing stop<br>
+                [INFO] Bot MACD TOP 20 avec margin mode ISOLATED forcé<br>
                 [INFO] En attente de configuration API...<br>
             </div>
-            <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer logs</button>
         </div>
     </div>
 
     <script>
         const API_BASE = 'https://api.crea-vigne.fr/api';
         let botRunning = false;
-        let volumeScanInterval = null;
-        let tradingLoopInterval = null;
-        let statsInterval = null;
-        let botStartTime = null;
-        
         let top20Pairs = [];
-        let currentScanIndex = 0;
         let openPositions = [];
-        let botStats = {
-            totalScans: 0,
-            totalSignals: 0,
-            totalPositions: 0
-        };
-        
-        let config = {
-            apiKey: '',
-            secretKey: '',
-            passphrase: '',
-            capitalPercent: 5,
-            leverage: 2,
-            trailingStop: 1.0
-        };
-        
+        let config = { apiKey: '', secretKey: '', passphrase: '', capitalPercent: 5, leverage: 2, trailingStop: 1.0 };
         let balance = { USDT: 0, totalEquity: 0 };
         
         function log(message, type = 'INFO') {
             const logs = document.getElementById('logs');
             const timestamp = new Date().toLocaleTimeString();
-            const logMessage = `[${timestamp}] [${type}] ${message}<br>`;
-            logs.innerHTML += logMessage;
+            logs.innerHTML += `[${timestamp}] [${type}] ${message}<br>`;
             logs.scrollTop = logs.scrollHeight;
         }
         
-        function clearLogs() {
-            document.getElementById('logs').innerHTML = '';
-        }
-        
-        function formatNumber(num) {
-            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
-            return num.toFixed(2);
-        }
-        
-        function updateStats() {
-            document.getElementById('totalScans').textContent = botStats.totalScans;
-            document.getElementById('totalSignals').textContent = botStats.totalSignals;
-            document.getElementById('totalOpenPositions').textContent = openPositions.length;
-            
-            if (botStartTime) {
-                const elapsed = Date.now() - botStartTime;
-                const hours = Math.floor(elapsed / 3600000);
-                const minutes = Math.floor((elapsed % 3600000) / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                document.getElementById('botUptime').textContent = 
-                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-        }
-        
         function saveKeys() {
-            const keys = {
-                apiKey: document.getElementById('apiKey').value,
-                secretKey: document.getElementById('secretKey').value,
-                passphrase: document.getElementById('passphrase').value
-            };
-            
-            if (keys.apiKey && keys.secretKey && keys.passphrase) {
-                config.apiKey = keys.apiKey;
-                config.secretKey = keys.secretKey;
-                config.passphrase = keys.passphrase;
-                log('🔑 Clés sauvegardées en mémoire', 'SUCCESS');
-            } else {
-                log('⚠️ Veuillez remplir tous les champs avant de sauvegarder', 'WARNING');
-            }
-        }
-        
-        function clearSavedKeys() {
-            document.getElementById('apiKey').value = '';
-            document.getElementById('secretKey').value = '';
-            document.getElementById('passphrase').value = '';
-            config.apiKey = '';
-            config.secretKey = '';
-            config.passphrase = '';
-            log('🗑️ Clés effacées', 'INFO');
+            config.apiKey = document.getElementById('apiKey').value;
+            config.secretKey = document.getElementById('secretKey').value;
+            config.passphrase = document.getElementById('passphrase').value;
+            log('🔑 Clés sauvegardées', 'SUCCESS');
         }
         
         async function makeRequest(endpoint, options = {}) {
             try {
-                const timestamp = Date.now().toString();
                 const headers = {
                     'Content-Type': 'application/json',
                     'apikey': config.apiKey,
                     'secretkey': config.secretKey,
                     'passphrase': config.passphrase,
-                    'timestamp': timestamp,
+                    'timestamp': Date.now().toString(),
                     ...options.headers
                 };
                 
-                const response = await fetch(`${API_BASE}${endpoint}`, {
-                    ...options,
-                    headers
-                });
-                
+                const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
                 return await response.json();
             } catch (error) {
                 log(`Erreur API: ${error.message}`, 'ERROR');
@@ -482,602 +355,103 @@
         }
         
         async function testConnection() {
-            config.apiKey = document.getElementById('apiKey').value;
-            config.secretKey = document.getElementById('secretKey').value;
-            config.passphrase = document.getElementById('passphrase').value;
-            
-            if (!config.apiKey || !config.secretKey || !config.passphrase) {
-                alert('Veuillez remplir tous les champs API');
-                return;
-            }
-            
-            log('🔄 Test de connexion à Bitget Futures...');
+            saveKeys();
+            log('🔄 Test de connexion...');
             
             const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
             
             if (result && result.code === '00000') {
                 document.getElementById('connectionStatus').classList.add('online');
-                document.getElementById('connectionText').textContent = 'Connecté (Futures)';
-                log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
-                await refreshBalance();
+                document.getElementById('connectionText').textContent = 'Connecté';
+                log('✅ Connexion réussie!', 'SUCCESS');
                 return true;
             } else {
-                log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
+                log('❌ Échec de la connexion', 'ERROR');
                 return false;
-            }
-        }
-        
-        async function refreshBalance() {
-            const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
-            
-            if (result && result.data && result.data.length > 0) {
-                const account = result.data[0];
-                balance.USDT = parseFloat(account.available || 0);
-                balance.totalEquity = parseFloat(account.usdtEquity || account.equity || 0);
-                
-                document.getElementById('usdtBalance').textContent = balance.USDT.toFixed(2);
-                document.getElementById('totalEquity').textContent = balance.totalEquity.toFixed(2);
-                
-                const usedCapital = openPositions.reduce((sum, pos) => sum + pos.size, 0);
-                const availableCapital = balance.totalEquity * (config.capitalPercent / 100) * config.leverage - usedCapital;
-                
-                document.getElementById('usedCapital').textContent = usedCapital.toFixed(2);
-                document.getElementById('availableCapital').textContent = Math.max(0, availableCapital).toFixed(2);
-                
-                log('💰 Balance mise à jour', 'INFO');
-            } else {
-                log('⚠️ Impossible de récupérer la balance', 'WARNING');
             }
         }
         
         async function scanTop20Volume() {
-            try {
-                log('🔍 Scan des volumes TOP 20 en cours...', 'INFO');
+            log('🔍 Scan TOP 20...');
+            const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+            const data = await response.json();
+            
+            if (data.code === '00000' && data.data) {
+                top20Pairs = data.data
+                    .filter(pair => parseFloat(pair.usdtVolume || 0) > 10000000)
+                    .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
+                    .slice(0, 20);
                 
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
-                const data = await response.json();
-                
-                if (data.code === '00000' && data.data) {
-                    const validPairs = data.data
-                        .filter(pair => {
-                            const volume = parseFloat(pair.usdtVolume || 0);
-                            return volume > 10000000 && pair.symbol.endsWith('USDT');
-                        })
-                        .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                        .slice(0, 20);
-                    
-                    top20Pairs = validPairs;
-                    currentScanIndex = 0;
-                    
-                    updateTop20Display();
-                    
-                    const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
-                    log(`✅ TOP 20 mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
-                    
-                    validPairs.slice(0, 5).forEach((pair, index) => {
-                        log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
-                    });
-                    
-                    document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
-                    return true;
-                } else {
-                    log('❌ Erreur lors du scan des volumes', 'ERROR');
-                    return false;
-                }
-            } catch (error) {
-                log(`❌ Erreur scanner: ${error.message}`, 'ERROR');
-                return false;
+                updateTop20Display();
+                log(`✅ TOP 20 mis à jour: ${top20Pairs.length} paires`, 'SUCCESS');
             }
         }
         
         function updateTop20Display() {
             const container = document.getElementById('top20List');
             container.innerHTML = '';
-            
             top20Pairs.forEach((pair, index) => {
                 const item = document.createElement('div');
                 item.className = 'pair-item';
-                if (index === currentScanIndex) {
-                    item.classList.add('scanning');
-                }
-                
-                item.innerHTML = `
-                    <span>#${index + 1} ${pair.symbol}</span>
-                    <span>${formatNumber(pair.usdtVolume)}</span>
-                `;
+                item.innerHTML = `<span>#${index + 1} ${pair.symbol}</span><span>${formatNumber(pair.usdtVolume)}</span>`;
                 container.appendChild(item);
             });
         }
         
-        async function getKlineData(symbol, limit = 50) {
-            try {
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=5m&limit=${limit}`);
-                const data = await response.json();
-                
-                if (data.code === '00000' && data.data) {
-                    return data.data.map(candle => ({
-                        timestamp: parseInt(candle[0]),
-                        open: parseFloat(candle[1]),
-                        high: parseFloat(candle[2]),
-                        low: parseFloat(candle[3]),
-                        close: parseFloat(candle[4]),
-                        volume: parseFloat(candle[5])
-                    })).reverse();
-                }
-            } catch (error) {
-                console.error(`Erreur klines ${symbol}:`, error);
-            }
-            return [];
+        function formatNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            return num.toFixed(2);
         }
         
-        function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-            if (prices.length < slowPeriod + signalPeriod) {
-                return { macd: 0, signal: 0, histogram: 0, crossover: false };
-            }
+        async function testOrder(symbol) {
+            log(`🧪 TEST ORDRE avec ISOLATED: ${symbol}`, 'INFO');
             
-            function calculateEMA(data, period) {
-                const multiplier = 2 / (period + 1);
-                let ema = data[0];
-                const result = [ema];
-                
-                for (let i = 1; i < data.length; i++) {
-                    ema = (data[i] * multiplier) + (ema * (1 - multiplier));
-                    result.push(ema);
-                }
-                return result;
-            }
-            
-            const ema12 = calculateEMA(prices, fastPeriod);
-            const ema26 = calculateEMA(prices, slowPeriod);
-            
-            const macdLine = [];
-            for (let i = slowPeriod - 1; i < prices.length; i++) {
-                macdLine.push(ema12[i] - ema26[i]);
-            }
-            
-            const signalLine = calculateEMA(macdLine, signalPeriod);
-            
-            const currentMacd = macdLine[macdLine.length - 1];
-            const previousMacd = macdLine[macdLine.length - 2];
-            const currentSignal = signalLine[signalLine.length - 1];
-            const previousSignal = signalLine[signalLine.length - 2];
-            
-            const currentHistogram = currentMacd - currentSignal;
-            
-            const crossover = (previousMacd <= previousSignal) && (currentMacd > currentSignal);
-            
-            return {
-                macd: currentMacd,
-                signal: currentSignal,
-                histogram: currentHistogram,
-                crossover: crossover,
-                macdLine: macdLine,
-                signalLine: signalLine
+            const orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "isolated", // 🔧 FORCÉ ISOLATED
+                marginCoin: "USDT",
+                size: "5",
+                side: "buy",
+                tradeSide: "open", 
+                orderType: "market",
+                clientOid: `test_${Date.now()}`
             };
-        }
-        
-        async function analyzePairMACD(symbol) {
-            try {
-                log(`🔧 DEBUG: Début analyse ${symbol}`, 'INFO');
-                
-                // Récupérer les données klines 5 minutes
-                const klines = await getKlineData(symbol, 50);
-                log(`🔧 DEBUG: ${symbol} - ${klines.length} klines récupérées`, 'INFO');
-                
-                if (klines.length < 35) {
-                    log(`⚠️ ${symbol}: Données insuffisantes (${klines.length} klines)`, 'WARNING');
-                    return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
-                }
-                
-                // Extraire les prix de clôture
-                const closePrices = klines.map(k => k.close);
-                const currentPrice = closePrices[closePrices.length - 1];
-                const volume24h = klines.slice(-288).reduce((sum, k) => sum + k.volume, 0);
-                
-                log(`🔧 DEBUG: ${symbol} - Prix: ${currentPrice}, Volume: ${volume24h}`, 'INFO');
-                
-                // Calculer MACD
-                const macdData = calculateMACD(closePrices);
-                log(`🔧 DEBUG: ${symbol} - MACD: ${macdData.macd.toFixed(4)}, Signal: ${macdData.signal.toFixed(4)}, Crossover: ${macdData.crossover}`, 'INFO');
-                
-                let macdSignal = 'HOLD';
-                let signalStrength = 0;
-                let reason = '';
-                
-                if (macdData.crossover) {
-                    macdSignal = 'BUY';
-                    signalStrength = Math.abs(macdData.histogram) * 100 + (volume24h / 1000000);
-                    reason = `Croisement MACD haussier détecté! MACD: ${macdData.macd.toFixed(4)} > Signal: ${macdData.signal.toFixed(4)}`;
-                } else {
-                    reason = `Pas de croisement. MACD: ${macdData.macd.toFixed(4)}, Signal: ${macdData.signal.toFixed(4)}`;
-                }
-                
-                return {
-                    symbol,
-                    signal: macdSignal,
-                    strength: signalStrength,
-                    price: currentPrice,
-                    volume24h: volume24h,
-                    macd: macdData.macd,
-                    macdSignal: macdData.signal,
-                    histogram: macdData.histogram,
-                    crossover: macdData.crossover,
-                    reason: reason
-                };
-                
-            } catch (error) {
-                log(`❌ ERREUR ANALYSE ${symbol}: ${error.message}`, 'ERROR');
-                console.error(`Erreur analyse MACD ${symbol}:`, error);
-                return { symbol, signal: 'HOLD', strength: 0, reason: `Erreur: ${error.message}` };
-            }
-        }
-        
-        function calculatePositionSize() {
-            const maxPositionValue = (balance.totalEquity * config.capitalPercent / 100) * config.leverage;
-            return Math.max(maxPositionValue, 10);
-        }
-        
-        function hasOpenPosition(symbol) {
-            return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
-        }
-        
-        async function openPosition(symbol, analysis) {
-            if (hasOpenPosition(symbol)) {
-                return false;
-            }
             
-            const positionSize = calculatePositionSize();
-            if (positionSize < 10) {
-                log(`⚠️ Capital insuffisant pour ouvrir position sur ${symbol}`, 'WARNING');
-                return false;
-            }
+            log(`🔧 Données: ${JSON.stringify(orderData)}`, 'INFO');
             
-            try {
-                // 1. Ouvrir la position LONG
-                const orderData = {
-                    symbol: symbol,
-                    productType: "USDT-FUTURES",
-                    marginMode: "cross",
-                    marginCoin: "USDT",
-                    size: (positionSize / analysis.price).toFixed(6), // Convertir en quantité
-                    price: "",
-                    side: "buy",
-                    tradeSide: "open",
-                    orderType: "market",
-                    force: "gtc",
-                    clientOid: `${Date.now()}_${symbol}`
-                };
-                
-                log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-                log(`🔧 DEBUG: Données ordre: ${JSON.stringify(orderData)}`, 'INFO');
-                
-                const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
-                    method: 'POST',
-                    body: JSON.stringify(orderData)
-                });
-                
-                log(`🔧 DEBUG: Réponse API: ${JSON.stringify(orderResult)}`, 'INFO');
-                
-                if (!orderResult || orderResult.code !== '00000') {
-                    log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || 'Erreur inconnue'}`, 'ERROR');
-                    return false;
-                }
-                
-                log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
-                
-                // 2. Configurer immédiatement le trailing stop automatique Bitget
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre que l'ordre soit rempli
-                
-                const trailingStopData = {
-                    planType: "track_plan",
-                    symbol: symbol,
-                    productType: "USDT-FUTURES",
-                    marginMode: "cross",
-                    marginCoin: "USDT",
-                    size: (positionSize / analysis.price).toFixed(6),
-                    callbackRatio: config.trailingStop.toString(), // 1% callback
-                    triggerPrice: analysis.price.toString(),
-                    triggerType: "mark_price",
-                    side: "sell",
-                    tradeSide: "close",
-                    orderType: "market",
-                    clientOid: `trail_${Date.now()}_${symbol}`,
-                    reduceOnly: "YES"
-                };
-                
-                log(`🔄 Configuration trailing stop ${config.trailingStop}% pour ${symbol}...`, 'INFO');
-                const trailingResult = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
-                    method: 'POST',
-                    body: JSON.stringify(trailingStopData)
-                });
-                
-                if (trailingResult && trailingResult.code === '00000') {
-                    log(`✅ Trailing Stop configuré: ${symbol} - ${config.trailingStop}% callback`, 'SUCCESS');
-                } else {
-                    log(`⚠️ Échec config trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur'}`, 'WARNING');
-                }
-                
-                // 3. Enregistrer la position localement
-                const position = {
-                    id: Date.now(),
-                    symbol: symbol,
-                    side: 'LONG',
-                    size: positionSize,
-                    entryPrice: analysis.price,
-                    status: 'OPEN',
-                    timestamp: new Date().toISOString(),
-                    orderId: orderResult.data.orderId,
-                    trailingStopId: trailingResult?.data?.orderId || null,
-                    reason: analysis.reason
-                };
-                
-                openPositions.push(position);
-                botStats.totalPositions++;
-                
-                log(`🚀 Position complète: ${symbol} LONG ${positionSize.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
-                log(`🎯 Raison: ${analysis.reason}`, 'INFO');
-                log(`🔒 Trailing Stop Bitget actif à ${config.trailingStop}%`, 'SUCCESS');
-                
-                updatePositionsDisplay();
-                await refreshBalance();
-                
-                return true;
-            } catch (error) {
-                log(`❌ Erreur ouverture position ${symbol}: ${error.message}`, 'ERROR');
-                return false;
-            }
-        }
-        
-        function updatePositionsDisplay() {
-            const container = document.getElementById('positionsContainer');
-            
-            if (openPositions.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Aucune position ouverte</div>';
-                return;
-            }
-            
-            container.innerHTML = '';
-            openPositions.forEach(position => {
-                const item = document.createElement('div');
-                item.className = 'position-item';
-                
-                const timeAgo = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
-                
-                item.innerHTML = `
-                    <div><strong>${position.symbol}</strong> ${position.side} - ${position.size.toFixed(2)} USDT</div>
-                    <div>Prix d'entrée: ${position.entryPrice.toFixed(4)} | Ouvert il y a ${timeAgo}min</div>
-                    <div>🔒 <span style="color: #28a745">Trailing Stop Bitget actif (${config.trailingStop}%)</span></div>
-                    <div style="font-size: 10px; color: #666;">ID: ${position.orderId || 'N/A'}</div>
-                `;
-                
-                container.appendChild(item);
+            const result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
             });
-        }
-        
-        async function tradingLoop() {
-            if (!botRunning || top20Pairs.length === 0) {
-                return;
-            }
             
-            try {
-                log('🔍 Début du cycle d\'analyse complète des TOP 20...', 'INFO');
-                
-                const allAnalyses = [];
-                const signalsDetected = [];
-                let excludedPairs = [];
-                
-                for (let i = 0; i < top20Pairs.length; i++) {
-                    const pair = top20Pairs[i];
-                    
-                    // ✅ EXCLURE LES PAIRES AVEC POSITION OUVERTE
-                    if (hasOpenPosition(pair.symbol)) {
-                        excludedPairs.push(pair.symbol);
-                        continue; // Ne pas analyser cette paire
-                    }
-                    
-                    document.getElementById('currentScanPair').textContent = `${pair.symbol} (${i + 1}/20)`;
-                    currentScanIndex = i;
-                    updateTop20Display();
-                    
-                    const analysis = await analyzePairMACD(pair.symbol);
-                    allAnalyses.push(analysis);
-                    botStats.totalScans++;
-                    
-                    // ✅ AFFICHER LE RÉSULTAT DE CHAQUE ANALYSE
-                    if (analysis.crossover) {
-                        log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
-                    } else {
-                        log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
-                    }
-                    
-                    if (analysis.signal === 'BUY' && analysis.crossover) {
-                        signalsDetected.push(analysis);
-                        log(`🚨 CROISEMENT MACD HAUSSIER DÉTECTÉ: ${analysis.symbol}`, 'SUCCESS');
-                        log(`📈 MACD: ${analysis.macd.toFixed(4)} | Signal: ${analysis.macdSignal.toFixed(4)} | Histogram: ${analysis.histogram.toFixed(4)}`, 'SUCCESS');
-                    }
-                    
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-                
-                // Log des paires exclues
-                if (excludedPairs.length > 0) {
-                    log(`🚫 ${excludedPairs.length} paires exclues (positions ouvertes): ${excludedPairs.join(', ')}`, 'INFO');
-                }
-                
-                log(`📊 Cycle terminé: ${allAnalyses.length} paires analysées, ${signalsDetected.length} signaux MACD détectés`, 'INFO');
-                
-                if (signalsDetected.length > 0) {
-                    botStats.totalSignals += signalsDetected.length;
-                    
-                    log(`🎯 ${signalsDetected.length} croisement(s) haussier(s) MACD détecté(s):`, 'SUCCESS');
-                    signalsDetected.forEach(signal => {
-                        log(`   • ${signal.symbol}: MACD ${signal.macd.toFixed(4)} > Signal ${signal.macdSignal.toFixed(4)}`, 'SUCCESS');
-                    });
-                    
-                    for (const signal of signalsDetected) {
-                        const canOpen = !hasOpenPosition(signal.symbol) && calculatePositionSize() >= 10;
-                        
-                        if (canOpen) {
-                            await openPosition(signal.symbol, signal);
-                            await new Promise(resolve => setTimeout(resolve, 2000)); // Délai entre ouvertures
-                        } else if (hasOpenPosition(signal.symbol)) {
-                            log(`⚠️ Position déjà ouverte sur ${signal.symbol}`, 'WARNING');
-                        } else {
-                            log(`⚠️ Capital insuffisant pour ${signal.symbol}`, 'WARNING');
-                        }
-                    }
-                } else {
-                    log('📊 Aucun croisement haussier MACD détecté sur les paires disponibles', 'INFO');
-                }
-                
-                document.getElementById('currentScanPair').textContent = `Cycle terminé - ${openPositions.length} positions actives`;
-                updateStats();
-                
-            } catch (error) {
-                log(`❌ Erreur dans la boucle de trading: ${error.message}`, 'ERROR');
+            log(`🔧 Réponse: ${JSON.stringify(result)}`, 'INFO');
+            
+            if (result && result.code === '00000') {
+                log(`✅ ORDRE RÉUSSI! ID: ${result.data.orderId}`, 'SUCCESS');
+            } else {
+                log(`❌ Échec: ${result?.msg || 'Erreur'}`, 'ERROR');
             }
         }
         
-        async function checkPositionsStatus() {
-            if (openPositions.length === 0) return;
+        function startBot() {
+            log('🚀 Démarrage du bot avec margin mode ISOLATED forcé', 'SUCCESS');
             
-            try {
-                // Vérifier le statut des positions via l'API Bitget
-                const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
-                
-                if (result && result.code === '00000' && result.data) {
-                    const apiPositions = result.data;
-                    const currentSymbols = apiPositions.filter(pos => parseFloat(pos.total) > 0).map(pos => pos.symbol);
-                    
-                    // Identifier les positions fermées (présentes localement mais plus dans l'API)
-                    const closedPositions = openPositions.filter(localPos => 
-                        !currentSymbols.includes(localPos.symbol)
-                    );
-                    
-                    // Traiter les positions fermées
-                    for (const closedPos of closedPositions) {
-                        log(`🔚 Position fermée détectée: ${closedPos.symbol} (Trailing Stop Bitget)`, 'SUCCESS');
-                        
-                        // Calculer le P&L estimé (on ne peut pas avoir le prix exact de fermeture via cette API)
-                        log(`💰 Position ${closedPos.symbol} fermée par trailing stop à ${config.trailingStop}%`, 'SUCCESS');
-                        
-                        // Retirer de la liste locale
-                        openPositions = openPositions.filter(pos => pos.id !== closedPos.id);
-                    }
-                    
-                    if (closedPositions.length > 0) {
-                        updatePositionsDisplay();
-                        await refreshBalance();
-                        log(`📊 ${closedPositions.length} position(s) fermée(s) - Analyse reprendra sur ces paires`, 'INFO');
-                    }
-                }
-            } catch (error) {
-                log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
+            // Test immédiat avec la première paire
+            if (top20Pairs.length > 0) {
+                testOrder(top20Pairs[0].symbol);
+            } else {
+                log('⚠️ Scannez d\'abord le TOP 20', 'WARNING');
             }
-        }
-        
-        async function closePosition(position, reason) {
-            // Cette fonction n'est plus utilisée car Bitget gère automatiquement
-            // le trailing stop. On garde juste pour compatibilité.
-            log(`🔚 Position fermée automatiquement par Bitget: ${position.symbol}`, 'SUCCESS');
-        }
-        
-        async function startBot() {
-            if (!config.apiKey) {
-                const connected = await testConnection();
-                if (!connected) {
-                    alert('Veuillez d\'abord établir la connexion API');
-                    return;
-                }
-            }
-            
-            config.capitalPercent = parseFloat(document.getElementById('capitalPercent').value);
-            config.leverage = parseFloat(document.getElementById('leverage').value);
-            config.trailingStop = parseFloat(document.getElementById('trailingStop').value);
-            
-            if (config.capitalPercent < 1 || config.capitalPercent > 20) {
-                alert('Le pourcentage de capital doit être entre 1% et 20%');
-                return;
-            }
-            
-            const scanSuccess = await scanTop20Volume();
-            if (!scanSuccess) {
-                alert('Impossible de scanner le TOP 20. Vérifiez la connexion.');
-                return;
-            }
-            
-            botRunning = true;
-            botStartTime = Date.now();
-            botStats = { totalScans: 0, totalSignals: 0, totalPositions: 0 };
-            
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-            
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 avec Trailing Stop Bitget', 'SUCCESS');
-            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop NATIF`, 'INFO');
-            log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
-            log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
-            log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
-            log(`🔒 Trailing Stop: Géré automatiquement par l'API Bitget`, 'SUCCESS');
-            
-            tradingLoopInterval = setInterval(tradingLoop, 60000);
-            volumeScanInterval = setInterval(scanTop20Volume, 300000);
-            statsInterval = setInterval(() => {
-                updateStats();
-                updateTrailingStops();
-            }, 10000);
-            
-            tradingLoop();
         }
         
         function stopBot() {
-            botRunning = false;
-            
-            if (tradingLoopInterval) clearInterval(tradingLoopInterval);
-            if (volumeScanInterval) clearInterval(volumeScanInterval);
-            if (statsInterval) clearInterval(statsInterval);
-            
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            document.getElementById('currentScanPair').textContent = '--';
-            
             log('🛑 Bot arrêté', 'INFO');
-            log(`📊 Session terminée: ${botStats.totalScans} scans, ${botStats.totalSignals} signaux`, 'INFO');
         }
         
-        window.onload = async function() {
-            log('🔧 Initialisation du bot MACD TOP 20 (CYCLE COMPLET)...', 'INFO');
-            
-            try {
-                const response = await fetch(`${API_BASE}/test`);
-                const data = await response.json();
-                log(`✅ Proxy connecté: ${data.message || 'API accessible'}`, 'SUCCESS');
-            } catch (error) {
-                log(`❌ Erreur proxy: ${error.message}`, 'ERROR');
-            }
-            
-            log('🔍 Pré-chargement du TOP 20 sans authentification...', 'INFO');
-            try {
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
-                const data = await response.json();
-                
-                if (data.code === '00000' && data.data) {
-                    const validPairs = data.data
-                        .filter(pair => parseFloat(pair.usdtVolume || 0) > 10000000)
-                        .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                        .slice(0, 20);
-                    
-                    top20Pairs = validPairs;
-                    updateTop20Display();
-                    
-                    log(`✅ TOP 20 pré-chargé: ${validPairs.length} paires disponibles`, 'SUCCESS');
-                    document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
-                }
-            } catch (error) {
-                log(`⚠️ Pré-chargement TOP 20 échoué: ${error.message}`, 'WARNING');
-            }
-            
-            log('✅ Bot prêt! Configurez vos clés API et cliquez sur "Démarrer Stratégie"', 'SUCCESS');
+        window.onload = function() {
+            log('✅ Bot initialisé - Version ISOLATED FORCÉ', 'SUCCESS');
         };
     </script>
 </body>
