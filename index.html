@@ -156,7 +156,7 @@
     <div class="container">
         <div class="header">
             <h1>🔧 Bot Bitget Simplifié</h1>
-            <p>Debug Margin Mode - Trading Manuel BTC/ETH</p>
+            <p>Debug Margin Mode - Trading Manuel EGLD/ADA</p>
         </div>
         
         <!-- Configuration API -->
@@ -192,14 +192,14 @@
             <div class="crypto-selector">
                 <label>Crypto:</label>
                 <select id="cryptoSelect">
-                    <option value="BTCUSDT">Bitcoin (BTC)</option>
-                    <option value="ETHUSDT">Ethereum (ETH)</option>
+                    <option value="EGLDUSDT">MultiversX (EGLD)</option>
+                    <option value="ADAUSDT">Cardano (ADA)</option>
                 </select>
             </div>
             
             <div class="trading-controls">
                 <button class="btn btn-success" onclick="openLongPosition()" id="openBtn">
-                    📈 Ouvrir Position LONG (10$)
+                    📈 Ouvrir Position LONG (50$)
                 </button>
                 <button class="btn btn-danger" onclick="closePosition()" id="closeBtn">
                     📉 Fermer Position
@@ -353,12 +353,187 @@
                 }
             }
             
-            // Calculer la quantité pour 10$ (taille en nombre de coins, pas en USDT)
-            const quantity = (10 / currentPrice).toFixed(6);
-            log(`📊 Quantité calculée: ${quantity} ${symbol.replace('USDT', '')} (~10$)`);
+            // Calculer la quantité pour 50$ (taille en nombre de coins, pas en USDT)
+            const quantity = (50 / currentPrice).toFixed(6);
+            log(`📊 Quantité calculée: ${quantity} ${symbol.replace('USDT', '')} (~50$)`);
             
             // Test 1: marginMode = isolated (le mode configuré automatiquement)
-            log('🧪 TEST 1: marginMode = isolated + quantité correcte');
+            log('🧪 TEST 1: marginMode = isolated + quantité 50
+            
+            log(`📤 Données ordre: ${JSON.stringify(orderData, null, 2)}`);
+            
+            let result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS avec marginMode = isolated!');
+                log(`🎉 Position ouverte: ${quantity} ${symbol.replace('USDT', '')} (~50$)`);
+                log(`📝 Order ID: ${result.data.orderId}`);
+                return;
+            }
+            
+            // Test 2: Quantité plus petite (25$)
+            log('🧪 TEST 2: Quantité réduite (25$)');
+            const smallerQuantity = (25 / currentPrice).toFixed(6);
+            orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "isolated",
+                marginCoin: "USDT",
+                size: smallerQuantity,
+                side: "buy",
+                tradeSide: "open",
+                orderType: "market",
+                clientOid: `test2_${Date.now()}`
+            };
+            
+            result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS avec quantité réduite!');
+                log(`🎉 Position ouverte: ${smallerQuantity} ${symbol.replace('USDT', '')} (~25$)`);
+                return;
+            }
+            
+            // Test 3: Force marginMode cross (même si configuré en isolated)
+            log('🧪 TEST 3: Force marginMode = cross');
+            orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "cross",
+                marginCoin: "USDT",
+                size: smallerQuantity,
+                side: "buy",
+                tradeSide: "open",
+                orderType: "market",
+                clientOid: `test3_${Date.now()}`
+            };
+            
+            result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS avec marginMode = cross!');
+                log(`🎉 Position ouverte: ${smallerQuantity} ${symbol.replace('USDT', '')} (~25$)`);
+                return;
+            }
+            
+            // Test 4: Configuration minimale (sans marginMode)
+            log('🧪 TEST 4: Sans marginMode (laisser l\'API décider)');
+            orderData = {
+                symbol: symbol,
+                productType: "USDT-FUTURES",
+                marginCoin: "USDT",
+                size: smallerQuantity,
+                side: "buy",
+                tradeSide: "open",
+                orderType: "market",
+                clientOid: `test4_${Date.now()}`
+            };
+            
+            result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                method: 'POST',
+                body: JSON.stringify(orderData)
+            });
+            
+            if (result && result.code === '00000') {
+                log('✅ SUCCÈS sans marginMode!');
+                log(`🎉 Position ouverte: ${smallerQuantity} ${symbol.replace('USDT', '')} (~25$)`);
+                return;
+            }
+            
+            log('❌ Tous les tests ont échoué.');
+            log('🔍 Vérifiez:');
+            log('   - Permissions API (Futures Trading activé)');
+            log('   - Balance suffisante pour le margin');
+            log('   - Paire disponible sur Bitget Futures');
+        }
+        
+        async function closePosition() {
+            const symbol = document.getElementById('cryptoSelect').value;
+            log(`📉 Fermeture de toutes les positions ${symbol}...`);
+            
+            // D'abord vérifier les positions ouvertes
+            const posResult = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+            
+            if (posResult && posResult.code === '00000' && posResult.data) {
+                const positions = posResult.data.filter(pos => 
+                    pos.symbol === symbol && parseFloat(pos.total) > 0
+                );
+                
+                if (positions.length === 0) {
+                    log(`⚠️ Aucune position ouverte sur ${symbol}`);
+                    return;
+                }
+                
+                for (const position of positions) {
+                    log(`🔄 Fermeture position: ${position.total} ${symbol}`);
+                    
+                    const closeData = {
+                        symbol: symbol,
+                        productType: "USDT-FUTURES",
+                        marginMode: position.marginMode,
+                        marginCoin: "USDT",
+                        size: Math.abs(parseFloat(position.total)).toString(),
+                        side: position.side === "long" ? "sell" : "buy",
+                        tradeSide: "close",
+                        orderType: "market",
+                        clientOid: `close_${Date.now()}`
+                    };
+                    
+                    const result = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+                        method: 'POST',
+                        body: JSON.stringify(closeData)
+                    });
+                    
+                    if (result && result.code === '00000') {
+                        log('✅ Position fermée avec succès!');
+                    } else {
+                        log(`❌ Échec fermeture: ${result?.msg || 'Erreur'}`);
+                    }
+                }
+            }
+        }
+        
+        async function checkPositions() {
+            log('🔍 Vérification des positions...');
+            
+            const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+            
+            if (result && result.code === '00000' && result.data) {
+                const openPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+                
+                if (openPositions.length === 0) {
+                    log('📊 Aucune position ouverte');
+                } else {
+                    log(`📊 ${openPositions.length} position(s) ouverte(s):`);
+                    openPositions.forEach(pos => {
+                        log(`   • ${pos.symbol}: ${pos.total} (${pos.side}) - PnL: ${pos.unrealizedPL} USDT`);
+                    });
+                }
+            }
+        }
+        
+        // Initialisation
+        window.onload = function() {
+            log('🚀 Bot simplifié chargé - Prêt pour les tests!');
+            log('📋 Instructions:');
+            log('1. Configurez vos clés API Bitget');
+            log('2. Testez la connexion');
+            log('3. Configurez le levier 2x');
+            log('4. Tentez d\'ouvrir une position');
+            log('');
+        };
+    </script>
+</body>
+</html>);
             let orderData = {
                 symbol: symbol,
                 productType: "USDT-FUTURES",
