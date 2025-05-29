@@ -217,7 +217,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 15:35 - API WORKING VERSION</div>
+    <div class="version">📅 29/05/2025 - 15:35 - API CORRIGÉE</div>
     
     <div class="container">
         <div class="header">
@@ -578,7 +578,6 @@
             });
         }
         
-        // ✅ FONCTION DE CONFIGURATION DU LEVIER (SOLUTION QUI MARCHE)
         async function setLeverage(symbol, leverage) {
             log(`⚡ Configuration du levier ${leverage}x pour ${symbol}...`, 'INFO');
             
@@ -603,7 +602,6 @@
             }
         }
         
-        // ✅ RÉCUPÉRATION DES KLINES POUR MACD
         async function getKlineData(symbol, limit = 50) {
             try {
                 const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=5m&limit=${limit}`);
@@ -625,7 +623,6 @@
             return [];
         }
         
-        // ✅ CALCUL MACD RÉEL
         function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
             if (prices.length < slowPeriod + signalPeriod) {
                 return { macd: 0, signal: 0, histogram: 0, crossover: false };
@@ -672,7 +669,6 @@
             };
         }
         
-        // ✅ ANALYSE MACD D'UNE PAIRE
         async function analyzePairMACD(symbol) {
             try {
                 const klines = await getKlineData(symbol, 50);
@@ -728,7 +724,6 @@
             return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
         }
         
-        // ✅ OUVERTURE DE POSITION (SOLUTION QUI MARCHE)
         async function openPosition(symbol, analysis) {
             if (hasOpenPosition(symbol)) {
                 return false;
@@ -741,27 +736,23 @@
             }
             
             try {
-                // 1. CONFIGURER LE LEVIER EN PREMIER (OBLIGATOIRE)
+                // 1. CONFIGURER LE LEVIER EN PREMIER
                 await setLeverage(symbol, config.leverage);
-                await new Promise(resolve => setTimeout(resolve, 500)); // Délai
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // 2. CALCULER LA QUANTITÉ EN TOKENS (PAS EN USDT)
+                // 2. CALCULER LA QUANTITÉ EN TOKENS
                 const quantity = (positionValue / analysis.price).toFixed(6);
                 
                 log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
                 log(`💰 Prix: ${analysis.price} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT`, 'INFO');
                 
+                // 3. ORDRE D'ACHAT - CORRECTION ICI
                 const orderData = {
                     symbol: symbol,
                     productType: "USDT-FUTURES",
-                    marginMode: "isolated", // ✅ SOLUTION QUI MARCHE
+                    marginMode: "isolated",
                     marginCoin: "USDT",
-                const orderData = {
-                    symbol: symbol,
-                    productType: "USDT-FUTURES",
-                    marginMode: "isolated", // ✅ SOLUTION QUI MARCHE
-                    marginCoin: "USDT",
-                    size: quantity, // ✅ QUANTITÉ EN TOKENS (PAS EN USDT)
+                    size: quantity,
                     side: "buy",
                     tradeSide: "open",
                     orderType: "market",
@@ -780,7 +771,7 @@
                 
                 log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
                 
-                // 3. CONFIGURER LE TRAILING STOP BITGET
+                // 4. CONFIGURER LE TRAILING STOP BITGET
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 const trailingStopData = {
@@ -812,7 +803,7 @@
                     log(`⚠️ Échec config trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur'}`, 'WARNING');
                 }
                 
-                // 4. ENREGISTRER LA POSITION LOCALEMENT
+                // 5. ENREGISTRER LA POSITION LOCALEMENT
                 const position = {
                     id: Date.now(),
                     symbol: symbol,
@@ -870,7 +861,6 @@
             });
         }
         
-        // ✅ VÉRIFICATION DES POSITIONS FERMÉES PAR BITGET 
         async function checkPositionsStatus() {
             if (openPositions.length === 0) return;
             
@@ -903,7 +893,6 @@
             }
         }
         
-        // ✅ BOUCLE DE TRADING PRINCIPALE
         async function tradingLoop() {
             if (!botRunning || top20Pairs.length === 0) {
                 return;
@@ -919,7 +908,6 @@
                 for (let i = 0; i < top20Pairs.length; i++) {
                     const pair = top20Pairs[i];
                     
-                    // ✅ EXCLURE LES PAIRES AVEC POSITION OUVERTE
                     if (hasOpenPosition(pair.symbol)) {
                         excludedPairs.push(pair.symbol);
                         continue;
@@ -933,7 +921,6 @@
                     allAnalyses.push(analysis);
                     botStats.totalScans++;
                     
-                    // ✅ AFFICHER LE RÉSULTAT DE CHAQUE ANALYSE
                     if (analysis.crossover) {
                         log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
                     } else {
@@ -1051,7 +1038,7 @@
         }
         
         window.onload = async function() {
-            log('🔧 Initialisation du bot MACD TOP 20 (API FONCTIONNELLE)...', 'INFO');
+            log('🔧 Initialisation du bot MACD TOP 20 (API CORRIGÉE)...', 'INFO');
             
             try {
                 const response = await fetch(`${API_BASE}/test`);
