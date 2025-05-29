@@ -217,7 +217,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 15:15 - SUCCESS! API WORKS</div>
+    <div class="version">📅 29/05/2025 - 15:20 - MULTI-ASSET FIX</div>
     
     <div class="container">
         <div class="header">
@@ -405,14 +405,14 @@
         }
         
         async function testOrder(symbol) {
-            log(`🧪 TEST ORDRE avec ISOLATED: ${symbol}`, 'INFO');
+            log(`🧪 TEST ORDRE avec CROSS (Multi-Asset): ${symbol}`, 'INFO');
             
             const orderData = {
                 symbol: symbol,
-                productType: "USDT-FUTURES",
-                marginMode: "isolated",
+                productType: "USDT-FUTURES", 
+                marginMode: "cross", // 🔧 CROSS pour Multi-Asset Mode
                 marginCoin: "USDT",
-                size: "10", // Test avec 10 USDT (vous avez 135$)
+                size: "10",
                 side: "buy",
                 tradeSide: "open", 
                 orderType: "market",
@@ -430,12 +430,10 @@
             
             if (result && result.code === '00000') {
                 log(`✅ ORDRE RÉUSSI! ID: ${result.data.orderId}`, 'SUCCESS');
-                log(`🎉 L'API FONCTIONNE! On peut maintenant remettre tout le code MACD!`, 'SUCCESS');
+                log(`🎉 L'API FONCTIONNE PARFAITEMENT! Multi-Asset + Cross = OK!`, 'SUCCESS');
+                log(`🚀 PRÊT À REMETTRE TOUT LE CODE MACD COMPLET!`, 'SUCCESS');
             } else {
                 log(`❌ Échec: ${result?.msg || 'Erreur'}`, 'ERROR');
-                if (result?.msg?.includes('balance')) {
-                    log(`💡 Vérifiez que BTCUSDT a assez de marge en mode isolated`, 'INFO');
-                }
             }
         }
         
