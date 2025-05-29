@@ -183,7 +183,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 Mis à jour: 29/05/2025 10:25 - Proxy APIs publiques</div></div>
+    <div class="version">📅 Mis à jour: 29/05/2025 10:30 - Fix format réponse prix</div></div></div>
     
     <div class="container">
         <div class="header">
@@ -466,10 +466,12 @@
                 const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${config.symbol}`);
                 const data = await response.json();
                 
-                if (data.code === '00000' && data.data) {
-                    currentPrice = parseFloat(data.data.lastPr);
+                if (data.code === '00000' && data.data && data.data.length > 0) {
+                    // CORRECTION: data.data est un array !
+                    currentPrice = parseFloat(data.data[0].lastPr);
                     document.getElementById('currentPrice').textContent = `${currentPrice.toLocaleString()} USDT`;
                     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                    log(`💰 Prix BTC: ${currentPrice.toLocaleString()} USDT`, 'SUCCESS');
                     return currentPrice;
                 } else {
                     log(`Erreur API prix: ${data.msg || JSON.stringify(data)}`, 'ERROR');
