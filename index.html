@@ -217,7 +217,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 12:40</div>
+    <div class="version">📅 29/05/2025 - 12:46</div>
     
     <div class="container">
         <div class="header">
@@ -749,10 +749,14 @@
                 };
                 
                 log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
+                log(`🔧 DEBUG: Données ordre: ${JSON.stringify(orderData)}`, 'INFO');
+                
                 const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
                     method: 'POST',
                     body: JSON.stringify(orderData)
                 });
+                
+                log(`🔧 DEBUG: Réponse API: ${JSON.stringify(orderResult)}`, 'INFO');
                 
                 if (!orderResult || orderResult.code !== '00000') {
                     log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || 'Erreur inconnue'}`, 'ERROR');
