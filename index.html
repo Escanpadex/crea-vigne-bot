@@ -183,7 +183,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 Mis à jour: 29/05/2025 00:10 - Fix prix</div>
+    <div class="version">📅 Mis à jour: 29/05/2025 10:15 - Prix publics directs</div>
     
     <div class="container">
         <div class="header">
@@ -459,11 +459,11 @@
             }
         }
         
-        // Récupérer le prix actuel via le proxy
+        // Récupérer le prix actuel (API publique directe)
         async function getCurrentPrice() {
             try {
-                // Utiliser le proxy au lieu d'appeler directement Bitget
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${config.symbol}`);
+                // API publique - pas besoin du proxy ni d'authentification
+                const response = await fetch(`https://api.bitget.com/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${config.symbol}`);
                 const data = await response.json();
                 
                 if (data.code === '00000' && data.data) {
@@ -475,9 +475,10 @@
                     log(`Erreur API prix: ${data.msg || 'Réponse invalide'}`, 'ERROR');
                 }
             } catch (error) {
-                log(`Erreur prix: ${error.message}`, 'ERROR');
+                log(`Erreur prix (CORS bloqué): ${error.message}`, 'WARNING');
+                log(`💡 Bitget bloque les requêtes directes depuis le navigateur`, 'INFO');
+                return null;
             }
-            return null;
         }
         
         // Calcul MACD simplifié
