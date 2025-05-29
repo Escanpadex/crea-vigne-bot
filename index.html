@@ -868,9 +868,17 @@
                     allAnalyses.push(analysis);
                     botStats.totalScans++;
                     
+                    // ✅ AFFICHER LE RÉSULTAT DE CHAQUE ANALYSE
+                    if (analysis.crossover) {
+                        log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
+                    } else {
+                        log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
+                    }
+                    
                     if (analysis.signal === 'BUY' && analysis.crossover) {
                         signalsDetected.push(analysis);
-                        log(`🎯 CROISEMENT MACD DÉTECTÉ: ${analysis.symbol} | MACD: ${analysis.macd.toFixed(4)} > Signal: ${analysis.macdSignal.toFixed(4)}`, 'SUCCESS');
+                        log(`🚨 CROISEMENT MACD HAUSSIER DÉTECTÉ: ${analysis.symbol}`, 'SUCCESS');
+                        log(`📈 MACD: ${analysis.macd.toFixed(4)} | Signal: ${analysis.macdSignal.toFixed(4)} | Histogram: ${analysis.histogram.toFixed(4)}`, 'SUCCESS');
                     }
                     
                     await new Promise(resolve => setTimeout(resolve, 200));
