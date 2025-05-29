@@ -610,46 +610,133 @@
             });
         }
         
-        // === ANALYSE MACD D'UNE PAIRE ===
-        async function analyzePairMACD(symbol) {
+        // === RÉCUPÉRATION DES DONNÉES KLINES 5 MINUTES ===
+        async function getKlineData(symbol, limit = 50) {
             try {
-                // Récupérer les données de la paire
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${symbol}`);
+                // Récupérer les klines 5 minutes
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=5m&limit=${limit}`);
                 const data = await response.json();
                 
-                if (data.code === '00000' && data.data && data.data.length > 0) {
-                    const ticker = data.data[0];
-                    const change24h = parseFloat(ticker.change24h || 0);
-                    const volume = parseFloat(ticker.usdtVolume || 0);
-                    const price = parseFloat(ticker.lastPr || 0);
-                    
-                    // Logique de signal MACD simplifiée mais plus sophistiquée
-                    let macdSignal = 'HOLD';
-                    let signalStrength = 0;
-                    
-                    // Conditions pour signal d'achat (croisement haussier MACD simulé)
-                    if (change24h > 3 && volume > 50000000) {
-                        macdSignal = 'BUY';
-                        signalStrength = Math.min(change24h * 2, 20);
-                    } else if (change24h > 1.5 && volume > 100000000) {
-                        macdSignal = 'BUY';
-                        signalStrength = Math.min(change24h * 1.5, 15);
-                    }
-                    
-                    return {
-                        symbol,
-                        signal: macdSignal,
-                        strength: signalStrength,
-                        price,
-                        change24h,
-                        volume
-                    };
+                if (data.code === '00000' && data.data) {
+                    // Convertir en format utilisable [timestamp, open, high, low, close, volume]
+                    return data.data.map(candle => ({
+                        timestamp: parseInt(candle[0]),
+                        open: parseFloat(candle[1]),
+                        high: parseFloat(candle[2]),
+                        low: parseFloat(candle[3]),
+                        close: parseFloat(candle[4]),
+                        volume: parseFloat(candle[5])
+                    })).reverse(); // Bitget retourne du plus récent au plus ancien
                 }
             } catch (error) {
-                console.error(`Erreur analyse ${symbol}:`, error);
+                console.error(`Erreur klines ${symbol}:`, error);
+            }
+            return [];
+        }
+        
+        // === CALCUL MACD RÉEL ===
+        function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+            if (prices.length < slowPeriod + signalPeriod) {
+                return { macd: 0, signal: 0, histogram: 0, crossover: false };
             }
             
-            return { symbol, signal: 'HOLD', strength: 0 };
+            // Calcul des EMA
+            function calculateEMA(data, period) {
+                const multiplier = 2 / (period + 1);
+                let ema = data[0];
+                const result = [ema];
+                
+                for (let i = 1; i < data.length; i++) {
+                    ema = (data[i] * multiplier) + (ema * (1 - multiplier));
+                    result.push(ema);
+                }
+                return result;
+            }
+            
+            // Calculer EMA 12 et EMA 26
+            const ema12 = calculateEMA(prices, fastPeriod);
+            const ema26 = calculateEMA(prices, slowPeriod);
+            
+            // Calculer MACD line
+            const macdLine = [];
+            for (let i = slowPeriod - 1; i < prices.length; i++) {
+                macdLine.push(ema12[i] - ema26[i]);
+            }
+            
+            // Calculer Signal line (EMA 9 du MACD)
+            const signalLine = calculateEMA(macdLine, signalPeriod);
+            
+            // Récupérer les 2 dernières valeurs pour détecter le croisement
+            const currentMacd = macdLine[macdLine.length - 1];
+            const previousMacd = macdLine[macdLine.length - 2];
+            const currentSignal = signalLine[signalLine.length - 1];
+            const previousSignal = signalLine[signalLine.length - 2];
+            
+            // Calculer histogram
+            const currentHistogram = currentMacd - currentSignal;
+            
+            // Détecter croisement haussier : MACD croise au-dessus de Signal
+            const crossover = (previousMacd <= previousSignal) && (currentMacd > currentSignal);
+            
+            return {
+                macd: currentMacd,
+                signal: currentSignal,
+                histogram: currentHistogram,
+                crossover: crossover,
+                macdLine: macdLine,
+                signalLine: signalLine
+            };
+        }
+        
+        // === ANALYSE MACD D'UNE PAIRE (CORRIGÉE) ===
+        async function analyzePairMACD(symbol) {
+            try {
+                // Récupérer les données klines 5 minutes
+                const klines = await getKlineData(symbol, 50);
+                
+                if (klines.length < 35) {
+                    return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
+                }
+                
+                // Extraire les prix de clôture
+                const closePrices = klines.map(k => k.close);
+                const currentPrice = closePrices[closePrices.length - 1];
+                const volume24h = klines.slice(-288).reduce((sum, k) => sum + k.volume, 0); // 24h = 288 périodes de 5min
+                
+                // Calculer MACD
+                const macdData = calculateMACD(closePrices);
+                
+                let macdSignal = 'HOLD';
+                let signalStrength = 0;
+                let reason = '';
+                
+                // ✅ CONDITION EXACTE : Croisement haussier MACD détecté
+                if (macdData.crossover) {
+                    macdSignal = 'BUY';
+                    // Force du signal basée sur l'amplitude du histogram et du volume
+                    signalStrength = Math.abs(macdData.histogram) * 100 + (volume24h / 1000000);
+                    reason = `Croisement MACD haussier détecté! MACD: ${macdData.macd.toFixed(4)} > Signal: ${macdData.signal.toFixed(4)}`;
+                } else {
+                    reason = `Pas de croisement. MACD: ${macdData.macd.toFixed(4)}, Signal: ${macdData.signal.toFixed(4)}`;
+                }
+                
+                return {
+                    symbol,
+                    signal: macdSignal,
+                    strength: signalStrength,
+                    price: currentPrice,
+                    volume24h: volume24h,
+                    macd: macdData.macd,
+                    macdSignal: macdData.signal,
+                    histogram: macdData.histogram,
+                    crossover: macdData.crossover,
+                    reason: reason
+                };
+                
+            } catch (error) {
+                console.error(`Erreur analyse MACD ${symbol}:`, error);
+                return { symbol, signal: 'HOLD', strength: 0, reason: `Erreur: ${error.message}` };
+            }
         }
         
         // === GESTION DES POSITIONS ===
@@ -691,8 +778,9 @@
                 openPositions.push(position);
                 botStats.totalPositions++;
                 
-                log(`🚀 Position ouverte: ${symbol} LONG ${positionSize.toFixed(2)} USDT @ ${analysis.price}`, 'SUCCESS');
-                log(`📍 Trailing Stop: ${position.trailingStopPrice.toFixed(2)} (-${config.trailingStop}%)`, 'INFO');
+                log(`🚀 Position ouverte: ${symbol} LONG ${positionSize.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
+                log(`📍 Trailing Stop: ${position.trailingStopPrice.toFixed(4)} (-${config.trailingStop}%)`, 'INFO');
+                log(`🎯 Raison: ${analysis.reason}`, 'INFO');
                 
                 updatePositionsDisplay();
                 await refreshBalance();
@@ -749,21 +837,36 @@
                 const currentPair = top20Pairs[currentScanIndex];
                 document.getElementById('currentScanPair').textContent = currentPair.symbol;
                 
-                // Analyser la paire courante
+                // Analyser la paire courante avec le VRAIE MACD
                 const analysis = await analyzePairMACD(currentPair.symbol);
                 botStats.totalScans++;
                 
                 // Mettre à jour l'affichage
                 updateTop20Display();
                 
-                log(`📊 Analyse ${analysis.symbol}: Signal ${analysis.signal} (Force: ${analysis.strength.toFixed(1)})`, 'INFO');
+                // Log détaillé de l'analyse
+                if (analysis.crossover) {
+                    log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
+                } else {
+                    log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
+                }
                 
-                // Si signal d'achat détecté
-                if (analysis.signal === 'BUY' && analysis.strength > 8) {
+                // ✅ CONDITION D'ENTRÉE EXACTE : Croisement haussier MACD détecté
+                if (analysis.signal === 'BUY' && analysis.crossover) {
                     botStats.totalSignals++;
-                    log(`🎯 SIGNAL DÉTECTÉ: ${analysis.symbol} - Force: ${analysis.strength.toFixed(1)}`, 'SUCCESS');
+                    log(`🚨 SIGNAL MACD HAUSSIER DÉTECTÉ: ${analysis.symbol}`, 'SUCCESS');
+                    log(`📈 MACD: ${analysis.macd.toFixed(4)} | Signal: ${analysis.macdSignal.toFixed(4)} | Histogram: ${analysis.histogram.toFixed(4)}`, 'SUCCESS');
                     
-                    await openPosition(analysis.symbol, analysis);
+                    // Vérifier si on peut ouvrir une position
+                    const canOpen = !hasOpenPosition(analysis.symbol) && calculatePositionSize() >= 10;
+                    
+                    if (canOpen) {
+                        await openPosition(analysis.symbol, analysis);
+                    } else if (hasOpenPosition(analysis.symbol)) {
+                        log(`⚠️ Position déjà ouverte sur ${analysis.symbol}`, 'WARNING');
+                    } else {
+                        log(`⚠️ Capital insuffisant pour ${analysis.symbol}`, 'WARNING');
+                    }
                 }
                 
                 // Passer à la paire suivante
@@ -880,12 +983,14 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 Volume', 'SUCCESS');
-            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing`, 'INFO');
-            log(`📊 ${top20Pairs.length} paires dans le TOP 20`, 'INFO');
+            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 Volume (VRAIE MACD)', 'SUCCESS');
+            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop`, 'INFO');
+            log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
+            log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume`, 'INFO');
+            log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
             
             // Démarrer les intervalles
-            tradingLoopInterval = setInterval(tradingLoop, 3000); // Analyse toutes les 3 secondes
+            tradingLoopInterval = setInterval(tradingLoop, 5000); // Analyse toutes les 5 secondes (pour respecter timeframe 5min)
             volumeScanInterval = setInterval(scanTop20Volume, 300000); // Rescan TOP 20 toutes les 5 minutes
             statsInterval = setInterval(() => {
                 updateStats();
