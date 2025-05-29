@@ -305,6 +305,11 @@
         let botRunning = false;
         let priceInterval = null;
         let tradingInterval = null;
+        let volumeScanInterval = null;
+        
+        // Scanner de volume
+        let top20Pairs = [];
+        let currentScanIndex = 0;
         
         // Sauvegarde des clés en mémoire
         let savedKeys = {
@@ -321,13 +326,16 @@
             symbol: 'BTCUSDT',
             amount: 10,
             takeProfit: 5,
-            stopLoss: 5
+            stopLoss: 5,
+            positionSize: 5, // 5% du capital
+            leverage: 2      // Levier 2x
         };
         
         // Variables de trading
         let currentPrice = 0;
         let macdData = { macd: 0, signal: 0, histogram: 0 };
         let balance = {};
+        let openPositions = [];
         
         // Fonctions utilitaires
         function log(message, type = 'INFO') {
@@ -459,7 +467,156 @@
             }
         }
         
-        // Récupérer le prix actuel via le proxy (API publique)
+        // 🔍 SCANNER DE VOLUME TOP 20
+        async function scanTop20Volume() {
+            try {
+                log('🔍 Scan des volumes TOP 20...', 'INFO');
+                
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+                const data = await response.json();
+                
+                if (data.code === '00000' && data.data) {
+                    // Trier par volume et prendre le TOP 20
+                    const sortedPairs = data.data
+                        .filter(pair => pair.usdtVolume && parseFloat(pair.usdtVolume) > 1000000) // Min 1M volume
+                        .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
+                        .slice(0, 20);
+                    
+                    top20Pairs = sortedPairs;
+                    
+                    const totalVolume = sortedPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
+                    log(`📊 TOP 20 mis à jour: ${sortedPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
+                    
+                    // Afficher le TOP 5 dans les logs
+                    sortedPairs.slice(0, 5).forEach((pair, index) => {
+                        log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} volume`, 'INFO');
+                    });
+                    
+                    return true;
+                } else {
+                    log('❌ Erreur lors du scan des volumes', 'ERROR');
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ Erreur scanner: ${error.message}`, 'ERROR');
+                return false;
+            }
+        }
+        
+        // 📈 CALCUL MACD POUR UNE PAIRE
+        async function getMACDSignal(symbol) {
+            try {
+                // Récupérer les données de prix historiques (simulation simplifiée)
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?productType=usdt-futures&symbol=${symbol}`);
+                const data = await response.json();
+                
+                if (data.code === '00000' && data.data && data.data.length > 0) {
+                    const currentPrice = parseFloat(data.data[0].lastPr);
+                    
+                    // Simulation MACD simplifiée basée sur le prix et volume
+                    const volume = parseFloat(data.data[0].usdtVolume);
+                    const change24h = parseFloat(data.data[0].change24h || 0);
+                    
+                    // Logique de signal simplifié
+                    if (change24h > 2 && volume > 50000000) {
+                        return { signal: 'BUY', strength: Math.min(change24h * 0.5, 10) };
+                    } else if (change24h < -2 && volume > 50000000) {
+                        return { signal: 'SELL', strength: Math.min(Math.abs(change24h) * 0.5, 10) };
+                    }
+                    
+                    return { signal: 'HOLD', strength: 0 };
+                }
+            } catch (error) {
+                console.error(`Erreur MACD ${symbol}:`, error);
+            }
+            
+            return { signal: 'HOLD', strength: 0 };
+        }
+        
+        // 🎯 BOUCLE DE TRADING MULTI-PAIRES
+        async function multiPairTradingLoop() {
+            if (!botRunning || top20Pairs.length === 0) return;
+            
+            try {
+                // Scanner une paire à la fois pour éviter le spam API
+                if (currentScanIndex >= top20Pairs.length) {
+                    currentScanIndex = 0;
+                }
+                
+                const pair = top20Pairs[currentScanIndex];
+                const macdResult = await getMACDSignal(pair.symbol);
+                
+                if (macdResult.signal === 'BUY' && macdResult.strength > 5) {
+                    const positionSize = calculatePositionSize();
+                    if (positionSize > 0 && !hasOpenPosition(pair.symbol)) {
+                        await openPosition(pair.symbol, 'LONG', positionSize);
+                    }
+                }
+                
+                currentScanIndex++;
+                
+                // Log périodique du scanning
+                if (currentScanIndex % 5 === 0) {
+                    log(`🔄 Analyse: ${currentScanIndex}/${top20Pairs.length} paires scannées`, 'INFO');
+                }
+                
+            } catch (error) {
+                log(`Erreur trading loop: ${error.message}`, 'ERROR');
+            }
+        }
+        
+        // 💰 CALCUL DE LA TAILLE DE POSITION (5% du capital)
+        function calculatePositionSize() {
+            const totalBalance = balance.USDT || 0;
+            const positionValue = (totalBalance * config.positionSize / 100) * config.leverage;
+            return Math.max(positionValue, 10); // Minimum 10 USDT
+        }
+        
+        // 📋 VÉRIFIER SI UNE POSITION EST DÉJÀ OUVERTE
+        function hasOpenPosition(symbol) {
+            return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
+        }
+        
+        // 🚀 OUVRIR UNE POSITION
+        async function openPosition(symbol, side, size) {
+            try {
+                log(`🚀 Ouverture position ${side} sur ${symbol}: ${size.toFixed(2)}`, 'SUCCESS');
+                
+                // Simulation de l'ouverture (à remplacer par vraie API)
+                const position = {
+                    id: Date.now(),
+                    symbol: symbol,
+                    side: side,
+                    size: size,
+                    entryPrice: Math.random() * 50000 + 30000, // Prix simulé
+                    status: 'OPEN',
+                    timestamp: new Date().toISOString(),
+                    trailingStop: 0.01 // 1% trailing stop
+                };
+                
+                openPositions.push(position);
+                
+                log(`✅ Position ouverte: ${symbol} ${side} ${size.toFixed(2)}`, 'SUCCESS');
+                updatePositionsDisplay();
+                
+            } catch (error) {
+                log(`❌ Erreur ouverture position ${symbol}: ${error.message}`, 'ERROR');
+            }
+        }
+        
+        // 📊 MISE À JOUR DE L'AFFICHAGE DES POSITIONS
+        function updatePositionsDisplay() {
+            const openCount = openPositions.filter(pos => pos.status === 'OPEN').length;
+            log(`📊 Positions ouvertes: ${openCount}`, 'INFO');
+        }
+        
+        // 🔢 FORMATAGE DES NOMBRES
+        function formatNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        }
         async function getCurrentPrice() {
             try {
                 // Via le proxy - il détecte automatiquement que c'est une API publique
