@@ -217,7 +217,7 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 13:30 - ISOLATED FORCED</div>
+    <div class="version">📅 29/05/2025 - 15:15 - SUCCESS! API WORKS</div>
     
     <div class="container">
         <div class="header">
@@ -410,9 +410,9 @@
             const orderData = {
                 symbol: symbol,
                 productType: "USDT-FUTURES",
-                marginMode: "isolated", // 🔧 FORCÉ ISOLATED
+                marginMode: "isolated",
                 marginCoin: "USDT",
-                size: "5",
+                size: "10", // Test avec 10 USDT (vous avez 135$)
                 side: "buy",
                 tradeSide: "open", 
                 orderType: "market",
@@ -430,8 +430,12 @@
             
             if (result && result.code === '00000') {
                 log(`✅ ORDRE RÉUSSI! ID: ${result.data.orderId}`, 'SUCCESS');
+                log(`🎉 L'API FONCTIONNE! On peut maintenant remettre tout le code MACD!`, 'SUCCESS');
             } else {
                 log(`❌ Échec: ${result?.msg || 'Erreur'}`, 'ERROR');
+                if (result?.msg?.includes('balance')) {
+                    log(`💡 Vérifiez que BTCUSDT a assez de marge en mode isolated`, 'INFO');
+                }
             }
         }
         
