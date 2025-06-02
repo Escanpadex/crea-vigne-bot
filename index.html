@@ -1123,8 +1123,11 @@
                     
                     if (analysis.crossover) {
                         log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
+                    } else if (analysis.macd > analysis.macdSignal) {
+                        // Afficher quand MACD > Signal même sans croisement
+                        log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
                     } else {
-                        // Réduire les logs pour éviter le spam
+                        // Réduire les logs pour MACD < Signal
                         if (botStats.totalScans % 20 === 0) { // Log 1 fois sur 20
                             log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
                         }
