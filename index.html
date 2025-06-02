@@ -687,62 +687,115 @@
         }
         
         function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-            if (prices.length < slowPeriod + signalPeriod + 5) {
-                return { macd: 0, signal: 0, histogram: 0, crossover: false };
+            // Vérifier qu'on a assez de données pour un calcul fiable
+            const minRequired = slowPeriod + signalPeriod + 10; // ~45 bougies minimum
+            if (prices.length < minRequired) {
+                return { macd: null, signal: null, histogram: null, crossover: false };
             }
             
-            // Calcul EMA comme TradingView (méthode standard)
+            // Fonction EMA corrigée avec gestion stricte des null
             function calculateEMA(data, period) {
-                const multiplier = 2 / (period + 1);
-                const emas = [];
+                const k = 2 / (period + 1);
+                const emaArray = new Array(data.length).fill(null);
                 
-                // Première valeur = SMA des premières périodes
-                let sma = 0;
+                // SMA pour initialiser l'EMA à l'index (period-1)
+                let sum = 0;
                 for (let i = 0; i < period; i++) {
-                    sma += data[i];
+                    sum += data[i];
                 }
-                sma = sma / period;
-                emas[period - 1] = sma;
+                let prevEma = sum / period;
+                emaArray[period - 1] = prevEma;
                 
-                // Calcul EMA standard
+                // EMA à partir de l'index period
                 for (let i = period; i < data.length; i++) {
-                    const ema = (data[i] * multiplier) + (emas[i - 1] * (1 - multiplier));
-                    emas[i] = ema;
+                    const ema = data[i] * k + prevEma * (1 - k);
+                    emaArray[i] = ema;
+                    prevEma = ema;
                 }
                 
-                return emas;
+                return emaArray;
             }
             
-            const ema12 = calculateEMA(prices, fastPeriod);
-            const ema26 = calculateEMA(prices, slowPeriod);
+            // Calcul des EMA 12 et 26
+            const ema12Array = calculateEMA(prices, fastPeriod);
+            const ema26Array = calculateEMA(prices, slowPeriod);
             
-            // Ligne MACD
-            const macdLine = [];
-            for (let i = slowPeriod - 1; i < prices.length; i++) {
-                if (ema12[i] !== undefined && ema26[i] !== undefined) {
-                    macdLine.push(ema12[i] - ema26[i]);
+            // Ligne MACD = EMA12 - EMA26 (null si l'une des EMA est null)
+            const macdArray = prices.map((price, idx) => {
+                const ema12 = ema12Array[idx];
+                const ema26 = ema26Array[idx];
+                if (ema12 === null || ema26 === null) return null;
+                return ema12 - ema26;
+            });
+            
+            // Créer un tableau MACD sans null pour calculer la signal line
+            const macdForSignal = [];
+            let startIndex = -1;
+            
+            for (let i = 0; i < macdArray.length; i++) {
+                if (macdArray[i] !== null) {
+                    if (startIndex === -1) startIndex = i;
+                    macdForSignal.push(macdArray[i]);
                 }
             }
             
-            // Signal line (EMA 9 du MACD)
-            const signalLine = calculateEMA(macdLine, signalPeriod);
+            // Signal line = EMA9 du MACD (seulement sur les valeurs non-null)
+            let signalArray = new Array(prices.length).fill(null);
             
-            if (macdLine.length < 2 || signalLine.length < 2) {
-                return { macd: 0, signal: 0, histogram: 0, crossover: false };
+            if (macdForSignal.length >= signalPeriod) {
+                const signalEMA = calculateEMA(macdForSignal, signalPeriod);
+                
+                // Reporter les valeurs signal aux bons indices
+                for (let i = 0; i < signalEMA.length; i++) {
+                    if (signalEMA[i] !== null) {
+                        const originalIndex = startIndex + i;
+                        if (originalIndex < prices.length) {
+                            signalArray[originalIndex] = signalEMA[i];
+                        }
+                    }
+                }
             }
             
-            const currentMacd = macdLine[macdLine.length - 1];
-            const previousMacd = macdLine[macdLine.length - 2];
-            const currentSignal = signalLine[signalLine.length - 1];
-            const previousSignal = signalLine[signalLine.length - 2];
+            // Prendre les dernières valeurs valides
+            let currentMacd = null, previousMacd = null;
+            let currentSignal = null, previousSignal = null;
+            
+            // Trouver les 2 dernières valeurs MACD valides
+            for (let i = macdArray.length - 1; i >= 0; i--) {
+                if (macdArray[i] !== null) {
+                    if (currentMacd === null) {
+                        currentMacd = macdArray[i];
+                    } else if (previousMacd === null) {
+                        previousMacd = macdArray[i];
+                        break;
+                    }
+                }
+            }
+            
+            // Trouver les 2 dernières valeurs Signal valides
+            for (let i = signalArray.length - 1; i >= 0; i--) {
+                if (signalArray[i] !== null) {
+                    if (currentSignal === null) {
+                        currentSignal = signalArray[i];
+                    } else if (previousSignal === null) {
+                        previousSignal = signalArray[i];
+                        break;
+                    }
+                }
+            }
+            
+            // Vérifier qu'on a toutes les valeurs nécessaires
+            if (currentMacd === null || previousMacd === null || 
+                currentSignal === null || previousSignal === null) {
+                return { macd: currentMacd, signal: currentSignal, histogram: null, crossover: false };
+            }
             
             const currentHistogram = currentMacd - currentSignal;
             const previousHistogram = previousMacd - previousSignal;
             
-            // Croisement haussier STRICT : 
-            // - Bougie précédente : MACD <= Signal 
-            // - Bougie actuelle : MACD > Signal
-            // - ET histogram passe de négatif à positif
+            // Croisement haussier STRICT :
+            // 1. Histogram passe de négatif/nul à positif
+            // 2. MACD croise au-dessus de Signal
             const crossover = (previousHistogram <= 0) && (currentHistogram > 0) && 
                              (previousMacd <= previousSignal) && (currentMacd > currentSignal);
             
@@ -751,14 +804,14 @@
                 signal: currentSignal,
                 histogram: currentHistogram,
                 crossover: crossover,
-                macdLine: macdLine,
-                signalLine: signalLine
+                macdArray: macdArray,
+                signalArray: signalArray
             };
         }
         
         async function analyzePairMACD(symbol) {
             try {
-                const klines = await getKlineData(symbol, 100); // Plus de données pour calcul précis
+                const klines = await getKlineData(symbol, 100); // 100 bougies pour calcul précis
                 
                 if (klines.length < 50) {
                     return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
@@ -774,9 +827,12 @@
                 let signalStrength = 0;
                 let reason = '';
                 
-                if (macdData.crossover && macdData.histogram > 0) {
+                // Vérifier que les calculs sont valides
+                if (macdData.macd === null || macdData.signal === null) {
+                    reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol}`;
+                } else if (macdData.crossover && macdData.histogram > 0) {
                     macdSignal = 'BUY';
-                    signalStrength = Math.abs(macdData.histogram) * 1000; // Ajuster la sensibilité
+                    signalStrength = Math.abs(macdData.histogram) * 1000;
                     reason = `🔥 CROISEMENT HAUSSIER CONFIRMÉ! MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} | Histogram: ${macdData.histogram.toFixed(6)}`;
                 } else if (macdData.macd > macdData.signal) {
                     reason = `📈 MACD au-dessus Signal mais pas de croisement récent. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
