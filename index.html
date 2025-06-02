@@ -217,12 +217,12 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 29/05/2025 - 15:35 - API CORRIGÉE</div>
+    <div class="version">📅 02/06/2025 - TRAILING STOP CORRIGÉ</div>
     
     <div class="container">
         <div class="header">
             <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 20 Volume - API FONCTIONNELLE</p>
+            <p>Stratégie MACD - TOP 20 Volume - TRAILING STOP FIXÉ</p>
         </div>
         
         <div class="grid">
@@ -284,6 +284,10 @@
                 
                 <div style="margin-top: 15px;">
                     <button class="btn" onclick="scanTop20Volume()" style="width: 100%;">🔍 Scanner TOP 20 Volume</button>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button class="btn" onclick="checkTrailingStops()" style="width: 100%;">🔍 Vérifier Trailing Stops</button>
                 </div>
             </div>
         </div>
@@ -361,6 +365,7 @@
             <div class="logs" id="logs">
                 [INFO] Bot de trading MACD TOP 20 initialisé...<br>
                 [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
+                [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
                 [INFO] En attente de configuration API...<br>
             </div>
             <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer logs</button>
@@ -724,6 +729,7 @@
             return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
         }
         
+        // FONCTION CORRIGÉE POUR TRAILING STOP
         async function openPosition(symbol, analysis) {
             if (hasOpenPosition(symbol)) {
                 return false;
@@ -736,17 +742,17 @@
             }
             
             try {
-                // 1. CONFIGURER LE LEVIER EN PREMIER
+                // 1. CONFIGURER LE LEVIER
                 await setLeverage(symbol, config.leverage);
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // 2. CALCULER LA QUANTITÉ EN TOKENS
+                // 2. CALCULER LA QUANTITÉ
                 const quantity = (positionValue / analysis.price).toFixed(6);
                 
                 log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
                 log(`💰 Prix: ${analysis.price} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT`, 'INFO');
                 
-                // 3. ORDRE D'ACHAT - CORRECTION ICI
+                // 3. ORDRE D'ACHAT MARKET
                 const orderData = {
                     symbol: symbol,
                     productType: "USDT-FUTURES",
@@ -771,24 +777,24 @@
                 
                 log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
                 
-                // 4. CONFIGURER LE TRAILING STOP BITGET
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // 4. ATTENDRE QUE LA POSITION SOIT REMPLIE
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
+                // 5. TRAILING STOP CORRIGÉ
                 const trailingStopData = {
-                    planType: "track_plan",
+                    planType: "moving_plan",  // ✅ CORRIGÉ : moving_plan pour trailing stop
                     symbol: symbol,
                     productType: "USDT-FUTURES",
                     marginMode: "isolated",
                     marginCoin: "USDT",
                     size: quantity,
-                    callbackRatio: config.trailingStop.toString(),
-                    triggerPrice: analysis.price.toString(),
-                    triggerType: "mark_price",
+                    rangeRate: config.trailingStop.toString(),  // ✅ rangeRate au lieu de callbackRatio
                     side: "sell",
                     tradeSide: "close",
                     orderType: "market",
                     clientOid: `trail_${Date.now()}_${symbol}`,
                     reduceOnly: "YES"
+                    // ✅ PAS de triggerPrice pour trailing stop !
                 };
                 
                 log(`🔄 Configuration trailing stop ${config.trailingStop}% pour ${symbol}...`, 'INFO');
@@ -798,12 +804,14 @@
                 });
                 
                 if (trailingResult && trailingResult.code === '00000') {
-                    log(`✅ Trailing Stop configuré: ${symbol} - ${config.trailingStop}% callback`, 'SUCCESS');
+                    log(`✅ Trailing Stop moving_plan créé: ${symbol} - ${config.trailingStop}% range`, 'SUCCESS');
+                    log(`🆔 Trailing Stop ID: ${trailingResult.data.orderId}`, 'INFO');
                 } else {
-                    log(`⚠️ Échec config trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur'}`, 'WARNING');
+                    log(`❌ ÉCHEC trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur API'}`, 'ERROR');
+                    log(`📋 Détails erreur: ${JSON.stringify(trailingResult)}`, 'ERROR');
                 }
                 
-                // 5. ENREGISTRER LA POSITION LOCALEMENT
+                // 6. ENREGISTRER LA POSITION
                 const position = {
                     id: Date.now(),
                     symbol: symbol,
@@ -823,7 +831,12 @@
                 
                 log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
                 log(`🎯 Raison: ${analysis.reason}`, 'INFO');
-                log(`🔒 Trailing Stop Bitget actif à ${config.trailingStop}%`, 'SUCCESS');
+                
+                if (trailingResult?.data?.orderId) {
+                    log(`🔒 Trailing Stop actif (moving_plan) à ${config.trailingStop}%`, 'SUCCESS');
+                } else {
+                    log(`⚠️ Position ouverte SANS trailing stop - Surveillance manuelle nécessaire`, 'WARNING');
+                }
                 
                 updatePositionsDisplay();
                 await refreshBalance();
@@ -832,6 +845,31 @@
             } catch (error) {
                 log(`❌ Erreur ouverture position ${symbol}: ${error.message}`, 'ERROR');
                 return false;
+            }
+        }
+        
+        // FONCTION POUR VÉRIFIER LES TRAILING STOPS ACTIFS
+        async function checkTrailingStops() {
+            try {
+                log('🔍 Vérification des trailing stops actifs...', 'INFO');
+                const result = await makeRequest('/bitget/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&planType=moving_plan');
+                
+                if (result && result.code === '00000' && result.data) {
+                    const activeTrailingStops = result.data.length;
+                    log(`🔍 ${activeTrailingStops} trailing stop(s) actif(s) détecté(s)`, 'SUCCESS');
+                    
+                    result.data.forEach(stop => {
+                        log(`📋 Trailing: ${stop.symbol} - Range: ${stop.rangeRate}% - ID: ${stop.orderId}`, 'INFO');
+                    });
+                    
+                    return result.data;
+                } else {
+                    log('⚠️ Aucun trailing stop actif trouvé', 'WARNING');
+                    return [];
+                }
+            } catch (error) {
+                log(`⚠️ Erreur vérification trailing stops: ${error.message}`, 'WARNING');
+                return [];
             }
         }
         
@@ -853,8 +891,13 @@
                 item.innerHTML = `
                     <div><strong>${position.symbol}</strong> ${position.side} - ${position.size.toFixed(2)} USDT</div>
                     <div>Prix d'entrée: ${position.entryPrice.toFixed(4)} | Ouvert il y a ${timeAgo}min</div>
-                    <div>🔒 <span style="color: #28a745">Trailing Stop Bitget actif (${config.trailingStop}%)</span></div>
-                    <div style="font-size: 10px; color: #666;">ID: ${position.orderId || 'N/A'}</div>
+                    <div>🔒 <span style="color: ${position.trailingStopId ? '#28a745' : '#dc3545'}">
+                        ${position.trailingStopId ? `Trailing Stop moving_plan actif (${config.trailingStop}%)` : 'AUCUN TRAILING STOP'}
+                    </span></div>
+                    <div style="font-size: 10px; color: #666;">
+                        Ordre ID: ${position.orderId || 'N/A'} | 
+                        Trailing ID: ${position.trailingStopId || 'N/A'}
+                    </div>
                 `;
                 
                 container.appendChild(item);
@@ -876,7 +919,7 @@
                     );
                     
                     for (const closedPos of closedPositions) {
-                        log(`🔚 Position fermée détectée: ${closedPos.symbol} (Trailing Stop Bitget)`, 'SUCCESS');
+                        log(`🔚 Position fermée détectée: ${closedPos.symbol} (Trailing Stop moving_plan)`, 'SUCCESS');
                         log(`💰 Position ${closedPos.symbol} fermée par trailing stop à ${config.trailingStop}%`, 'SUCCESS');
                         
                         openPositions = openPositions.filter(pos => pos.id !== closedPos.id);
@@ -1005,12 +1048,12 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 avec API Fonctionnelle', 'SUCCESS');
+            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 avec TRAILING STOP CORRIGÉ', 'SUCCESS');
             log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop`, 'INFO');
             log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
             log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
             log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
-            log(`🔒 Trailing Stop: Géré automatiquement par l'API Bitget`, 'SUCCESS');
+            log(`🔒 Trailing Stop: moving_plan avec rangeRate (API corrigée)`, 'SUCCESS');
             
             tradingLoopInterval = setInterval(tradingLoop, 60000);
             volumeScanInterval = setInterval(scanTop20Volume, 300000);
@@ -1038,7 +1081,7 @@
         }
         
         window.onload = async function() {
-            log('🔧 Initialisation du bot MACD TOP 20 (API CORRIGÉE)...', 'INFO');
+            log('🔧 Initialisation du bot MACD TOP 20 (TRAILING STOP CORRIGÉ)...', 'INFO');
             
             try {
                 const response = await fetch(`${API_BASE}/test`);
@@ -1069,7 +1112,8 @@
                 log(`⚠️ Pré-chargement TOP 20 échoué: ${error.message}`, 'WARNING');
             }
             
-            log('✅ Bot prêt! Configurez vos clés API et cliquez sur "Démarrer Stratégie"', 'SUCCESS');
+            log('✅ Bot prêt! Trailing Stop corrigé avec moving_plan + rangeRate', 'SUCCESS');
+            log('💡 Cliquez sur "Vérifier Trailing Stops" pour voir les ordres actifs', 'INFO');
         };
     </script>
 </body>
