@@ -329,7 +329,7 @@
                 </div>
                 
                 <div style="margin-top: 10px;">
-                    <button class="btn" onclick="checkTrailingStops()" style="width: 100%;">🔍 Vérifier Trailing Stops</button>
+                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%;">🔄 Vérifier Stop Loss Manuellement</button>
                 </div>
             </div>
         </div>
@@ -421,6 +421,7 @@
         let tradingLoopInterval = null;
         let statsInterval = null;
         let pnlUpdateInterval = null;
+        let stopLossManagementInterval = null; // Nouveau : gestion stop loss
         let botStartTime = null;
         
         let top30Pairs = [];
@@ -920,39 +921,38 @@
                 // 4. ATTENDRE QUE LA POSITION SOIT REMPLIE
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 
-                // 5. TRAILING STOP CORRIGÉ - Protection immédiate
-                const triggerPrice = analysis.price; // Prix d'entrée = protection immédiate
+                // 5. STOP LOSS SIMPLE au lieu de trailing stop
+                const initialStopPrice = analysis.price * 0.99; // -1% du prix d'entrée
                 
-                const trailingStopData = {
-                    planType: "moving_plan",  // ✅ moving_plan pour trailing stop
+                const stopLossData = {
+                    planType: "normal_plan",
                     symbol: symbol,
                     productType: "USDT-FUTURES",
                     marginMode: "isolated",
                     marginCoin: "USDT",
                     size: quantity,
-                    triggerPrice: triggerPrice.toString(),  // ✅ Prix d'entrée pour protection immédiate
+                    triggerPrice: initialStopPrice.toString(),
                     triggerType: "mark_price",
-                    rangeRate: config.trailingStop.toString(),  // ✅ rangeRate pour le trailing
                     side: "sell",
                     tradeSide: "close",
                     orderType: "market",
-                    clientOid: `trail_${Date.now()}_${symbol}`,
+                    clientOid: `stop_${Date.now()}_${symbol}`,
                     reduceOnly: "YES"
                 };
                 
-                log(`🔄 Configuration trailing stop ${config.trailingStop}% pour ${symbol} (protection immédiate @ ${triggerPrice.toFixed(4)})...`, 'INFO');
-                const trailingResult = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
+                log(`🔄 Configuration stop loss initial -1% pour ${symbol} @ ${initialStopPrice.toFixed(4)}...`, 'INFO');
+                const stopLossResult = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
                     method: 'POST',
-                    body: JSON.stringify(trailingStopData)
+                    body: JSON.stringify(stopLossData)
                 });
                 
-                if (trailingResult && trailingResult.code === '00000') {
-                    log(`✅ Trailing Stop immédiat créé: ${symbol} - ${config.trailingStop}% range @ ${triggerPrice.toFixed(4)}`, 'SUCCESS');
-                    log(`🆔 Trailing Stop ID: ${trailingResult.data.orderId}`, 'INFO');
+                if (stopLossResult && stopLossResult.code === '00000') {
+                    log(`✅ Stop Loss initial créé: ${symbol} @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
+                    log(`🆔 Stop Loss ID: ${stopLossResult.data.orderId}`, 'INFO');
                 } else {
-                    log(`❌ ÉCHEC trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur API'}`, 'ERROR');
-                    log(`📋 Détails erreur: ${JSON.stringify(trailingResult)}`, 'ERROR');
-                    log(`📋 Données envoyées: ${JSON.stringify(trailingStopData)}`, 'ERROR');
+                    log(`❌ ÉCHEC stop loss ${symbol}: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
+                    log(`📋 Détails erreur: ${JSON.stringify(stopLossResult)}`, 'ERROR');
+                    log(`📋 Données envoyées: ${JSON.stringify(stopLossData)}`, 'ERROR');
                 }
                 
                 // 6. ENREGISTRER LA POSITION
@@ -966,7 +966,9 @@
                     status: 'OPEN',
                     timestamp: new Date().toISOString(),
                     orderId: orderResult.data.orderId,
-                    trailingStopId: trailingResult?.data?.orderId || null,
+                    stopLossId: stopLossResult?.data?.orderId || null,
+                    currentStopPrice: initialStopPrice,
+                    highestPrice: analysis.price, // Prix le plus haut atteint
                     reason: analysis.reason
                 };
                 
@@ -976,10 +978,10 @@
                 log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
                 log(`🎯 Raison: ${analysis.reason}`, 'INFO');
                 
-                if (trailingResult?.data?.orderId) {
-                    log(`🔒 Trailing Stop actif (moving_plan) à ${config.trailingStop}%`, 'SUCCESS');
+                if (stopLossResult?.data?.orderId) {
+                    log(`🔒 Stop Loss actif @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
                 } else {
-                    log(`⚠️ Position ouverte SANS trailing stop - Surveillance manuelle nécessaire`, 'WARNING');
+                    log(`⚠️ Position ouverte SANS stop loss - RISQUE ÉLEVÉ !`, 'WARNING');
                 }
                 
                 updatePositionsDisplay();
@@ -992,7 +994,152 @@
             }
         }
         
-        // DIAGNOSTIC AVANCÉ DES TRAILING STOPS
+        // ====== SYSTÈME DE GESTION STOP LOSS TRAILING ======
+        
+        // Récupérer les positions actives depuis l'API Bitget
+        async function fetchActivePositionsFromAPI() {
+            try {
+                const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+                
+                if (result && result.code === '00000' && result.data) {
+                    return result.data.filter(pos => parseFloat(pos.total) > 0);
+                }
+                return [];
+            } catch (error) {
+                console.error('Erreur récupération positions API:', error);
+                return [];
+            }
+        }
+        
+        // Synchroniser positions locales avec API
+        async function syncLocalPositions() {
+            const apiPositions = await fetchActivePositionsFromAPI();
+            const apiSymbols = apiPositions.map(pos => pos.symbol);
+            
+            const removedPositions = openPositions.filter(localPos => 
+                !apiSymbols.includes(localPos.symbol)
+            );
+            
+            if (removedPositions.length > 0) {
+                removedPositions.forEach(pos => {
+                    log(`🔚 Position fermée détectée: ${pos.symbol} (Stop Loss déclenché)`, 'SUCCESS');
+                });
+                
+                openPositions = openPositions.filter(localPos => 
+                    apiSymbols.includes(localPos.symbol)
+                );
+                
+                updatePositionsDisplay();
+            }
+            
+            return apiPositions;
+        }
+        
+        // Récupérer prix actuel d'un symbole
+        async function getCurrentPrice(symbol) {
+            try {
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?symbol=${symbol}&productType=usdt-futures`);
+                const data = await response.json();
+                
+                if (data.code === '00000' && data.data) {
+                    return parseFloat(data.data.lastPr);
+                }
+                return null;
+            } catch (error) {
+                console.error(`Erreur prix ${symbol}:`, error);
+                return null;
+            }
+        }
+        
+        // Modifier un ordre stop loss existant
+        async function modifyStopLoss(symbol, stopLossId, newStopPrice, quantity) {
+            try {
+                const modifyData = {
+                    symbol: symbol,
+                    productType: "USDT-FUTURES",
+                    marginCoin: "USDT",
+                    orderId: stopLossId,
+                    triggerPrice: newStopPrice.toString(),
+                    size: quantity
+                };
+                
+                const result = await makeRequest('/bitget/api/v2/mix/order/modify-plan-order', {
+                    method: 'POST',
+                    body: JSON.stringify(modifyData)
+                });
+                
+                if (result && result.code === '00000') {
+                    log(`🔄 Stop Loss ajusté: ${symbol} → ${newStopPrice.toFixed(4)}`, 'SUCCESS');
+                    return true;
+                } else {
+                    log(`❌ Échec modification stop loss ${symbol}: ${result?.msg}`, 'ERROR');
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ Erreur modification stop loss ${symbol}: ${error.message}`, 'ERROR');
+                return false;
+            }
+        }
+        
+        // Gestion principale des stop loss trailing (appelée toutes les 30s)
+        async function manageTrailingStops() {
+            if (!botRunning || openPositions.length === 0) return;
+            
+            try {
+                log('🔍 Vérification stop loss trailing...', 'DEBUG');
+                
+                // 1. Synchroniser avec les positions API
+                const apiPositions = await syncLocalPositions();
+                
+                // 2. Pour chaque position locale active
+                for (const position of openPositions) {
+                    if (!position.stopLossId) {
+                        log(`⚠️ ${position.symbol}: Pas de stop loss configuré`, 'WARNING');
+                        continue;
+                    }
+                    
+                    // 3. Récupérer prix actuel
+                    const currentPrice = await getCurrentPrice(position.symbol);
+                    if (!currentPrice) {
+                        log(`⚠️ ${position.symbol}: Impossible de récupérer le prix`, 'WARNING');
+                        continue;
+                    }
+                    
+                    // 4. Mettre à jour le prix le plus haut atteint
+                    if (currentPrice > position.highestPrice) {
+                        position.highestPrice = currentPrice;
+                    }
+                    
+                    // 5. Calculer nouveau stop loss optimal (1% sous le plus haut)
+                    const newStopPrice = position.highestPrice * 0.99;
+                    
+                    // 6. Vérifier s'il faut modifier le stop loss
+                    if (newStopPrice > position.currentStopPrice) {
+                        const success = await modifyStopLoss(
+                            position.symbol, 
+                            position.stopLossId, 
+                            newStopPrice, 
+                            position.quantity
+                        );
+                        
+                        if (success) {
+                            position.currentStopPrice = newStopPrice;
+                            const gainPercent = ((newStopPrice - position.entryPrice) / position.entryPrice * 100);
+                            log(`📈 ${position.symbol}: Stop ajusté → ${newStopPrice.toFixed(4)} (${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`, 'SUCCESS');
+                        }
+                    }
+                    
+                    // Petite pause entre chaque position
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                // 3. Mettre à jour l'affichage
+                updatePositionsDisplay();
+                
+            } catch (error) {
+                log(`❌ Erreur gestion stop loss: ${error.message}`, 'ERROR');
+            }
+        }
         async function checkTrailingStops() {
             try {
                 log('🔍 Diagnostic complet des trailing stops...', 'INFO');
@@ -1071,7 +1218,7 @@
                 item.className = 'position-item';
                 
                 const timeAgo = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
-                const hasTrailing = position.trailingStopId ? true : false;
+                const hasStopLoss = position.stopLossId ? true : false;
                 
                 // Calcul du PnL
                 let pnlDisplay = '';
@@ -1094,6 +1241,12 @@
                     pnlDisplay = 'Calcul...';
                 }
                 
+                // Informations stop loss
+                const stopInfo = hasStopLoss ? 
+                    `🔒 SL ${position.currentStopPrice ? position.currentStopPrice.toFixed(4) : '--'}` : 
+                    '❌ NO SL';
+                const stopClass = hasStopLoss ? 'trailing-active' : 'trailing-inactive';
+                
                 item.innerHTML = `
                     <div class="position-header">
                         <span><strong>${position.symbol}</strong> ${position.side}</span>
@@ -1102,10 +1255,11 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
                         <span style="font-size: 10px;">
                             Entry: ${position.entryPrice.toFixed(4)} | 
-                            Current: ${position.currentPrice ? position.currentPrice.toFixed(4) : '--'}
+                            Current: ${position.currentPrice ? position.currentPrice.toFixed(4) : '--'} |
+                            High: ${position.highestPrice ? position.highestPrice.toFixed(4) : '--'}
                         </span>
-                        <span class="trailing-status ${hasTrailing ? 'trailing-active' : 'trailing-inactive'}">
-                            ${hasTrailing ? `🔒 TS ${config.trailingStop}%` : '❌ NO TS'}
+                        <span class="trailing-status ${stopClass}">
+                            ${stopInfo}
                         </span>
                     </div>
                     <div class="position-details">
@@ -1267,12 +1421,12 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 30 avec TRAILING STOP CORRIGÉ', 'SUCCESS');
-            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop`, 'INFO');
+            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 30 avec STOP LOSS TRAILING MAISON', 'SUCCESS');
+            log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × Stop Loss -1% initial`, 'INFO');
             log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
             log(`🎯 Surveillance: ${top30Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
             log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
-            log(`🔒 Trailing Stop: moving_plan avec rangeRate (API corrigée)`, 'SUCCESS');
+            log(`🔒 Stop Loss: Système trailing maison toutes les 30s (plus fiable)`, 'SUCCESS');
             
             tradingLoopInterval = setInterval(tradingLoop, 60000);
             volumeScanInterval = setInterval(scanTop30Volume, 300000);
@@ -1285,6 +1439,9 @@
             // Intervalle dédié pour les PnL (toutes les 10 secondes)
             pnlUpdateInterval = setInterval(updatePositionsPnL, 10000);
             
+            // Intervalle pour la gestion des stop loss trailing (toutes les 30 secondes)
+            stopLossManagementInterval = setInterval(manageTrailingStops, 30000);
+            
             tradingLoop();
         }
         
@@ -1295,6 +1452,7 @@
             if (volumeScanInterval) clearInterval(volumeScanInterval);
             if (statsInterval) clearInterval(statsInterval);
             if (pnlUpdateInterval) clearInterval(pnlUpdateInterval);
+            if (stopLossManagementInterval) clearInterval(stopLossManagementInterval);
             
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
@@ -1302,11 +1460,11 @@
             
             log('🛑 Bot arrêté', 'INFO');
             log(`📊 Session terminée: ${botStats.totalScans} scans, ${botStats.totalSignals} signaux`, 'INFO');
-            log(`💼 ${openPositions.length} position(s) restent ouvertes avec trailing stops`, 'INFO');
+            log(`💼 ${openPositions.length} position(s) restent ouvertes avec stop loss trailing actifs`, 'INFO');
         }
         
         window.onload = async function() {
-            log('🔧 Initialisation du bot MACD TOP 30 (TRAILING STOP CORRIGÉ)...', 'INFO');
+            log('🔧 Initialisation du bot MACD TOP 30 (STOP LOSS TRAILING MAISON)...', 'INFO');
             
             try {
                 const response = await fetch(`${API_BASE}/test`);
@@ -1334,6 +1492,36 @@
                     document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
                 }
             } catch (error) {
+                log(`⚠️ Pré-chargement TOP 30 échoué: ${error.message}`, 'WARNING');
+            }
+            
+            log('✅ Bot prêt! Stop Loss trailing maison plus fiable que l\'API Bitget', 'SUCCESS');
+            log('💡 Système: Stop Loss -1% initial puis trailing automatique toutes les 30s', 'INFO');
+        };
+        
+        // DIAGNOSTIC AVANCÉ DES STOP LOSS
+        async function checkTrailingStops() {
+            try {
+                log('🔍 Diagnostic complet des stop loss...', 'INFO');
+                
+                // Vérifier les ordres conditionnels
+                const result = await makeRequest('/bitget/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&planType=normal_plan');
+                
+                if (result && result.code === '00000' && result.data && result.data.length > 0) {
+                    log(`📋 ${result.data.length} stop loss actif(s) trouvé(s)`, 'SUCCESS');
+                    result.data.forEach(order => {
+                        log(`   • ${order.symbol}: Stop @ ${order.triggerPrice} - ID: ${order.orderId}`, 'INFO');
+                    });
+                } else {
+                    log('❌ ALERTE: Aucun stop loss actif trouvé!', 'ERROR');
+                }
+                
+                return result?.data || [];
+            } catch (error) {
+                log(`⚠️ Erreur diagnostic: ${error.message}`, 'WARNING');
+                return [];
+            }
+        } (error) {
                 log(`⚠️ Pré-chargement TOP 30 échoué: ${error.message}`, 'WARNING');
             }
             
