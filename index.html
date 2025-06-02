@@ -210,9 +210,41 @@
             background: #e8f5e8;
             border: 1px solid #28a745;
             border-radius: 6px;
-            padding: 8px;
-            margin-bottom: 8px;
-            font-size: 12px;
+            padding: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            line-height: 1.2;
+        }
+        
+        .position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .position-details {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .trailing-status {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        
+        .trailing-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .trailing-inactive {
+            background: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -404,7 +436,18 @@
             const logs = document.getElementById('logs');
             const timestamp = new Date().toLocaleTimeString();
             const logMessage = `[${timestamp}] [${type}] ${message}<br>`;
+            
+            // Ajouter le nouveau log
             logs.innerHTML += logMessage;
+            
+            // Limiter à 100 logs maximum
+            const logLines = logs.innerHTML.split('<br>').filter(line => line.trim() !== '');
+            if (logLines.length > 100) {
+                // Garder seulement les 100 derniers logs
+                const recentLogs = logLines.slice(-100);
+                logs.innerHTML = recentLogs.join('<br>') + '<br>';
+            }
+            
             logs.scrollTop = logs.scrollHeight;
         }
         
@@ -877,7 +920,7 @@
             const container = document.getElementById('positionsContainer');
             
             if (openPositions.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Aucune position ouverte</div>';
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 15px; font-size: 12px;">Aucune position ouverte</div>';
                 return;
             }
             
@@ -887,16 +930,21 @@
                 item.className = 'position-item';
                 
                 const timeAgo = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
+                const hasTrailing = position.trailingStopId ? true : false;
                 
                 item.innerHTML = `
-                    <div><strong>${position.symbol}</strong> ${position.side} - ${position.size.toFixed(2)} USDT</div>
-                    <div>Prix d'entrée: ${position.entryPrice.toFixed(4)} | Ouvert il y a ${timeAgo}min</div>
-                    <div>🔒 <span style="color: ${position.trailingStopId ? '#28a745' : '#dc3545'}">
-                        ${position.trailingStopId ? `Trailing Stop moving_plan actif (${config.trailingStop}%)` : 'AUCUN TRAILING STOP'}
-                    </span></div>
-                    <div style="font-size: 10px; color: #666;">
-                        Ordre ID: ${position.orderId || 'N/A'} | 
-                        Trailing ID: ${position.trailingStopId || 'N/A'}
+                    <div class="position-header">
+                        <span><strong>${position.symbol}</strong> ${position.side}</span>
+                        <span>${position.size.toFixed(2)} USDT</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
+                        <span style="font-size: 10px;">Prix: ${position.entryPrice.toFixed(4)}</span>
+                        <span class="trailing-status ${hasTrailing ? 'trailing-active' : 'trailing-inactive'}">
+                            ${hasTrailing ? `🔒 TS ${config.trailingStop}%` : '❌ NO TS'}
+                        </span>
+                    </div>
+                    <div class="position-details">
+                        Ouvert: ${timeAgo}min ago | ID: ${(position.orderId || 'N/A').slice(-8)}
                     </div>
                 `;
                 
