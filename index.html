@@ -864,35 +864,39 @@
                 // 4. ATTENDRE QUE LA POSITION SOIT REMPLIE
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 
-                // 5. TRAILING STOP CORRIGÉ
+                // 5. TRAILING STOP CORRIGÉ - Protection immédiate
+                const triggerPrice = analysis.price; // Prix d'entrée = protection immédiate
+                
                 const trailingStopData = {
-                    planType: "moving_plan",  // ✅ CORRIGÉ : moving_plan pour trailing stop
+                    planType: "moving_plan",  // ✅ moving_plan pour trailing stop
                     symbol: symbol,
                     productType: "USDT-FUTURES",
                     marginMode: "isolated",
                     marginCoin: "USDT",
                     size: quantity,
-                    rangeRate: config.trailingStop.toString(),  // ✅ rangeRate au lieu de callbackRatio
+                    triggerPrice: triggerPrice.toString(),  // ✅ Prix d'entrée pour protection immédiate
+                    triggerType: "mark_price",
+                    rangeRate: config.trailingStop.toString(),  // ✅ rangeRate pour le trailing
                     side: "sell",
                     tradeSide: "close",
                     orderType: "market",
                     clientOid: `trail_${Date.now()}_${symbol}`,
                     reduceOnly: "YES"
-                    // ✅ PAS de triggerPrice pour trailing stop !
                 };
                 
-                log(`🔄 Configuration trailing stop ${config.trailingStop}% pour ${symbol}...`, 'INFO');
+                log(`🔄 Configuration trailing stop ${config.trailingStop}% pour ${symbol} (protection immédiate @ ${triggerPrice.toFixed(4)})...`, 'INFO');
                 const trailingResult = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
                     method: 'POST',
                     body: JSON.stringify(trailingStopData)
                 });
                 
                 if (trailingResult && trailingResult.code === '00000') {
-                    log(`✅ Trailing Stop moving_plan créé: ${symbol} - ${config.trailingStop}% range`, 'SUCCESS');
+                    log(`✅ Trailing Stop immédiat créé: ${symbol} - ${config.trailingStop}% range @ ${triggerPrice.toFixed(4)}`, 'SUCCESS');
                     log(`🆔 Trailing Stop ID: ${trailingResult.data.orderId}`, 'INFO');
                 } else {
                     log(`❌ ÉCHEC trailing stop ${symbol}: ${trailingResult?.msg || 'Erreur API'}`, 'ERROR');
                     log(`📋 Détails erreur: ${JSON.stringify(trailingResult)}`, 'ERROR');
+                    log(`📋 Données envoyées: ${JSON.stringify(trailingStopData)}`, 'ERROR');
                 }
                 
                 // 6. ENREGISTRER LA POSITION
@@ -1120,7 +1124,10 @@
                     if (analysis.crossover) {
                         log(`🎯 ${analysis.symbol}: ${analysis.reason}`, 'SUCCESS');
                     } else {
-                        log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
+                        // Réduire les logs pour éviter le spam
+                        if (botStats.totalScans % 20 === 0) { // Log 1 fois sur 20
+                            log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
+                        }
                     }
                     
                     if (analysis.signal === 'BUY' && analysis.crossover) {
