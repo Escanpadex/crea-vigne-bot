@@ -242,9 +242,19 @@
             color: #155724;
         }
         
-        .trailing-inactive {
-            background: #f8d7da;
-            color: #721c24;
+        .pnl-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .pnl-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .pnl-neutral {
+            color: #6c757d;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -410,6 +420,7 @@
         let volumeScanInterval = null;
         let tradingLoopInterval = null;
         let statsInterval = null;
+        let pnlUpdateInterval = null;
         let botStartTime = null;
         
         let top20Pairs = [];
@@ -891,28 +902,68 @@
             }
         }
         
-        // FONCTION POUR VÉRIFIER LES TRAILING STOPS ACTIFS
+        // DIAGNOSTIC AVANCÉ DES TRAILING STOPS
         async function checkTrailingStops() {
             try {
-                log('🔍 Vérification des trailing stops actifs...', 'INFO');
-                const result = await makeRequest('/bitget/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&planType=moving_plan');
+                log('🔍 Diagnostic complet des trailing stops...', 'INFO');
+                
+                // Vérifier tous les types d'ordres conditionnels
+                const planTypes = ['moving_plan', 'track_plan', 'normal_plan'];
+                let totalFound = 0;
+                
+                for (const planType of planTypes) {
+                    const result = await makeRequest(`/bitget/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&planType=${planType}`);
+                    
+                    if (result && result.code === '00000' && result.data && result.data.length > 0) {
+                        log(`📋 ${planType}: ${result.data.length} ordre(s) trouvé(s)`, 'INFO');
+                        result.data.forEach(order => {
+                            log(`   • ${order.symbol}: ${planType} - ID: ${order.orderId}`, 'INFO');
+                        });
+                        totalFound += result.data.length;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                if (totalFound === 0) {
+                    log('❌ ALERTE: Aucun ordre conditionnel trouvé pour vos positions!', 'ERROR');
+                    log('💡 Utilisez "Stop Loss Urgence" pour protéger vos positions', 'WARNING');
+                } else {
+                    log(`✅ Total: ${totalFound} ordre(s) conditionnel(s) actif(s)`, 'SUCCESS');
+                }
+                
+                return totalFound;
+            } catch (error) {
+                log(`⚠️ Erreur diagnostic: ${error.message}`, 'WARNING');
+                return 0;
+            }
+        }
+        
+        // FONCTION POUR RÉCUPÉRER LES PNL DES POSITIONS
+        async function updatePositionsPnL() {
+            if (openPositions.length === 0) return;
+            
+            try {
+                // Récupérer les positions actuelles depuis l'API
+                const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
                 
                 if (result && result.code === '00000' && result.data) {
-                    const activeTrailingStops = result.data.length;
-                    log(`🔍 ${activeTrailingStops} trailing stop(s) actif(s) détecté(s)`, 'SUCCESS');
+                    const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
                     
-                    result.data.forEach(stop => {
-                        log(`📋 Trailing: ${stop.symbol} - Range: ${stop.rangeRate}% - ID: ${stop.orderId}`, 'INFO');
+                    // Mettre à jour les PnL dans nos positions locales
+                    openPositions.forEach(localPos => {
+                        const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
+                        if (apiPos) {
+                            localPos.currentPrice = parseFloat(apiPos.markPrice);
+                            localPos.unrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
+                            localPos.pnlPercentage = ((localPos.currentPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
+                        }
                     });
                     
-                    return result.data;
-                } else {
-                    log('⚠️ Aucun trailing stop actif trouvé', 'WARNING');
-                    return [];
+                    updatePositionsDisplay();
                 }
             } catch (error) {
-                log(`⚠️ Erreur vérification trailing stops: ${error.message}`, 'WARNING');
-                return [];
+                // Mise à jour silencieuse, pas de log d'erreur pour éviter le spam
             }
         }
         
@@ -932,19 +983,43 @@
                 const timeAgo = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
                 const hasTrailing = position.trailingStopId ? true : false;
                 
+                // Calcul du PnL
+                let pnlDisplay = '';
+                let pnlClass = 'pnl-neutral';
+                
+                if (position.currentPrice && position.unrealizedPnL !== undefined) {
+                    const pnlValue = position.unrealizedPnL;
+                    const pnlPercent = position.pnlPercentage || 0;
+                    
+                    if (pnlValue > 0) {
+                        pnlClass = 'pnl-positive';
+                        pnlDisplay = `+${pnlValue.toFixed(2)} USDT (+${pnlPercent.toFixed(2)}%)`;
+                    } else if (pnlValue < 0) {
+                        pnlClass = 'pnl-negative';
+                        pnlDisplay = `${pnlValue.toFixed(2)} USDT (${pnlPercent.toFixed(2)}%)`;
+                    } else {
+                        pnlDisplay = `0.00 USDT (0.00%)`;
+                    }
+                } else {
+                    pnlDisplay = 'Calcul...';
+                }
+                
                 item.innerHTML = `
                     <div class="position-header">
                         <span><strong>${position.symbol}</strong> ${position.side}</span>
-                        <span>${position.size.toFixed(2)} USDT</span>
+                        <span class="${pnlClass}">${pnlDisplay}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
-                        <span style="font-size: 10px;">Prix: ${position.entryPrice.toFixed(4)}</span>
+                        <span style="font-size: 10px;">
+                            Entry: ${position.entryPrice.toFixed(4)} | 
+                            Current: ${position.currentPrice ? position.currentPrice.toFixed(4) : '--'}
+                        </span>
                         <span class="trailing-status ${hasTrailing ? 'trailing-active' : 'trailing-inactive'}">
                             ${hasTrailing ? `🔒 TS ${config.trailingStop}%` : '❌ NO TS'}
                         </span>
                     </div>
                     <div class="position-details">
-                        Ouvert: ${timeAgo}min ago | ID: ${(position.orderId || 'N/A').slice(-8)}
+                        Size: ${position.size.toFixed(2)} USDT | ${timeAgo}min ago | ID: ${(position.orderId || 'N/A').slice(-8)}
                     </div>
                 `;
                 
@@ -1108,7 +1183,11 @@
             statsInterval = setInterval(() => {
                 updateStats();
                 checkPositionsStatus();
+                updatePositionsPnL(); // Mise à jour PnL toutes les 15 secondes
             }, 15000);
+            
+            // Intervalle dédié pour les PnL (toutes les 10 secondes)
+            pnlUpdateInterval = setInterval(updatePositionsPnL, 10000);
             
             tradingLoop();
         }
@@ -1119,6 +1198,7 @@
             if (tradingLoopInterval) clearInterval(tradingLoopInterval);
             if (volumeScanInterval) clearInterval(volumeScanInterval);
             if (statsInterval) clearInterval(statsInterval);
+            if (pnlUpdateInterval) clearInterval(pnlUpdateInterval);
             
             document.getElementById('startBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
