@@ -259,12 +259,12 @@
     </style>
 </head>
 <body>
-    <div class="version">📅 02/06/2025 - TRAILING STOP CORRIGÉ</div>
+    <div class="version">📅 02/06/2025 - TOP 30 VOLUME - TRAILING STOP CORRIGÉ</div>
     
     <div class="container">
         <div class="header">
             <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 20 Volume - TRAILING STOP FIXÉ</p>
+            <p>Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</p>
         </div>
         
         <div class="grid">
@@ -325,7 +325,7 @@
                 </div>
                 
                 <div style="margin-top: 15px;">
-                    <button class="btn" onclick="scanTop20Volume()" style="width: 100%;">🔍 Scanner TOP 20 Volume</button>
+                    <button class="btn" onclick="scanTop30Volume()" style="width: 100%;">🔍 Scanner TOP 30 Volume</button>
                 </div>
                 
                 <div style="margin-top: 10px;">
@@ -336,7 +336,7 @@
         
         <div class="grid">
             <div class="card">
-                <h3>📈 TOP 20 Volume (Surveillance)</h3>
+                <h3>📈 TOP 30 Volume (Surveillance)</h3>
                 <div style="margin-bottom: 10px;">
                     <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
                 </div>
@@ -423,7 +423,7 @@
         let pnlUpdateInterval = null;
         let botStartTime = null;
         
-        let top20Pairs = [];
+        let top30Pairs = [];
         let currentScanIndex = 0;
         let openPositions = [];
         let botStats = {
@@ -578,9 +578,9 @@
             }
         }
         
-        async function scanTop20Volume() {
+        async function scanTop30Volume() {
             try {
-                log('🔍 Scan des volumes TOP 20 en cours...', 'INFO');
+                log('🔍 Scan des volumes TOP 30 en cours...', 'INFO');
                 
                 const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
                 const data = await response.json();
@@ -592,15 +592,15 @@
                             return volume > 10000000 && pair.symbol.endsWith('USDT');
                         })
                         .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                        .slice(0, 20);
+                        .slice(0, 30); // ✅ TOP 30 au lieu de 20
                     
-                    top20Pairs = validPairs;
+                    top30Pairs = validPairs;
                     currentScanIndex = 0;
                     
-                    updateTop20Display();
+                    updateTop30Display();
                     
                     const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
-                    log(`✅ TOP 20 mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
+                    log(`✅ TOP 30 mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
                     
                     validPairs.slice(0, 5).forEach((pair, index) => {
                         log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
@@ -618,11 +618,11 @@
             }
         }
         
-        function updateTop20Display() {
+        function updateTop30Display() {
             const container = document.getElementById('top20List');
             container.innerHTML = '';
             
-            top20Pairs.forEach((pair, index) => {
+            top30Pairs.forEach((pair, index) => {
                 const item = document.createElement('div');
                 item.className = 'pair-item';
                 if (index === currentScanIndex) {
@@ -1094,28 +1094,28 @@
         }
         
         async function tradingLoop() {
-            if (!botRunning || top20Pairs.length === 0) {
+            if (!botRunning || top30Pairs.length === 0) {
                 return;
             }
             
             try {
-                log('🔍 Début du cycle d\'analyse complète des TOP 20...', 'INFO');
+                log('🔍 Début du cycle d\'analyse complète des TOP 30...', 'INFO');
                 
                 const allAnalyses = [];
                 const signalsDetected = [];
                 let excludedPairs = [];
                 
-                for (let i = 0; i < top20Pairs.length; i++) {
-                    const pair = top20Pairs[i];
+                for (let i = 0; i < top30Pairs.length; i++) {
+                    const pair = top30Pairs[i];
                     
                     if (hasOpenPosition(pair.symbol)) {
                         excludedPairs.push(pair.symbol);
                         continue;
                     }
                     
-                    document.getElementById('currentScanPair').textContent = `${pair.symbol} (${i + 1}/20)`;
+                    document.getElementById('currentScanPair').textContent = `${pair.symbol} (${i + 1}/30)`;
                     currentScanIndex = i;
-                    updateTop20Display();
+                    updateTop30Display();
                     
                     const analysis = await analyzePairMACD(pair.symbol);
                     allAnalyses.push(analysis);
@@ -1128,7 +1128,7 @@
                         log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
                     } else {
                         // Réduire les logs pour MACD < Signal
-                        if (botStats.totalScans % 20 === 0) { // Log 1 fois sur 20
+                        if (botStats.totalScans % 30 === 0) { // Log 1 fois sur 30 maintenant
                             log(`📊 ${analysis.symbol}: ${analysis.reason}`, 'INFO');
                         }
                     }
@@ -1198,9 +1198,9 @@
                 return;
             }
             
-            const scanSuccess = await scanTop20Volume();
+            const scanSuccess = await scanTop30Volume();
             if (!scanSuccess) {
-                alert('Impossible de scanner le TOP 20. Vérifiez la connexion.');
+                alert('Impossible de scanner le TOP 30. Vérifiez la connexion.');
                 return;
             }
             
@@ -1211,15 +1211,15 @@
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             
-            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 20 avec TRAILING STOP CORRIGÉ', 'SUCCESS');
+            log('🚀 BOT DÉMARRÉ - Stratégie MACD TOP 30 avec TRAILING STOP CORRIGÉ', 'SUCCESS');
             log(`⚙️ Config: ${config.capitalPercent}% capital × ${config.leverage}x levier × ${config.trailingStop}% trailing stop`, 'INFO');
             log(`📊 Timeframe: 5 minutes | Indicateur: Croisement haussier MACD`, 'INFO');
-            log(`🎯 Surveillance: ${top20Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
+            log(`🎯 Surveillance: ${top30Pairs.length} paires TOP volume (exclusion auto des positions ouvertes)`, 'INFO');
             log(`📈 Condition: Ouvrir LONG si MACD croise au-dessus de Signal`, 'INFO');
             log(`🔒 Trailing Stop: moving_plan avec rangeRate (API corrigée)`, 'SUCCESS');
             
             tradingLoopInterval = setInterval(tradingLoop, 60000);
-            volumeScanInterval = setInterval(scanTop20Volume, 300000);
+            volumeScanInterval = setInterval(scanTop30Volume, 300000);
             statsInterval = setInterval(() => {
                 updateStats();
                 checkPositionsStatus();
@@ -1246,10 +1246,11 @@
             
             log('🛑 Bot arrêté', 'INFO');
             log(`📊 Session terminée: ${botStats.totalScans} scans, ${botStats.totalSignals} signaux`, 'INFO');
+            log(`💼 ${openPositions.length} position(s) restent ouvertes avec trailing stops`, 'INFO');
         }
         
         window.onload = async function() {
-            log('🔧 Initialisation du bot MACD TOP 20 (TRAILING STOP CORRIGÉ)...', 'INFO');
+            log('🔧 Initialisation du bot MACD TOP 30 (TRAILING STOP CORRIGÉ)...', 'INFO');
             
             try {
                 const response = await fetch(`${API_BASE}/test`);
@@ -1259,7 +1260,7 @@
                 log(`❌ Erreur proxy: ${error.message}`, 'ERROR');
             }
             
-            log('🔍 Pré-chargement du TOP 20 sans authentification...', 'INFO');
+            log('🔍 Pré-chargement du TOP 30 sans authentification...', 'INFO');
             try {
                 const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
                 const data = await response.json();
@@ -1268,16 +1269,16 @@
                     const validPairs = data.data
                         .filter(pair => parseFloat(pair.usdtVolume || 0) > 10000000)
                         .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                        .slice(0, 20);
+                        .slice(0, 30);
                     
-                    top20Pairs = validPairs;
-                    updateTop20Display();
+                    top30Pairs = validPairs;
+                    updateTop30Display();
                     
-                    log(`✅ TOP 20 pré-chargé: ${validPairs.length} paires disponibles`, 'SUCCESS');
+                    log(`✅ TOP 30 pré-chargé: ${validPairs.length} paires disponibles`, 'SUCCESS');
                     document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
                 }
             } catch (error) {
-                log(`⚠️ Pré-chargement TOP 20 échoué: ${error.message}`, 'WARNING');
+                log(`⚠️ Pré-chargement TOP 30 échoué: ${error.message}`, 'WARNING');
             }
             
             log('✅ Bot prêt! Trailing Stop corrigé avec moving_plan + rangeRate', 'SUCCESS');
