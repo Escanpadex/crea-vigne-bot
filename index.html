@@ -663,18 +663,22 @@
         
         async function getKlineData(symbol, limit = 50) {
             try {
+                // S'assurer qu'on récupère bien les données 5min
                 const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=5m&limit=${limit}`);
                 const data = await response.json();
                 
                 if (data.code === '00000' && data.data) {
-                    return data.data.map(candle => ({
+                    const klines = data.data.map(candle => ({
                         timestamp: parseInt(candle[0]),
                         open: parseFloat(candle[1]),
                         high: parseFloat(candle[2]),
                         low: parseFloat(candle[3]),
                         close: parseFloat(candle[4]),
                         volume: parseFloat(candle[5])
-                    })).reverse();
+                    })).reverse(); // Plus ancien au plus récent
+                    
+                    log(`📊 ${symbol}: ${klines.length} bougies 5m récupérées`, 'DEBUG');
+                    return klines;
                 }
             } catch (error) {
                 console.error(`Erreur klines ${symbol}:`, error);
@@ -683,31 +687,49 @@
         }
         
         function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-            if (prices.length < slowPeriod + signalPeriod) {
+            if (prices.length < slowPeriod + signalPeriod + 5) {
                 return { macd: 0, signal: 0, histogram: 0, crossover: false };
             }
             
+            // Calcul EMA comme TradingView (méthode standard)
             function calculateEMA(data, period) {
                 const multiplier = 2 / (period + 1);
-                let ema = data[0];
-                const result = [ema];
+                const emas = [];
                 
-                for (let i = 1; i < data.length; i++) {
-                    ema = (data[i] * multiplier) + (ema * (1 - multiplier));
-                    result.push(ema);
+                // Première valeur = SMA des premières périodes
+                let sma = 0;
+                for (let i = 0; i < period; i++) {
+                    sma += data[i];
                 }
-                return result;
+                sma = sma / period;
+                emas[period - 1] = sma;
+                
+                // Calcul EMA standard
+                for (let i = period; i < data.length; i++) {
+                    const ema = (data[i] * multiplier) + (emas[i - 1] * (1 - multiplier));
+                    emas[i] = ema;
+                }
+                
+                return emas;
             }
             
             const ema12 = calculateEMA(prices, fastPeriod);
             const ema26 = calculateEMA(prices, slowPeriod);
             
+            // Ligne MACD
             const macdLine = [];
             for (let i = slowPeriod - 1; i < prices.length; i++) {
-                macdLine.push(ema12[i] - ema26[i]);
+                if (ema12[i] !== undefined && ema26[i] !== undefined) {
+                    macdLine.push(ema12[i] - ema26[i]);
+                }
             }
             
+            // Signal line (EMA 9 du MACD)
             const signalLine = calculateEMA(macdLine, signalPeriod);
+            
+            if (macdLine.length < 2 || signalLine.length < 2) {
+                return { macd: 0, signal: 0, histogram: 0, crossover: false };
+            }
             
             const currentMacd = macdLine[macdLine.length - 1];
             const previousMacd = macdLine[macdLine.length - 2];
@@ -715,8 +737,14 @@
             const previousSignal = signalLine[signalLine.length - 2];
             
             const currentHistogram = currentMacd - currentSignal;
+            const previousHistogram = previousMacd - previousSignal;
             
-            const crossover = (previousMacd <= previousSignal) && (currentMacd > currentSignal);
+            // Croisement haussier STRICT : 
+            // - Bougie précédente : MACD <= Signal 
+            // - Bougie actuelle : MACD > Signal
+            // - ET histogram passe de négatif à positif
+            const crossover = (previousHistogram <= 0) && (currentHistogram > 0) && 
+                             (previousMacd <= previousSignal) && (currentMacd > currentSignal);
             
             return {
                 macd: currentMacd,
@@ -730,9 +758,9 @@
         
         async function analyzePairMACD(symbol) {
             try {
-                const klines = await getKlineData(symbol, 50);
+                const klines = await getKlineData(symbol, 100); // Plus de données pour calcul précis
                 
-                if (klines.length < 35) {
+                if (klines.length < 50) {
                     return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
                 }
                 
@@ -746,12 +774,14 @@
                 let signalStrength = 0;
                 let reason = '';
                 
-                if (macdData.crossover) {
+                if (macdData.crossover && macdData.histogram > 0) {
                     macdSignal = 'BUY';
-                    signalStrength = Math.abs(macdData.histogram) * 100 + (volume24h / 1000000);
-                    reason = `Croisement MACD haussier détecté! MACD: ${macdData.macd.toFixed(4)} > Signal: ${macdData.signal.toFixed(4)}`;
+                    signalStrength = Math.abs(macdData.histogram) * 1000; // Ajuster la sensibilité
+                    reason = `🔥 CROISEMENT HAUSSIER CONFIRMÉ! MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} | Histogram: ${macdData.histogram.toFixed(6)}`;
+                } else if (macdData.macd > macdData.signal) {
+                    reason = `📈 MACD au-dessus Signal mais pas de croisement récent. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
                 } else {
-                    reason = `Pas de croisement. MACD: ${macdData.macd.toFixed(4)}, Signal: ${macdData.signal.toFixed(4)}`;
+                    reason = `📊 MACD en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
                 }
                 
                 return {
