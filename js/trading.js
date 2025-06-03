@@ -61,57 +61,84 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         }
     }
     
-    let currentMacd = null, previousMacd = null;
-    let currentSignal = null, previousSignal = null;
+    // Prendre les TROIS dernières valeurs pour détecter un vrai croisement
+    let currentMacd = null, previousMacd = null, previousMacd2 = null;
+    let currentSignal = null, previousSignal = null, previousSignal2 = null;
     
+    // Récupérer les 3 dernières valeurs MACD
     for (let i = macdArray.length - 1; i >= 0; i--) {
         if (macdArray[i] !== null) {
             if (currentMacd === null) {
                 currentMacd = macdArray[i];
             } else if (previousMacd === null) {
                 previousMacd = macdArray[i];
+            } else if (previousMacd2 === null) {
+                previousMacd2 = macdArray[i];
                 break;
             }
         }
     }
     
+    // Récupérer les 3 dernières valeurs Signal
     for (let i = signalArray.length - 1; i >= 0; i--) {
         if (signalArray[i] !== null) {
             if (currentSignal === null) {
                 currentSignal = signalArray[i];
             } else if (previousSignal === null) {
                 previousSignal = signalArray[i];
+            } else if (previousSignal2 === null) {
+                previousSignal2 = signalArray[i];
                 break;
             }
         }
     }
     
-    if (currentMacd === null || previousMacd === null || 
-        currentSignal === null || previousSignal === null) {
+    // Vérifier qu'on a toutes les valeurs nécessaires
+    if (currentMacd === null || previousMacd === null || previousMacd2 === null ||
+        currentSignal === null || previousSignal === null || previousSignal2 === null) {
         return { macd: currentMacd, signal: currentSignal, histogram: null, crossover: false };
     }
     
     const currentHistogram = currentMacd - currentSignal;
     const previousHistogram = previousMacd - previousSignal;
+    const previousHistogram2 = previousMacd2 - previousSignal2;
     
-    const crossover = (previousHistogram <= 0) && (currentHistogram > 0) && 
-                     (previousMacd <= previousSignal) && (currentMacd > currentSignal);
+    // CROISEMENT HAUSSIER STRICT :
+    // 1. Les 2 périodes précédentes MACD était SOUS Signal (confirmation tendance baissière)
+    // 2. Période précédente : MACD encore SOUS Signal
+    // 3. Période actuelle : MACD CROISE AU-DESSUS de Signal
+    // 4. Histogram passe de négatif à positif
+    const strictCrossover = 
+        (previousMacd2 < previousSignal2) &&     // Il y a 2 périodes : MACD < Signal
+        (previousMacd < previousSignal) &&       // Période précédente : MACD < Signal  
+        (currentMacd > currentSignal) &&         // Maintenant : MACD > Signal
+        (previousHistogram < 0) &&               // Histogram était négatif
+        (currentHistogram > 0) &&                // Histogram devient positif
+        (currentHistogram > previousHistogram);  // Histogram s'améliore
     
     return {
         macd: currentMacd,
         signal: currentSignal,
         histogram: currentHistogram,
-        crossover: crossover,
+        crossover: strictCrossover,
         macdArray: macdArray,
-        signalArray: signalArray
+        signalArray: signalArray,
+        // Debug info
+        previousMacd: previousMacd,
+        previousMacd2: previousMacd2,
+        previousSignal: previousSignal,
+        previousSignal2: previousSignal2,
+        previousHistogram: previousHistogram,
+        previousHistogram2: previousHistogram2
     };
 }
 
 async function analyzePairMACD(symbol) {
     try {
-        const klines = await getKlineData(symbol, 100);
+        // Augmenter le nombre de bougies pour un calcul plus précis
+        const klines = await getKlineData(symbol, 150); // 150 bougies au lieu de 100
         
-        if (klines.length < 50) {
+        if (klines.length < 80) {
             return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
         }
         
@@ -130,9 +157,12 @@ async function analyzePairMACD(symbol) {
         } else if (macdData.crossover && macdData.histogram > 0) {
             macdSignal = 'BUY';
             signalStrength = Math.abs(macdData.histogram) * 1000;
-            reason = `🔥 CROISEMENT HAUSSIER CONFIRMÉ! MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} | Histogram: ${macdData.histogram.toFixed(6)}`;
+            reason = `🔥 CROISEMENT HAUSSIER STRICT CONFIRMÉ! 
+                     MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} 
+                     | Histogram: ${macdData.histogram.toFixed(6)} 
+                     | Prev MACD: ${macdData.previousMacd.toFixed(6)} < Prev Signal: ${macdData.previousSignal.toFixed(6)}`;
         } else if (macdData.macd > macdData.signal) {
-            reason = `📈 MACD au-dessus Signal mais pas de croisement récent. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            reason = `📈 MACD au-dessus Signal mais PAS de croisement récent. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         } else {
             reason = `📊 MACD en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         }
@@ -147,7 +177,16 @@ async function analyzePairMACD(symbol) {
             macdSignal: macdData.signal,
             histogram: macdData.histogram,
             crossover: macdData.crossover,
-            reason: reason
+            reason: reason,
+            // Debug data
+            debugData: {
+                previousMacd: macdData.previousMacd,
+                previousMacd2: macdData.previousMacd2,
+                previousSignal: macdData.previousSignal,
+                previousSignal2: macdData.previousSignal2,
+                previousHistogram: macdData.previousHistogram,
+                previousHistogram2: macdData.previousHistogram2
+            }
         };
         
     } catch (error) {
@@ -167,7 +206,16 @@ function hasOpenPosition(symbol) {
 }
 
 async function openPosition(symbol, analysis) {
+    // Vérifications préalables
     if (hasOpenPosition(symbol)) {
+        log(`⚠️ Position déjà ouverte sur ${symbol}`, 'WARNING');
+        return false;
+    }
+    
+    // NEW: Vérifier le cooldown
+    if (isPairInCooldown(symbol)) {
+        const remainingMinutes = getRemainingCooldown(symbol);
+        log(`⏰ ${symbol} en cooldown encore ${remainingMinutes} minutes`, 'WARNING');
         return false;
     }
     
@@ -185,6 +233,7 @@ async function openPosition(symbol, analysis) {
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
         log(`💰 Prix: ${analysis.price} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT`, 'INFO');
+        log(`🎯 Signal détecté: ${analysis.reason}`, 'INFO');
         
         const orderData = {
             symbol: symbol,
@@ -209,6 +258,9 @@ async function openPosition(symbol, analysis) {
         }
         
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
+        
+        // NEW: Ajouter immédiatement au cooldown
+        addPairToCooldown(symbol);
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
@@ -443,4 +495,83 @@ function updatePositionsDisplay() {
         
         container.appendChild(item);
     });
+}
+
+// Improved function to check if positions were manually closed on Bitget
+async function checkPositionsStatus() {
+    if (openPositions.length === 0) return;
+    
+    try {
+        // Récupérer les positions actives depuis l'API Bitget
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        
+        if (result && result.code === '00000' && result.data) {
+            const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            const currentSymbols = apiPositions.map(pos => pos.symbol);
+            
+            // Détecter les positions fermées manuellement
+            const closedPositions = openPositions.filter(localPos => 
+                !currentSymbols.includes(localPos.symbol)
+            );
+            
+            // Si des positions ont été fermées manuellement
+            if (closedPositions.length > 0) {
+                for (const closedPos of closedPositions) {
+                    log(`🔚 Position fermée MANUELLEMENT détectée: ${closedPos.symbol}`, 'WARNING');
+                    log(`💰 ${closedPos.symbol} fermée par l'utilisateur sur Bitget`, 'INFO');
+                    
+                    // Annuler le stop loss associé si il existe encore
+                    if (closedPos.stopLossId) {
+                        try {
+                            const cancelResult = await makeRequest('/bitget/api/v2/mix/order/cancel-plan-order', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    symbol: closedPos.symbol,
+                                    productType: "USDT-FUTURES",
+                                    marginCoin: "USDT",
+                                    orderId: closedPos.stopLossId
+                                })
+                            });
+                            
+                            if (cancelResult && cancelResult.code === '00000') {
+                                log(`✅ Stop Loss ${closedPos.symbol} annulé automatiquement`, 'SUCCESS');
+                            }
+                        } catch (error) {
+                            log(`⚠️ Erreur annulation stop loss ${closedPos.symbol}: ${error.message}`, 'WARNING');
+                        }
+                    }
+                }
+                
+                // Supprimer les positions fermées de la liste locale
+                openPositions = openPositions.filter(localPos => 
+                    currentSymbols.includes(localPos.symbol)
+                );
+                
+                updatePositionsDisplay();
+                await refreshBalance();
+                
+                log(`📊 ${closedPositions.length} position(s) fermée(s) manuellement - Synchronisation effectuée`, 'SUCCESS');
+                log(`🔄 Bot peut maintenant analyser à nouveau ces paires`, 'INFO');
+            }
+            
+            // Mettre à jour les PnL des positions restantes
+            for (const localPos of openPositions) {
+                const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
+                if (apiPos) {
+                    localPos.currentPrice = parseFloat(apiPos.markPrice);
+                    localPos.unrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
+                    localPos.pnlPercentage = ((localPos.currentPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
+                    
+                    // Mettre à jour le prix le plus haut pour le trailing stop
+                    if (localPos.currentPrice > localPos.highestPrice) {
+                        localPos.highestPrice = localPos.currentPrice;
+                    }
+                }
+            }
+            
+            updatePositionsDisplay();
+        }
+    } catch (error) {
+        log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
+    }
 } 
