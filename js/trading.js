@@ -574,4 +574,6 @@ async function checkPositionsStatus() {
     } catch (error) {
         log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
     }
-} 
+}
+
+🕐 Dernière MAJ: 06/06/2025 15:30 
