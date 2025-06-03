@@ -1,0 +1,251 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #dc3545;
+}
+
+.status-dot.online {
+    background: #28a745;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #555;
+}
+
+input, select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+.btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-danger {
+    background: linear-gradient(45deg, #dc3545, #c82333);
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #28a745, #1e7e34);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.logs {
+    background: #1a1a1a;
+    color: #00ff00;
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.balance-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: #f8f9fa;
+    margin-bottom: 8px;
+    border-radius: 6px;
+}
+
+.price-display {
+    font-size: 18px;
+    font-weight: bold;
+    color: #667eea;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.indicator {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.indicator.buy {
+    background: #28a745;
+    color: white;
+}
+
+.indicator.sell {
+    background: #dc3545;
+    color: white;
+}
+
+.indicator.hold {
+    background: #ffc107;
+    color: #212529;
+}
+
+.version {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    z-index: 1000;
+}
+
+.top20-list {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.pair-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px;
+    font-size: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.pair-item:last-child {
+    border-bottom: none;
+}
+
+.scanning {
+    background: #ffc107;
+    color: black;
+}
+
+.position-item {
+    background: #e8f5e8;
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 6px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.position-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.position-details {
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.trailing-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.trailing-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.pnl-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.pnl-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.pnl-neutral {
+    color: #6c757d;
+    font-weight: bold;
+} 
