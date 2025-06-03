@@ -4,64 +4,169 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot Trading Bitget Futures - Stratégie MACD TOP 20</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <div class="version">Version <span id="version">1.0.0</span></div>
+    <div class="version">📅 02/06/2025 - TOP 30 VOLUME - TRAILING STOP CORRIGÉ</div>
     
     <div class="container">
         <div class="header">
-            <h1>Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD TOP 20</p>
+            <h1>🚀 Bot Trading Bitget Futures</h1>
+            <p>Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</p>
         </div>
-
+        
         <div class="grid">
             <div class="card">
+                <h3>⚙️ Configuration API</h3>
                 <div class="status">
-                    <div class="status-dot"></div>
-                    <span>Status: Offline</span>
+                    <div class="status-dot" id="connectionStatus"></div>
+                    <span id="connectionText">Déconnecté</span>
                 </div>
                 
-                <form id="apiForm">
-                    <div class="form-group">
-                        <label for="apiKey">API Key</label>
-                        <input type="text" id="apiKey" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="apiSecret">API Secret</label>
-                        <input type="password" id="apiSecret" required>
-                    </div>
-                    <button type="submit" class="btn">Initialize API</button>
-                </form>
-
-                <div class="form-group" style="margin-top: 20px;">
-                    <button id="startBtn" class="btn btn-success">Start Bot</button>
-                    <button id="stopBtn" class="btn btn-danger">Stop Bot</button>
+                <div class="form-group">
+                    <label>API Key:</label>
+                    <input type="password" id="apiKey" placeholder="Votre API Key Bitget">
+                </div>
+                
+                <div class="form-group">
+                    <label>Secret Key:</label>
+                    <input type="password" id="secretKey" placeholder="Votre Secret Key">
+                </div>
+                
+                <div class="form-group">
+                    <label>Passphrase:</label>
+                    <input type="password" id="passphrase" placeholder="Votre Passphrase">
+                </div>
+                
+                <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
+                <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
+            </div>
+            
+            <div class="card">
+                <h3>📊 Paramètres Stratégie MACD</h3>
+                
+                <div class="form-group">
+                    <label>Capital à utiliser (% du total):</label>
+                    <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1">
+                    <small>5% du capital × levier 2x par position</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Levier:</label>
+                    <select id="leverage">
+                        <option value="2" selected>2x (Recommandé)</option>
+                        <option value="3">3x</option>
+                        <option value="5">5x</option>
+                        <option value="10">10x</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Trailing Stop (%):</label>
+                    <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1">
+                    <small>Recul maximum autorisé</small>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="startBot()" id="startBtn">▶️ Démarrer Stratégie</button>
+                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter Bot</button>
+                </div>
+                
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="scanTop30Volume()" style="width: 100%;">🔍 Scanner TOP 30 Volume</button>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%;">🔄 Vérifier Stop Loss Manuellement</button>
                 </div>
             </div>
-
+        </div>
+        
+        <div class="grid">
             <div class="card">
-                <h3>Top 20 Pairs</h3>
-                <div id="topPairs" class="top20-list"></div>
+                <h3>📈 TOP 30 Volume (Surveillance)</h3>
+                <div style="margin-bottom: 10px;">
+                    <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
+                </div>
+                <div class="top20-list" id="top20List">
+                    <div class="pair-item">
+                        <span>Chargement...</span>
+                        <span>--</span>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                    <strong>Dernière MAJ:</strong> <span id="lastScanTime">--</span>
+                </div>
             </div>
-
+            
             <div class="card">
-                <h3>Balance</h3>
-                <div id="balance"></div>
+                <h3>💼 Positions Ouvertes</h3>
+                <div id="positionsContainer">
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        Aucune position ouverte
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
+                    <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
+                </div>
             </div>
-
+        </div>
+        
+        <div class="grid">
             <div class="card">
-                <h3>Positions</h3>
-                <div id="positions"></div>
+                <h3>💳 Balance Futures</h3>
+                <div id="balanceContainer">
+                    <div class="balance-item">
+                        <span>USDT Total:</span>
+                        <span id="usdtBalance">--</span>
+                    </div>
+                    <div class="balance-item">
+                        <span>Équité:</span>
+                        <span id="totalEquity">--</span>
+                    </div>
+                </div>
+                <button class="btn" onclick="refreshBalance()" style="width: 100%; margin-top: 10px;">🔄 Actualiser</button>
             </div>
-
+            
             <div class="card">
-                <h3>Logs</h3>
-                <div id="logs" class="logs"></div>
+                <h3>📊 Statistiques Bot</h3>
+                <div class="balance-item">
+                    <span>Scans effectués:</span>
+                    <span id="totalScans">0</span>
+                </div>
+                <div class="balance-item">
+                    <span>Signaux détectés:</span>
+                    <span id="totalSignals">0</span>
+                </div>
+                <div class="balance-item">
+                    <span>Positions ouvertes:</span>
+                    <span id="totalOpenPositions">0</span>
+                </div>
+                <div class="balance-item">
+                    <span>Uptime:</span>
+                    <span id="botUptime">00:00:00</span>
+                </div>
             </div>
+        </div>
+        
+        <div class="card">
+            <h3>📝 Logs de Trading</h3>
+            <div class="logs" id="logs">
+                [INFO] Bot de trading MACD TOP 20 initialisé...<br>
+                [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
+                [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
+                [INFO] En attente de configuration API...<br>
+            </div>
+            <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer logs</button>
         </div>
     </div>
 
-    <script type="module" src="main.js"></script>
+    <!-- JavaScript Files -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/trading.js"></script>
+    <script src="js/main.js"></script>
 </body>
-</html>
+</html> 
