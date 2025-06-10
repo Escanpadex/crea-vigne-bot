@@ -81,4 +81,16 @@ function saveKeys() {
     } else {
         alert('Veuillez remplir tous les champs API');
     }
+}
+
+function fillApiKeys() {
+    // Remplir automatiquement les champs avec les clés API prédéfinies
+    document.getElementById('apiKey').value = 'bg_a6cefdfb426b44f00fa74ac0203a5049';
+    document.getElementById('secretKey').value = '0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc';
+    document.getElementById('passphrase').value = 'Charmant16320Charmant16320';
+    
+    log('🔑 Clés API automatiquement remplies', 'SUCCESS');
+    
+    // Optionnel: sauvegarder et tester automatiquement
+    saveKeys();
 } 
