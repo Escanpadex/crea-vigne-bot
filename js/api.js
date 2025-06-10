@@ -130,6 +130,11 @@ function updateTop30Display() {
         `;
         container.appendChild(item);
     });
+    
+    // NOUVEAU: Mettre à jour aussi le sélecteur de graphiques TradingView
+    if (typeof updateChartSelector === 'function') {
+        updateChartSelector();
+    }
 }
 
 async function setLeverage(symbol, leverage) {
