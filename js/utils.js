@@ -45,26 +45,6 @@ function updateStats() {
     }
 }
 
-// NEW: Update version timestamp
-function updateVersionTimestamp() {
-    const now = new Date();
-    const day = now.getDate().toString().padStart(2, '0');
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const year = now.getFullYear();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    
-    const timestamp = `${day}/${month}/${year} ${hours}:${minutes}`;
-    
-    const versionElement = document.querySelector('.version');
-    if (versionElement) {
-        versionElement.textContent = `🕐 Dernière MAJ: ${timestamp}`;
-        log(`🕒 Version mise à jour: ${timestamp}`, 'SUCCESS');
-    } else {
-        log('❌ Élément version non trouvé dans le DOM', 'ERROR');
-    }
-}
-
 function saveKeys() {
     const keys = {
         apiKey: document.getElementById('apiKey').value,
