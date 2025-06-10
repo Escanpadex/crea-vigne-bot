@@ -7,10 +7,12 @@
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
+    <div class="version">🕐 Dernière MAJ: 06/06/2025 15:30</div>
+    
     <div class="container">
         <div class="header">
-            <h1>🤖 BOT BITGET - STRATÉGIE MACD</h1>
-            <div class="version-badge">Dernière MAJ: 06/01/2025 19:50</div>
+            <h1>🚀 Bot Trading Bitget Futures</h1>
+            <p>Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</p>
         </div>
         
         <div class="grid">
@@ -36,11 +38,8 @@
                     <input type="password" id="passphrase" placeholder="Votre Passphrase">
                 </div>
                 
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <button class="btn" onclick="loadApiKeys()" style="flex: 1;">🔑 Charger les clés</button>
-                    <button class="btn" onclick="testConnection()" style="flex: 1;">🔗 Tester la connexion</button>
-                </div>
-                <button class="btn btn-success" onclick="saveKeys()" style="width: 100%;">💾 Sauvegarder les clés</button>
+                <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
+                <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
             </div>
             
             <div class="card">
@@ -158,9 +157,9 @@
         <div class="card">
             <h3>📝 Logs de Trading</h3>
             <div class="logs" id="logs">
-                [INFO] Bot de trading MACD TOP 30 initialisé...<br>
+                [INFO] Bot de trading MACD TOP 20 initialisé...<br>
                 [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
-                [INFO] Système de trailing stop automatique activé<br>
+                [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
                 [INFO] En attente de configuration API...<br>
             </div>
             <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer logs</button>
