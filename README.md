@@ -62,4 +62,4 @@ Ce bot est fourni à des fins éducatives. Le trading de cryptomonnaies comporte
 
 ---
 
-**Version** : 02/06/2025 - TOP 30 VOLUME - TRAILING STOP CORRIGÉ
+**Version** : Bot MACD TOP 30 - Dernière mise à jour automatique
