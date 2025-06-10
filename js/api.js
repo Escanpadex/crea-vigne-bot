@@ -2,13 +2,11 @@
 
 async function makeRequest(endpoint, options = {}) {
     try {
-        const timestamp = Date.now().toString();
         const headers = {
             'Content-Type': 'application/json',
-            'apikey': config.apiKey,
-            'secretkey': config.secretKey,
-            'passphrase': config.passphrase,
-            'timestamp': timestamp,
+            'BG-ACCESS-KEY': config.apiKey,
+            'BG-SECRET-KEY': config.secretKey,
+            'BG-ACCESS-PASSPHRASE': config.passphrase,
             ...options.headers
         };
         
@@ -16,6 +14,10 @@ async function makeRequest(endpoint, options = {}) {
             ...options,
             headers
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         return await response.json();
     } catch (error) {

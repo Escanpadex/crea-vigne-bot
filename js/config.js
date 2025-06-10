@@ -12,8 +12,8 @@ const config = {
     cooldownMinutes: 30
 };
 
-// API Configuration
-const API_BASE = 'http://localhost:3000';
+// API Configuration - Serveur proxy VPS existant
+const API_BASE = 'https://api.crea-vigne.fr/api';
 
 // Global variables
 let top30Pairs = [];
