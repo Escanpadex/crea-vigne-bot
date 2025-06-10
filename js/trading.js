@@ -476,7 +476,12 @@ function updatePositionsDisplay() {
         item.innerHTML = `
             <div class="position-header">
                 <span><strong>${position.symbol}</strong> ${position.side}</span>
-                <span class="${pnlClass}">${pnlDisplay}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="${pnlClass}">${pnlDisplay}</span>
+                    <button class="btn-close-position" onclick="closePosition('${position.symbol}')" title="Fermer cette position">
+                        ❌ Fermer
+                    </button>
+                </div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin: 2px 0;">
                 <span style="font-size: 10px;">
@@ -574,4 +579,106 @@ async function checkPositionsStatus() {
     } catch (error) {
         log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
     }
-} 
+}
+
+// Close a position manually with confirmation
+async function closePosition(symbol) {
+    const position = openPositions.find(pos => pos.symbol === symbol);
+    if (!position) {
+        log(`❌ Position ${symbol} introuvable`, 'ERROR');
+        return;
+    }
+    
+    const confirmation = confirm(`Voulez-vous vraiment fermer la position ${symbol} ?\n\nPnL actuel: ${position.unrealizedPnL ? position.unrealizedPnL.toFixed(2) : '--'} USDT\nEntry: ${position.entryPrice.toFixed(4)}\nCurrent: ${position.currentPrice ? position.currentPrice.toFixed(4) : '--'}`);
+    
+    if (!confirmation) {
+        log(`🚫 Fermeture position ${symbol} annulée par l'utilisateur`, 'INFO');
+        return;
+    }
+    
+    try {
+        log(`🔄 Fermeture position ${symbol}...`, 'INFO');
+        
+        // Obtenir la taille exacte de la position depuis l'API
+        const positionResult = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        let exactSize = position.quantity;
+        
+        if (positionResult && positionResult.code === '00000' && positionResult.data) {
+            const apiPosition = positionResult.data.find(pos => pos.symbol === symbol && parseFloat(pos.total) > 0);
+            if (apiPosition) {
+                exactSize = Math.abs(parseFloat(apiPosition.total));
+            }
+        }
+        
+        // Fermer la position avec un ordre market opposé
+        const closeOrderData = {
+            symbol: symbol,
+            productType: "USDT-FUTURES",
+            marginMode: "crossed",
+            marginCoin: "USDT",
+            size: exactSize.toString(),
+            side: position.side === 'long' ? 'sell' : 'buy', // Ordre opposé pour fermer
+            orderType: "market",
+            timeInForceValue: "normal",
+            reduceOnly: true
+        };
+        
+        const closeResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+            method: 'POST',
+            body: JSON.stringify(closeOrderData)
+        });
+        
+        if (closeResult && closeResult.code === '00000') {
+            log(`✅ ${symbol}: Ordre de fermeture passé avec succès`, 'SUCCESS');
+            log(`📤 Ordre ID: ${closeResult.data.orderId}`, 'INFO');
+            
+            // Annuler le stop loss associé
+            if (position.stopLossId) {
+                try {
+                    const cancelResult = await makeRequest('/bitget/api/v2/mix/order/cancel-plan-order', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            symbol: symbol,
+                            productType: "USDT-FUTURES",
+                            marginCoin: "USDT",
+                            orderId: position.stopLossId
+                        })
+                    });
+                    
+                    if (cancelResult && cancelResult.code === '00000') {
+                        log(`✅ Stop Loss ${symbol} annulé automatiquement`, 'SUCCESS');
+                    }
+                } catch (error) {
+                    log(`⚠️ Erreur annulation stop loss ${symbol}: ${error.message}`, 'WARNING');
+                }
+            }
+            
+            // Supprimer la position de la liste locale
+            const positionIndex = openPositions.findIndex(pos => pos.symbol === symbol);
+            if (positionIndex > -1) {
+                openPositions.splice(positionIndex, 1);
+            }
+            
+            // Supprimer le cooldown
+            if (pairCooldowns[symbol]) {
+                delete pairCooldowns[symbol];
+                log(`🔄 Cooldown ${symbol} supprimé - Analyse autorisée immédiatement`, 'INFO');
+            }
+            
+            updatePositionsDisplay();
+            await refreshBalance();
+            
+            log(`💰 Position ${symbol} fermée avec succès par l'utilisateur`, 'SUCCESS');
+            
+        } else {
+            const errorMsg = closeResult?.msg || 'Erreur inconnue lors de la fermeture';
+            log(`❌ Erreur fermeture ${symbol}: ${errorMsg}`, 'ERROR');
+            alert(`Erreur lors de la fermeture de ${symbol}:\n${errorMsg}`);
+        }
+        
+    } catch (error) {
+        log(`❌ Erreur critique fermeture ${symbol}: ${error.message}`, 'ERROR');
+        alert(`Erreur critique lors de la fermeture de ${symbol}:\n${error.message}`);
+    }
+}
+
