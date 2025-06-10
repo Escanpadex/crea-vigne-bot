@@ -10,6 +10,8 @@ async function makeRequest(endpoint, options = {}) {
             ...options.headers
         };
         
+        log(`🌐 Requête API: ${API_BASE}${endpoint}`, 'DEBUG');
+        
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers
@@ -21,7 +23,16 @@ async function makeRequest(endpoint, options = {}) {
         
         return await response.json();
     } catch (error) {
-        log(`Erreur API: ${error.message}`, 'ERROR');
+        // Diagnostic détaillé des erreurs
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            log(`❌ Erreur réseau: Impossible d'atteindre ${API_BASE}`, 'ERROR');
+            log(`🔍 Vérifiez: 1) Serveur proxy actif 2) CORS configuré 3) HTTPS valide`, 'ERROR');
+        } else if (error.name === 'TypeError') {
+            log(`❌ Erreur CORS/Réseau: ${error.message}`, 'ERROR');
+            log(`💡 GitHub Pages → ${API_BASE} - Vérifiez Access-Control-Allow-Origin`, 'WARNING');
+        } else {
+            log(`❌ Erreur API: ${error.message}`, 'ERROR');
+        }
         return null;
     }
 }
