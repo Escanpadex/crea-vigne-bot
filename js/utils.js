@@ -45,6 +45,23 @@ function updateStats() {
     }
 }
 
+// NEW: Update version timestamp
+function updateVersionTimestamp() {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    
+    const timestamp = `${day}/${month}/${year} ${hours}:${minutes}`;
+    
+    const versionElement = document.querySelector('.version');
+    if (versionElement) {
+        versionElement.textContent = `🕐 Dernière MAJ: ${timestamp}`;
+    }
+}
+
 function saveKeys() {
     const keys = {
         apiKey: document.getElementById('apiKey').value,
@@ -63,36 +80,5 @@ function saveKeys() {
         testConnection();
     } else {
         alert('Veuillez remplir tous les champs API');
-    }
-}
-
-// NEW: Function to load API keys from config
-function loadApiKeys() {
-    try {
-        const apiKeyField = document.getElementById('apiKey');
-        const secretKeyField = document.getElementById('secretKey');
-        const passphraseField = document.getElementById('passphrase');
-        
-        if (apiKeyField && secretKeyField && passphraseField) {
-            apiKeyField.value = config.apiKey;
-            secretKeyField.value = config.secretKey;
-            passphraseField.value = config.passphrase;
-            
-            log('🔑 Clés API chargées avec succès depuis la configuration', 'SUCCESS');
-            log(`✅ API Key: ${config.apiKey.substring(0, 10)}...`, 'INFO');
-            log(`✅ Secret Key: ${config.secretKey.substring(0, 10)}...`, 'INFO');
-            log(`✅ Passphrase: ${config.passphrase.substring(0, 5)}...`, 'INFO');
-            
-            // Mise à jour automatique de la config locale
-            config.apiKey = config.apiKey;
-            config.secretKey = config.secretKey;
-            config.passphrase = config.passphrase;
-            
-            log('🎯 Clés prêtes pour utilisation - Vous pouvez maintenant tester la connexion', 'SUCCESS');
-        } else {
-            log('❌ Erreur: Champs API non trouvés dans le DOM', 'ERROR');
-        }
-    } catch (error) {
-        log(`❌ Erreur lors du chargement des clés: ${error.message}`, 'ERROR');
     }
 } 

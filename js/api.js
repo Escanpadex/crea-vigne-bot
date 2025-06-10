@@ -2,37 +2,24 @@
 
 async function makeRequest(endpoint, options = {}) {
     try {
+        const timestamp = Date.now().toString();
         const headers = {
             'Content-Type': 'application/json',
-            'BG-ACCESS-KEY': config.apiKey,
-            'BG-SECRET-KEY': config.secretKey,
-            'BG-ACCESS-PASSPHRASE': config.passphrase,
+            'apikey': config.apiKey,
+            'secretkey': config.secretKey,
+            'passphrase': config.passphrase,
+            'timestamp': timestamp,
             ...options.headers
         };
-        
-        log(`🌐 Requête API: ${API_BASE}${endpoint}`, 'DEBUG');
         
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
         return await response.json();
     } catch (error) {
-        // Diagnostic détaillé des erreurs
-        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            log(`❌ Erreur réseau: Impossible d'atteindre ${API_BASE}`, 'ERROR');
-            log(`🔍 Vérifiez: 1) Serveur proxy actif 2) CORS configuré 3) HTTPS valide`, 'ERROR');
-        } else if (error.name === 'TypeError') {
-            log(`❌ Erreur CORS/Réseau: ${error.message}`, 'ERROR');
-            log(`💡 GitHub Pages → ${API_BASE} - Vérifiez Access-Control-Allow-Origin`, 'WARNING');
-        } else {
-            log(`❌ Erreur API: ${error.message}`, 'ERROR');
-        }
+        log(`Erreur API: ${error.message}`, 'ERROR');
         return null;
     }
 }
