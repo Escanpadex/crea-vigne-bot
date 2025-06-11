@@ -47,26 +47,63 @@
             <div class="card">
                 <h3>📊 Paramètres Stratégie MACD</h3>
                 
-                <div class="form-group">
-                    <label>Capital à utiliser (% du total):</label>
-                    <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1">
-                    <small>5% du capital × levier 2x par position</small>
-                </div>
-                
-                <div class="form-group">
-                    <label>Levier:</label>
-                    <select id="leverage">
-                        <option value="2" selected>2x (Recommandé)</option>
-                        <option value="3">3x</option>
-                        <option value="5">5x</option>
-                        <option value="10">10x</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Trailing Stop (%):</label>
-                    <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1">
-                    <small>Recul maximum autorisé</small>
+                <!-- Layout en 2 colonnes -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    
+                    <!-- Colonne Gauche - Paramètres de base (réduits) -->
+                    <div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px;">Capital (%):</label>
+                            <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 60px;">
+                            <small style="font-size: 10px;">5% × levier</small>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px;">Levier:</label>
+                            <select id="leverage" style="width: 80px;">
+                                <option value="2" selected>2x</option>
+                                <option value="3">3x</option>
+                                <option value="5">5x</option>
+                                <option value="10">10x</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px;">Stop (%):</label>
+                            <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 60px;">
+                            <small style="font-size: 10px;">Trailing</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Colonne Droite - Nouveaux paramètres -->
+                    <div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px;">⏱️ Timeframe MACD:</label>
+                            <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%;">
+                                <option value="5m" selected>5 minutes</option>
+                                <option value="15m">15 minutes</option>
+                                <option value="1h">1 heure</option>
+                                <option value="4h">4 heures</option>
+                            </select>
+                            <small style="font-size: 10px;">Période d'analyse</small>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px;">📊 Quantité analysée:</label>
+                            <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 100%;">
+                                <option value="5">TOP 5 Volume</option>
+                                <option value="10">TOP 10 Volume</option>
+                                <option value="20">TOP 20 Volume</option>
+                                <option value="30" selected>TOP 30 Volume</option>
+                                <option value="50">TOP 50 Volume</option>
+                            </select>
+                            <small style="font-size: 10px;">Paires à surveiller</small>
+                        </div>
+                        
+                        <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                            <strong id="currentSettings">📈 5min | TOP 30</strong>
+                        </div>
+                    </div>
                 </div>
                 
                 <div style="display: flex; gap: 10px;">
@@ -82,7 +119,7 @@
         
         <div class="grid">
             <div class="card">
-                <h3>📈 TOP 30 Volume (Surveillance)</h3>
+                <h3 id="topVolumeTitle">📈 TOP 30 Volume (Surveillance)</h3>
                 <div style="margin-bottom: 10px;">
                     <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
                 </div>
@@ -168,7 +205,7 @@
             <div class="card">
                 <h3>📊 Graphique TradingView & MACD</h3>
                 <div class="form-group">
-                    <label>Sélectionner une paire (TOP 30 Volume):</label>
+                    <label id="chartSelectorLabel">Sélectionner une paire (TOP 30 Volume):</label>
                     <select id="chartSymbol" onchange="updateChart()">
                         <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
                     </select>
@@ -227,11 +264,14 @@
         // Initialize TradingView Chart
         function initTradingViewChart() {
             if (typeof TradingView !== 'undefined') {
+                const timeframe = config.macdTimeframe || '5m';
+                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                
                 tvWidget = new TradingView.widget({
                     "width": "100%",
                     "height": 500,
                     "symbol": currentSymbol,
-                    "interval": "5",
+                    "interval": interval,
                     "timezone": "Europe/Paris",
                     "theme": "light",
                     "style": "1",
@@ -253,7 +293,7 @@
                     }
                 });
                 
-                log('📊 Graphique TradingView initialisé avec MACD', 'SUCCESS');
+                log(`📊 Graphique TradingView initialisé avec MACD (${timeframe})`, 'SUCCESS');
             } else {
                 setTimeout(initTradingViewChart, 1000);
             }
@@ -565,11 +605,14 @@
             
             // Recréer le widget avec le nouveau symbole
             setTimeout(() => {
+                const timeframe = config.macdTimeframe || '5m';
+                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                
                 tvWidget = new TradingView.widget({
                     "width": "100%",
                     "height": 600,
                     "symbol": selectedSymbol,
-                    "interval": "5",
+                    "interval": interval,
                     "timezone": "Europe/Paris",
                     "theme": "light",
                     "style": "1",
@@ -588,7 +631,7 @@
                     }
                 });
                 
-                log(`📊 Graphique recréé avec succès: ${symbolName}`, 'SUCCESS');
+                log(`📊 Graphique recréé avec succès: ${symbolName} (${timeframe})`, 'SUCCESS');
             }, 500);
             
             // Redémarrer le scan temps réel pour la nouvelle paire
@@ -602,6 +645,65 @@
 
         async function refreshMACDData() {
             await refreshCompleteHistory();
+        }
+
+        // 🆕 NOUVELLES FONCTIONS: Gestion des paramètres MACD
+        function updateMacdTimeframe() {
+            const timeframe = document.getElementById('macdTimeframe').value;
+            config.macdTimeframe = timeframe;
+            
+            const settingsElement = document.getElementById('currentSettings');
+            settingsElement.textContent = `📈 ${timeframe === '5m' ? '5min' : timeframe === '15m' ? '15min' : timeframe === '1h' ? '1h' : '4h'} | TOP ${config.topVolumeCount}`;
+            
+            log(`⏰ Timeframe MACD modifié: ${timeframe}`, 'INFO');
+            
+            // Mettre à jour le graphique TradingView si il existe
+            if (tvWidget) {
+                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                updateChart(); // Recréer avec le nouveau timeframe
+                log(`📊 Graphique TradingView mis à jour: ${timeframe}`, 'SUCCESS');
+            }
+            
+            // Si le bot tourne, informer de l'impact
+            if (botRunning) {
+                log(`⚠️ Changement appliqué - Redémarrez le bot pour une analyse optimale`, 'WARNING');
+            }
+        }
+
+        function updateTopVolumeCount() {
+            const count = parseInt(document.getElementById('topVolumeCount').value);
+            config.topVolumeCount = count;
+            
+            const settingsElement = document.getElementById('currentSettings');
+            const timeframeText = config.macdTimeframe === '5m' ? '5min' : config.macdTimeframe === '15m' ? '15min' : config.macdTimeframe === '1h' ? '1h' : '4h';
+            settingsElement.textContent = `📈 ${timeframeText} | TOP ${count}`;
+            
+            log(`📊 Quantité modifiée: TOP ${count} Volume`, 'INFO');
+            
+            // Mettre à jour le titre de la section
+            const topSectionTitle = document.getElementById('topVolumeTitle');
+            if (topSectionTitle) {
+                topSectionTitle.textContent = `📈 TOP ${count} Volume (Surveillance)`;
+            }
+            
+            // Mettre à jour le sélecteur de graphique
+            const chartLabel = document.getElementById('chartSelectorLabel');
+            if (chartLabel) {
+                chartLabel.textContent = `Sélectionner une paire (TOP ${count} Volume):`;
+            }
+            
+            // Relancer le scan si connecté
+            if (config.apiKey && top30Pairs.length > 0) {
+                log(`🔄 Mise à jour automatique du TOP ${count}...`, 'INFO');
+                setTimeout(() => {
+                    scanTop30Volume();
+                }, 1000);
+            }
+            
+            // Si le bot tourne, informer de l'impact
+            if (botRunning) {
+                log(`✅ TOP ${count} appliqué - Prochaine analyse dans ${count} paires`, 'SUCCESS');
+            }
         }
 
         // Initialize when page loads
