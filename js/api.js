@@ -90,6 +90,7 @@ async function scanTop30Volume() {
                 .slice(0, 30);
             
             top30Pairs = validPairs;
+            window.top30Pairs = validPairs;
             currentScanIndex = 0;
             
             updateTop30Display();
@@ -132,8 +133,15 @@ function updateTop30Display() {
     });
     
     // NOUVEAU: Mettre à jour aussi le sélecteur de graphiques TradingView
-    if (typeof updateChartSelector === 'function') {
-        updateChartSelector();
+    if (typeof window.updateChartSelector === 'function') {
+        window.updateChartSelector();
+    } else {
+        // Fallback si la fonction n'est pas encore chargée
+        setTimeout(() => {
+            if (typeof window.updateChartSelector === 'function') {
+                window.updateChartSelector();
+            }
+        }, 500);
     }
 }
 
