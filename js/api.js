@@ -60,6 +60,11 @@ async function testConnection() {
         // 🔄 AUTO: Démarrer la synchronisation automatique des positions
         startAutoSyncPositions();
         
+        // 💰 AUTO: Démarrer le rafraîchissement automatique du solde
+        if (typeof startAutoBalanceRefresh === 'function') {
+            startAutoBalanceRefresh();
+        }
+        
         return true;
     } else {
         log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
