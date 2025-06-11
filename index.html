@@ -50,57 +50,58 @@
                 <!-- Layout en 2 colonnes -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     
-                    <!-- Colonne Gauche - Paramètres de base (réduits) -->
+                    <!-- Colonne Gauche - Paramètres de base -->
                     <div>
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 12px;">Capital (%):</label>
-                            <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 60px;">
-                            <small style="font-size: 10px;">5% × levier</small>
+                            <label style="font-size: 14px;">Capital (%):</label>
+                            <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 400px;">
+                            <small style="font-size: 11px;">Pourcentage du capital total à utiliser</small>
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 12px;">Levier:</label>
-                            <select id="leverage" style="width: 80px;">
-                                <option value="2" selected>2x</option>
+                            <label style="font-size: 14px;">Levier:</label>
+                            <select id="leverage" style="width: 400px;">
+                                <option value="2" selected>2x (Recommandé)</option>
                                 <option value="3">3x</option>
                                 <option value="5">5x</option>
                                 <option value="10">10x</option>
                             </select>
+                            <small style="font-size: 11px;">Multiplicateur de position</small>
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 12px;">Stop (%):</label>
-                            <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 60px;">
-                            <small style="font-size: 10px;">Trailing</small>
+                            <label style="font-size: 14px;">Trailing Stop (%):</label>
+                            <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 400px;">
+                            <small style="font-size: 11px;">Distance de protection en %</small>
                         </div>
                     </div>
                     
                     <!-- Colonne Droite - Nouveaux paramètres -->
                     <div>
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 12px;">⏱️ Timeframe MACD:</label>
-                            <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%;">
+                            <label style="font-size: 14px;">⏱️ Timeframe MACD:</label>
+                            <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 400px;">
                                 <option value="5m" selected>5 minutes</option>
                                 <option value="15m">15 minutes</option>
                                 <option value="1h">1 heure</option>
                                 <option value="4h">4 heures</option>
                             </select>
-                            <small style="font-size: 10px;">Période d'analyse</small>
+                            <small style="font-size: 11px;">Période d'analyse MACD</small>
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 12px;">📊 Quantité analysée:</label>
-                            <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 100%;">
+                            <label style="font-size: 14px;">📊 Quantité analysée:</label>
+                            <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 400px;">
                                 <option value="5">TOP 5 Volume</option>
                                 <option value="10">TOP 10 Volume</option>
                                 <option value="20">TOP 20 Volume</option>
                                 <option value="30" selected>TOP 30 Volume</option>
                                 <option value="50">TOP 50 Volume</option>
                             </select>
-                            <small style="font-size: 10px;">Paires à surveiller</small>
+                            <small style="font-size: 11px;">Nombre de cryptos à surveiller</small>
                         </div>
                         
-                        <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                        <div style="font-size: 12px; color: #666; margin-top: 8px;">
                             <strong id="currentSettings">📈 5min | TOP 30</strong>
                         </div>
                     </div>
