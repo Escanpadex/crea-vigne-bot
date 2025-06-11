@@ -477,26 +477,29 @@
                 const timeStr = crossover.time.toLocaleString('fr-FR');
                 const now = new Date();
                 const delayMinutes = Math.round((now - crossover.time) / 60000);
-                const signalStrength = Math.abs(crossover.histogram) > 0.001 ? 'Fort' : 'Faible';
-                const signalColor = Math.abs(crossover.histogram) > 0.001 ? '#48bb78' : '#f59e0b';
                 
-                // Couleur du délai
-                const delayColor = delayMinutes <= 2 ? '#48bb78' : delayMinutes <= 5 ? '#f59e0b' : '#f56565';
+                // Convertir en heures si > 60 minutes
+                let delayText;
+                let delayColor;
+                
+                if (delayMinutes >= 60) {
+                    const hours = Math.floor(delayMinutes / 60);
+                    const remainingMinutes = delayMinutes % 60;
+                    delayText = remainingMinutes > 0 ? `${hours}h${remainingMinutes}min` : `${hours}h`;
+                    delayColor = '#f56565'; // Rouge pour les délais longs
+                } else {
+                    delayText = `${delayMinutes}min`;
+                    delayColor = delayMinutes <= 2 ? '#48bb78' : delayMinutes <= 5 ? '#f59e0b' : '#f56565';
+                }
                 
                 html += `
                     <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin: 8px 0; background: #f8fffe;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                             <strong style="color: #1a202c;">🔔 Croisement #${crossovers.length - index}</strong>
-                            <div style="display: flex; gap: 10px;">
-                                <span style="color: ${signalColor}; font-weight: bold;">📊 ${signalStrength}</span>
-                                <span style="color: ${delayColor}; font-weight: bold;">⚡ ${delayMinutes}min</span>
-                            </div>
+                            <span style="color: ${delayColor}; font-weight: bold;">⚡ ${delayText}</span>
                         </div>
                         <div style="font-size: 13px; color: #4a5568;">
                             <div>⏰ Heure: ${timeStr}</div>
-                            <div>📈 MACD: ${crossover.macd.toFixed(6)}</div>
-                            <div>📊 Signal: ${crossover.signal.toFixed(6)}</div>
-                            <div>📋 Histogram: ${crossover.histogram.toFixed(6)}</div>
                         </div>
                     </div>
                 `;
@@ -579,7 +582,72 @@
             setTimeout(() => {
                 initTradingViewChart();
             }, 2000);
+            
+            // Initialiser le sélecteur avec des valeurs par défaut
+            setTimeout(() => {
+                initializeChartSelector();
+            }, 1000);
         });
+        
+        // Fonction d'initialisation du sélecteur
+        function initializeChartSelector() {
+            const chartSelect = document.getElementById('chartSymbol');
+            
+            // Si pas encore de TOP 30, mettre des valeurs par défaut
+            if (!top30Pairs || top30Pairs.length === 0) {
+                chartSelect.innerHTML = `
+                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT)</option>
+                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT)</option>
+                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT)</option>
+                    <option value="BINANCE:ADAUSDT">4. Cardano (ADA/USDT)</option>
+                    <option value="BINANCE:SOLUSDT">5. Solana (SOL/USDT)</option>
+                `;
+                log('📊 Sélecteur initialisé avec paires par défaut', 'INFO');
+            }
+        }
+        
+        // Fonction globale accessible depuis api.js
+        window.updateChartSelector = function() {
+            const chartSelect = document.getElementById('chartSymbol');
+            
+            if (window.top30Pairs && window.top30Pairs.length > 0) {
+                // Sauvegarder la sélection actuelle
+                const currentSelection = chartSelect.value;
+                
+                // Vider le sélecteur
+                chartSelect.innerHTML = '';
+                
+                // Ajouter les TOP 30 volume
+                window.top30Pairs.forEach((pair, index) => {
+                    const option = document.createElement('option');
+                    const symbol = pair.symbol.replace('USDT', '');
+                    const binanceSymbol = `BINANCE:${pair.symbol}`;
+                    
+                    option.value = binanceSymbol;
+                    option.textContent = `${index + 1}. ${symbol}/USDT (${formatNumber(pair.usdtVolume || pair.volume24h)})`;
+                    
+                    chartSelect.appendChild(option);
+                });
+                
+                // Restaurer la sélection ou prendre le premier
+                if (currentSelection && Array.from(chartSelect.options).some(opt => opt.value === currentSelection)) {
+                    chartSelect.value = currentSelection;
+                } else {
+                    chartSelect.value = chartSelect.options[0].value;
+                    updateChart();
+                }
+                
+                log(`📊 Sélecteur graphique mis à jour avec ${window.top30Pairs.length} paires TOP volume`, 'SUCCESS');
+            } else {
+                // Si pas de données TOP 30, garder quelques paires par défaut
+                chartSelect.innerHTML = `
+                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT) - En attente TOP 30</option>
+                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT) - En attente TOP 30</option>
+                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT) - En attente TOP 30</option>
+                `;
+                log('📊 Sélecteur en attente des données TOP 30', 'INFO');
+            }
+        };
     </script>
 </body>
 </html> 
