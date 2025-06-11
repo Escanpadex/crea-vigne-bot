@@ -75,15 +75,7 @@
                 </div>
                 
                 <div style="margin-top: 15px;">
-                    <button class="btn" onclick="scanTop30Volume()" style="width: 100%;">🔍 Scanner TOP 30 Volume</button>
-                </div>
-                
-                <div style="margin-top: 10px;">
                     <button class="btn" onclick="manageTrailingStops()" style="width: 100%;">🔄 Vérifier Stop Loss Manuellement</button>
-                </div>
-                
-                <div style="margin-top: 10px;">
-                    <button class="btn" onclick="checkPositionsStatus()" style="width: 100%;">🔄 Synchroniser Positions</button>
                 </div>
             </div>
         </div>
@@ -138,10 +130,6 @@
             <div class="card">
                 <h3>📊 Statistiques Bot</h3>
                 <div class="balance-item">
-                    <span>Scans effectués:</span>
-                    <span id="totalScans">0</span>
-                </div>
-                <div class="balance-item">
                     <span>Signaux détectés:</span>
                     <span id="totalSignals">0</span>
                 </div>
@@ -150,8 +138,16 @@
                     <span id="totalOpenPositions">0</span>
                 </div>
                 <div class="balance-item">
-                    <span>Uptime:</span>
-                    <span id="botUptime">00:00:00</span>
+                    <span>Positions fermées:</span>
+                    <span id="totalClosedPositions">0</span>
+                </div>
+                <div class="balance-item">
+                    <span>🟢 Gagnantes:</span>
+                    <span id="winningPositions" style="color: #48bb78;">0 (+0$)</span>
+                </div>
+                <div class="balance-item">
+                    <span>🔴 Perdantes:</span>
+                    <span id="losingPositions" style="color: #f56565;">0 (-0$)</span>
                 </div>
             </div>
         </div>
@@ -558,10 +554,42 @@
             const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
             document.getElementById('currentMACDPair').textContent = symbolName;
             
+            // Détruire l'ancien widget et en créer un nouveau avec le nouveau symbole
             if (tvWidget) {
-                tvWidget.setSymbol(selectedSymbol, '5');
-                log(`📊 Graphique mis à jour: ${symbolName}`, 'INFO');
+                try {
+                    tvWidget.remove();
+                } catch(e) {
+                    console.log('Widget déjà supprimé');
+                }
             }
+            
+            // Recréer le widget avec le nouveau symbole
+            setTimeout(() => {
+                tvWidget = new TradingView.widget({
+                    "width": "100%",
+                    "height": 600,
+                    "symbol": selectedSymbol,
+                    "interval": "5",
+                    "timezone": "Europe/Paris",
+                    "theme": "light",
+                    "style": "1",
+                    "locale": "fr",
+                    "toolbar_bg": "#f1f3f6",
+                    "enable_publishing": false,
+                    "hide_top_toolbar": false,
+                    "hide_legend": false,
+                    "save_image": false,
+                    "container_id": "tradingview_chart",
+                    "studies": ["MACD@tv-basicstudies"],
+                    "overrides": {
+                        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
+                        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
+                        "paneProperties.background": "#ffffff"
+                    }
+                });
+                
+                log(`📊 Graphique recréé avec succès: ${symbolName}`, 'SUCCESS');
+            }, 500);
             
             // Redémarrer le scan temps réel pour la nouvelle paire
             startRealTimeScanning();
