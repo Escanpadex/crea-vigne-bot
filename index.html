@@ -190,7 +190,8 @@
             </div>
         </div>
         
-        <div class="card">
+        <!-- Logs de Trading (Masqués - Cliquer pour afficher) -->
+        <div class="card" id="logsSection" style="display: none;">
             <h3>📝 Logs de Trading</h3>
             <div class="logs" id="logs">
                 [INFO] Bot de trading MACD TOP 20 initialisé...<br>
@@ -198,7 +199,16 @@
                 [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
                 [INFO] En attente de configuration API...<br>
             </div>
-            <button class="btn" onclick="clearLogs()" style="margin-top: 10px;">🗑️ Effacer logs</button>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn" onclick="clearLogs()" style="flex: 1;">🗑️ Effacer logs</button>
+                <button class="btn" onclick="toggleLogs()" style="flex: 1;">👁️ Masquer logs</button>
+            </div>
+        </div>
+        
+        <!-- Bouton pour afficher les logs -->
+        <div class="card" id="logsToggleCard" style="text-align: center; padding: 15px;">
+            <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
+            <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
         </div>
         
         <!-- NOUVELLE SECTION TRADINGVIEW & MACD -->
@@ -704,6 +714,22 @@
             // Si le bot tourne, informer de l'impact
             if (botRunning) {
                 log(`✅ TOP ${count} appliqué - Prochaine analyse dans ${count} paires`, 'SUCCESS');
+            }
+        }
+
+        // 👁️ FONCTION: Basculer l'affichage des logs
+        function toggleLogs() {
+            const logsSection = document.getElementById('logsSection');
+            const toggleCard = document.getElementById('logsToggleCard');
+            
+            if (logsSection.style.display === 'none') {
+                // Afficher les logs
+                logsSection.style.display = 'block';
+                toggleCard.style.display = 'none';
+            } else {
+                // Masquer les logs
+                logsSection.style.display = 'none';
+                toggleCard.style.display = 'block';
             }
         }
 
