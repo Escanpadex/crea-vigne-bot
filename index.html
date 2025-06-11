@@ -18,30 +18,24 @@
         </div>
         
         <div class="grid">
-            <div class="card">
-                <h3>⚙️ Configuration API</h3>
-                <div class="status">
-                    <div class="status-dot" id="connectionStatus"></div>
-                    <span id="connectionText">Déconnecté</span>
+            <div class="card" style="padding: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h4 style="margin: 0;">⚙️ API</h4>
+                        <div class="status">
+                            <div class="status-dot" id="connectionStatus"></div>
+                            <span id="connectionText" style="font-size: 12px;">Déconnecté</span>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="testConnection()" style="font-size: 12px; padding: 5px 10px;">🔗 Connecter</button>
                 </div>
                 
-                <div class="form-group">
-                    <label>API Key:</label>
+                <!-- Champs API cachés mais fonctionnels -->
+                <div style="display: none;">
                     <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
-                </div>
-                
-                <div class="form-group">
-                    <label>Secret Key:</label>
                     <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
-                </div>
-                
-                <div class="form-group">
-                    <label>Passphrase:</label>
                     <input type="password" id="passphrase" value="Charmant16320Charmant16320">
                 </div>
-                
-                <button class="btn" onclick="testConnection()">🔗 Tester la connexion</button>
-                <button class="btn btn-success" onclick="saveKeys()" style="margin-top: 10px;">💾 Sauvegarder les clés</button>
             </div>
             
             <div class="card">
@@ -101,6 +95,15 @@
                             <small style="font-size: 11px; display: block; margin-top: 3px;">Nombre de cryptos à surveiller</small>
                         </div>
                         
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 14px;">💳 Balance:</label>
+                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 12px;">
+                                <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
+                                <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
+                            </div>
+                            <small style="font-size: 11px; display: block; margin-top: 3px;">Mise à jour automatique</small>
+                        </div>
+                        
                         <div style="font-size: 12px; color: #666; margin-top: 8px; text-align: center;">
                             <strong id="currentSettings">📈 5min | TOP 30</strong>
                         </div>
@@ -150,20 +153,7 @@
         </div>
         
         <div class="grid">
-            <div class="card">
-                <h3>💳 Balance Futures</h3>
-                <div id="balanceContainer">
-                    <div class="balance-item">
-                        <span>USDT Total:</span>
-                        <span id="usdtBalance">--</span>
-                    </div>
-                    <div class="balance-item">
-                        <span>Équité:</span>
-                        <span id="totalEquity">--</span>
-                    </div>
-                </div>
-                <button class="btn" onclick="refreshBalance()" style="width: 100%; margin-top: 10px;">🔄 Actualiser</button>
-            </div>
+
             
             <div class="card">
                 <h3>📊 Statistiques Bot</h3>
@@ -731,6 +721,25 @@
                 logsSection.style.display = 'none';
                 toggleCard.style.display = 'block';
             }
+        }
+
+        // 💰 AUTOMATISATION: Rafraîchissement automatique du solde
+        let autoBalanceInterval = null;
+        
+        function startAutoBalanceRefresh() {
+            if (autoBalanceInterval) {
+                clearInterval(autoBalanceInterval);
+            }
+            
+            // Rafraîchir immédiatement
+            refreshBalance();
+            
+            // Programmer le rafraîchissement toutes les minutes
+            autoBalanceInterval = setInterval(() => {
+                if (config.apiKey) {
+                    refreshBalance();
+                }
+            }, 60 * 1000); // 60 secondes
         }
 
         // Initialize when page loads
