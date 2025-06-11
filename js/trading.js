@@ -344,6 +344,20 @@ async function syncLocalPositions() {
     if (removedPositions.length > 0) {
         removedPositions.forEach(pos => {
             log(`🔚 Position fermée détectée: ${pos.symbol} (Stop Loss déclenché)`, 'SUCCESS');
+            
+            // Mettre à jour les statistiques de trading
+            botStats.totalClosedPositions++;
+            const pnl = pos.unrealizedPnL || 0;
+            
+            if (pnl > 0) {
+                botStats.winningPositions++;
+                botStats.totalWinAmount += pnl;
+                log(`🟢 Position gagnante: +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
+            } else if (pnl < 0) {
+                botStats.losingPositions++;
+                botStats.totalLossAmount += pnl; // pnl est négatif
+                log(`🔴 Position perdante: ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
+            }
         });
         
         openPositions = openPositions.filter(localPos => 
@@ -351,6 +365,7 @@ async function syncLocalPositions() {
         );
         
         updatePositionsDisplay();
+        updateStats();
     }
     
     return apiPositions;
@@ -520,6 +535,20 @@ async function checkPositionsStatus() {
                     log(`🔚 Position fermée MANUELLEMENT détectée: ${closedPos.symbol}`, 'WARNING');
                     log(`💰 ${closedPos.symbol} fermée par l'utilisateur sur Bitget`, 'INFO');
                     
+                    // Mettre à jour les statistiques de trading
+                    botStats.totalClosedPositions++;
+                    const pnl = closedPos.unrealizedPnL || 0;
+                    
+                    if (pnl > 0) {
+                        botStats.winningPositions++;
+                        botStats.totalWinAmount += pnl;
+                        log(`🟢 Position gagnante (manuelle): +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
+                    } else if (pnl < 0) {
+                        botStats.losingPositions++;
+                        botStats.totalLossAmount += pnl; // pnl est négatif
+                        log(`🔴 Position perdante (manuelle): ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
+                    }
+                    
                     // Annuler le stop loss associé si il existe encore
                     if (closedPos.stopLossId) {
                         try {
@@ -552,6 +581,7 @@ async function checkPositionsStatus() {
                 
                 log(`📊 ${closedPositions.length} position(s) fermée(s) manuellement - Synchronisation effectuée`, 'SUCCESS');
                 log(`🔄 Bot peut maintenant analyser à nouveau ces paires`, 'INFO');
+                updateStats();
             }
             
             // Mettre à jour les PnL des positions restantes

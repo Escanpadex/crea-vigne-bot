@@ -31,18 +31,11 @@ function formatNumber(num) {
 }
 
 function updateStats() {
-    document.getElementById('totalScans').textContent = botStats.totalScans;
     document.getElementById('totalSignals').textContent = botStats.totalSignals;
     document.getElementById('totalOpenPositions').textContent = openPositions.length;
-    
-    if (botStartTime) {
-        const elapsed = Date.now() - botStartTime;
-        const hours = Math.floor(elapsed / 3600000);
-        const minutes = Math.floor((elapsed % 3600000) / 60000);
-        const seconds = Math.floor((elapsed % 60000) / 1000);
-        document.getElementById('botUptime').textContent = 
-            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
+    document.getElementById('totalClosedPositions').textContent = botStats.totalClosedPositions;
+    document.getElementById('winningPositions').textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
+    document.getElementById('losingPositions').textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
 }
 
 // NEW: Update version timestamp

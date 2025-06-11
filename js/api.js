@@ -43,6 +43,23 @@ async function testConnection() {
         document.getElementById('connectionText').textContent = 'Connecté (Futures)';
         log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
+        
+        // 🚀 AUTO: Lancer immédiatement le scan TOP 30 après connexion
+        log('🔄 Lancement automatique du scan TOP 30 Volume...', 'INFO');
+        await scanTop30Volume();
+        
+        // 🔄 AUTO: Programmer le scan automatique toutes les 30 minutes
+        if (window.autoScanInterval) {
+            clearInterval(window.autoScanInterval);
+        }
+        window.autoScanInterval = setInterval(async () => {
+            log('🔄 Scan automatique TOP 30 Volume (30min)...', 'INFO');
+            await scanTop30Volume();
+        }, 30 * 60 * 1000); // 30 minutes
+        
+        // 🔄 AUTO: Démarrer la synchronisation automatique des positions
+        startAutoSyncPositions();
+        
         return true;
     } else {
         log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
@@ -112,6 +129,27 @@ async function scanTop30Volume() {
         log(`❌ Erreur scanner: ${error.message}`, 'ERROR');
         return false;
     }
+}
+
+// 🔄 NOUVELLE FONCTION: Synchronisation automatique des positions
+function startAutoSyncPositions() {
+    log('🔄 Démarrage de la synchronisation automatique des positions (toutes les 2 minutes)', 'INFO');
+    
+    // Arrêter l'ancien intervalle s'il existe
+    if (window.autoSyncInterval) {
+        clearInterval(window.autoSyncInterval);
+    }
+    
+    // Synchroniser immédiatement
+    checkPositionsStatus();
+    
+    // Programmer la synchronisation toutes les 2 minutes
+    window.autoSyncInterval = setInterval(() => {
+        if (openPositions.length > 0) {
+            log('🔄 Synchronisation automatique des positions...', 'DEBUG');
+            checkPositionsStatus();
+        }
+    }, 2 * 60 * 1000); // 2 minutes
 }
 
 function updateTop30Display() {

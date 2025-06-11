@@ -17,9 +17,13 @@ let openPositions = [];
 let recentAnalysis = new Map();
 let pairCooldown = new Map();
 let botStats = {
-    totalScans: 0,
     totalSignals: 0,
-    totalPositions: 0
+    totalPositions: 0,
+    totalClosedPositions: 0,
+    winningPositions: 0,
+    losingPositions: 0,
+    totalWinAmount: 0,
+    totalLossAmount: 0
 };
 
 // Configuration object
