@@ -35,7 +35,10 @@ let config = {
     leverage: 2,
     trailingStop: 1.0,
     cooldownMinutes: 30,
-    // NEW: Advanced trailing stop settings
+    // NEW: MACD Strategy settings
+    macdTimeframe: '5m',            // Timeframe pour l'analyse MACD
+    topVolumeCount: 30,             // Nombre de cryptos à analyser (TOP x)
+    // Advanced trailing stop settings
     trailingStopSettings: {
         initialStopPercent: 1.0,        // Stop loss initial (-1%)
         trailingPercent: 1.0,           // Distance de trailing (1% sous le plus haut)

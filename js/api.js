@@ -92,7 +92,8 @@ async function refreshBalance() {
 
 async function scanTop30Volume() {
     try {
-        log('🔍 Scan des volumes TOP 30 en cours...', 'INFO');
+        const topCount = config.topVolumeCount || 30;
+        log(`🔍 Scan des volumes TOP ${topCount} en cours...`, 'INFO');
         
         const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
         const data = await response.json();
@@ -104,7 +105,7 @@ async function scanTop30Volume() {
                     return volume > 10000000 && pair.symbol.endsWith('USDT');
                 })
                 .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                .slice(0, 30);
+                .slice(0, topCount);
             
             top30Pairs = validPairs;
             window.top30Pairs = validPairs;
@@ -113,9 +114,9 @@ async function scanTop30Volume() {
             updateTop30Display();
             
             const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
-            log(`✅ TOP 30 mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
+            log(`✅ TOP ${topCount} mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
             
-            validPairs.slice(0, 5).forEach((pair, index) => {
+            validPairs.slice(0, Math.min(5, topCount)).forEach((pair, index) => {
                 log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
             });
             
@@ -209,7 +210,8 @@ async function setLeverage(symbol, leverage) {
 
 async function getKlineData(symbol, limit = 50) {
     try {
-        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=5m&limit=${limit}`);
+        const timeframe = config.macdTimeframe || '5m';
+        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
         const data = await response.json();
         
         if (data.code === '00000' && data.data) {
@@ -222,7 +224,7 @@ async function getKlineData(symbol, limit = 50) {
                 volume: parseFloat(candle[5])
             })).reverse();
             
-            log(`📊 ${symbol}: ${klines.length} bougies 5m récupérées`, 'DEBUG');
+            log(`📊 ${symbol}: ${klines.length} bougies ${timeframe} récupérées`, 'DEBUG');
             return klines;
         }
     } catch (error) {
