@@ -18,16 +18,17 @@
         </div>
         
         <div class="grid">
-            <div class="card" style="padding: 10px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div class="card">
+                <!-- En-tête avec API et titre -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0;">📊 Paramètres Stratégie MACD</h3>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <h4 style="margin: 0;">⚙️ API</h4>
                         <div class="status">
                             <div class="status-dot" id="connectionStatus"></div>
-                            <span id="connectionText" style="font-size: 12px;">Déconnecté</span>
+                            <span id="connectionText" style="font-size: 11px;">Déconnecté</span>
                         </div>
+                        <button class="btn" onclick="testConnection()" style="font-size: 11px; padding: 4px 8px;">🔗 API</button>
                     </div>
-                    <button class="btn" onclick="testConnection()" style="font-size: 12px; padding: 5px 10px;">🔗 Connecter</button>
                 </div>
                 
                 <!-- Champs API cachés mais fonctionnels -->
@@ -36,10 +37,6 @@
                     <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
                     <input type="password" id="passphrase" value="Charmant16320Charmant16320">
                 </div>
-            </div>
-            
-            <div class="card">
-                <h3>📊 Paramètres Stratégie MACD</h3>
                 
                 <!-- Layout en 2 colonnes -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -139,43 +136,43 @@
             </div>
             
             <div class="card">
-                <h3>💼 Positions Ouvertes</h3>
+                <h3>💼 Positions & Statistiques</h3>
+                
+                <!-- Statistiques compactes en haut -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #666;">Signaux</div>
+                        <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #666;">Ouvertes</div>
+                        <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #666;">Fermées</div>
+                        <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #666;">🟢 Gains</div>
+                        <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
+                        <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
+                    </div>
+                </div>
+                
+                <!-- Positions ouvertes -->
                 <div id="positionsContainer">
                     <div style="text-align: center; color: #666; padding: 20px;">
                         Aucune position ouverte
                     </div>
                 </div>
-                <div style="margin-top: 10px;">
+                
+                <!-- Capital en bas -->
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
                     <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
                     <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid">
-
-            
-            <div class="card">
-                <h3>📊 Statistiques Bot</h3>
-                <div class="balance-item">
-                    <span>Signaux détectés:</span>
-                    <span id="totalSignals">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>Positions ouvertes:</span>
-                    <span id="totalOpenPositions">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>Positions fermées:</span>
-                    <span id="totalClosedPositions">0</span>
-                </div>
-                <div class="balance-item">
-                    <span>🟢 Gagnantes:</span>
-                    <span id="winningPositions" style="color: #48bb78;">0 (+0$)</span>
-                </div>
-                <div class="balance-item">
-                    <span>🔴 Perdantes:</span>
-                    <span id="losingPositions" style="color: #f56565;">0 (-0$)</span>
                 </div>
             </div>
         </div>
