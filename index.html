@@ -12,167 +12,71 @@
     <div class="version">🕐 Dernière MAJ: 07/01/2025 14:30</div>
     
     <div class="container">
-        <div class="header">
-            <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</p>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <!-- En-tête avec API et titre -->
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                    <h3 style="margin: 0;">📊 Paramètres Stratégie MACD</h3>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="status">
-                            <div class="status-dot" id="connectionStatus"></div>
-                            <span id="connectionText" style="font-size: 11px;">Déconnecté</span>
-                        </div>
-                        <button class="btn" onclick="testConnection()" style="font-size: 11px; padding: 4px 8px;">🔗 API</button>
+        <div class="dashboard-header">
+            <div class="dashboard-header-left">
+                <img src="logo.png" alt="Bot Logo" class="dashboard-logo" />
+                <div>
+                    <h1 class="dashboard-title">Bot Trading Bitget Futures</h1>
+                    <div class="dashboard-subtitle">Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</div>
+                </div>
+            </div>
+            <div class="dashboard-header-right">
+                <div class="connection-indicator">
+                    <span id="connectionDot" class="connection-dot offline"></span>
+                    <span id="connectionText">Déconnecté</span>
+                    <button class="btn btn-connection" onclick="testConnection()">🔗 API</button>
+                </div>
+                <div class="main-metrics">
+                    <div class="metric">
+                        <div class="metric-label">USDT</div>
+                        <div class="metric-value" id="usdtBalance">--</div>
                     </div>
-                </div>
-                
-                <!-- Champs API cachés mais fonctionnels -->
-                <div style="display: none;">
-                    <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
-                    <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
-                    <input type="password" id="passphrase" value="Charmant16320Charmant16320">
-                </div>
-                
-                <!-- Layout en 2 colonnes -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    
-                    <!-- Colonne Gauche - Paramètres de base -->
-                    <div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Capital (%):</label>
-                            <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; max-width: 200px;">
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Pourcentage du capital total à utiliser</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Levier:</label>
-                            <select id="leverage" style="width: 100%; max-width: 200px;">
-                                <option value="2" selected>2x (Recommandé)</option>
-                                <option value="3">3x</option>
-                                <option value="5">5x</option>
-                                <option value="10">10x</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Multiplicateur de position</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Trailing Stop (%):</label>
-                            <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; max-width: 200px;">
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Distance de protection en %</small>
-                        </div>
+                    <div class="metric">
+                        <div class="metric-label">Équité</div>
+                        <div class="metric-value" id="totalEquity">--</div>
                     </div>
-                    
-                    <!-- Colonne Droite - Nouveaux paramètres -->
-                    <div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">⏱️ Timeframe MACD:</label>
-                            <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%; max-width: 200px;">
-                                <option value="5m" selected>5 minutes</option>
-                                <option value="15m">15 minutes</option>
-                                <option value="1h">1 heure</option>
-                                <option value="4h">4 heures</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Période d'analyse MACD</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">📊 Quantité analysée:</label>
-                            <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 100%; max-width: 200px;">
-                                <option value="5">TOP 5 Volume</option>
-                                <option value="10">TOP 10 Volume</option>
-                                <option value="20">TOP 20 Volume</option>
-                                <option value="30" selected>TOP 30 Volume</option>
-                                <option value="50">TOP 50 Volume</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Nombre de cryptos à surveiller</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">💳 Balance:</label>
-                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 12px;">
-                                <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
-                                <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
-                            </div>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Mise à jour automatique</small>
-                        </div>
-                        
-                        <div style="font-size: 12px; color: #666; margin-top: 8px; text-align: center;">
-                            <strong id="currentSettings">📈 5min | TOP 30</strong>
-                        </div>
+                    <div class="metric">
+                        <div class="metric-label">Capital utilisé</div>
+                        <div class="metric-value" id="usedCapital">0</div>
                     </div>
-                </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn" onclick="startBot()" id="startBtn">▶️ Démarrer Stratégie</button>
-                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter Bot</button>
-                </div>
-                
-                <div style="margin-top: 15px;">
-                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%;">🔄 Vérifier Stop Loss Manuellement</button>
                 </div>
             </div>
         </div>
-        
-        <div class="grid">
-            <div class="card">
-                <h3 id="topVolumeTitle">📈 TOP 30 Volume (Surveillance)</h3>
-                <div style="margin-bottom: 10px;">
-                    <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
-                </div>
-                <div class="top20-list" id="top20List">
-                    <div class="pair-item">
-                        <span>Chargement...</span>
-                        <span>--</span>
-                    </div>
-                </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <strong>Dernière MAJ:</strong> <span id="lastScanTime">--</span>
+        <div class="dashboard-cards">
+            <div class="dashboard-card dashboard-card-params">
+                <h2>Paramètres Stratégie MACD</h2>
+                <div class="dashboard-card-content">
+                    <!-- Place existing parameters form here -->
                 </div>
             </div>
-            
-            <div class="card">
-                <h3>💼 Positions & Statistiques</h3>
-                
-                <!-- Statistiques compactes en haut -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Signaux</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
+            <div class="dashboard-card dashboard-card-positions">
+                <h2>Positions & Statistiques</h2>
+                <div class="dashboard-card-content">
+                    <div class="positions-metrics">
+                        <div class="positions-metric">
+                            <span class="positions-metric-label">Signaux</span>
+                            <span class="positions-metric-value" id="totalSignals">0</span>
+                        </div>
+                        <div class="positions-metric">
+                            <span class="positions-metric-label">Ouvertes</span>
+                            <span class="positions-metric-value" id="totalOpenPositions">0</span>
+                        </div>
+                        <div class="positions-metric">
+                            <span class="positions-metric-label">Fermées</span>
+                            <span class="positions-metric-value" id="totalClosedPositions">0</span>
+                        </div>
+                        <div class="positions-metric">
+                            <span class="positions-metric-label">🟢 Gains</span>
+                            <span class="positions-metric-value profit" id="winningPositions">0 (+0$)</span>
+                        </div>
+                        <div class="positions-metric">
+                            <span class="positions-metric-label">🔴 Pertes</span>
+                            <span class="positions-metric-value loss" id="losingPositions">0 (-0$)</span>
+                        </div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Ouvertes</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
+                    <div id="positionsContainer" class="positions-list">
+                        <div class="positions-empty">Aucune position ouverte</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Fermées</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🟢 Gains</div>
-                        <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
-                        <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
-                    </div>
-                </div>
-                
-                <!-- Positions ouvertes -->
-                <div id="positionsContainer">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        Aucune position ouverte
-                    </div>
-                </div>
-                
-                <!-- Capital en bas -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
-                    <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
-                    <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
                 </div>
             </div>
         </div>
