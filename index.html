@@ -3,33 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Trading Bitget Futures - Stratégie MACD TOP 20</title>
+    <title>Bot Trading Bitget Futures - Terminal Dark</title>
     <link rel="stylesheet" href="styles/main.css">
     <!-- TradingView Widget Script -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
-    <div class="version">🕐 Dernière MAJ: 07/01/2025 14:30</div>
+    <div class="version">🕐 v2.0.0 - 07/01/2025 14:30</div>
     
     <div class="container">
+        <!-- HEADER PRINCIPAL AVEC STATUS -->
         <div class="header">
-            <h1>🚀 Bot Trading Bitget Futures</h1>
-            <p>Stratégie MACD - TOP 30 Volume - TRAILING STOP FIXÉ</p>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <!-- En-tête avec API et titre -->
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                    <h3 style="margin: 0;">📊 Paramètres Stratégie MACD</h3>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="status">
-                            <div class="status-dot" id="connectionStatus"></div>
-                            <span id="connectionText" style="font-size: 11px;">Déconnecté</span>
-                        </div>
-                        <button class="btn" onclick="testConnection()" style="font-size: 11px; padding: 4px 8px;">🔗 API</button>
-                    </div>
+            <div class="status-header">
+                <div>
+                    <h1>🚀 TRADING TERMINAL</h1>
+                    <p>Bitget Futures • Stratégie MACD • Auto-Trailing</p>
                 </div>
+                <div class="status">
+                    <div class="status-dot" id="connectionStatus"></div>
+                    <span class="connection-text" id="connectionText">SYSTÈME DÉCONNECTÉ</span>
+                </div>
+            </div>
+            
+            <!-- MÉTRIQUES PRINCIPALES -->
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Balance</div>
+                    <div class="metric-value text-primary" id="usdtBalance">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Équité</div>
+                    <div class="metric-value text-primary" id="totalEquity">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Positions</div>
+                    <div class="metric-value" id="totalOpenPositions">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">P&L Total</div>
+                    <div class="metric-value" id="totalPnL">$0.00</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Signaux</div>
+                    <div class="metric-value text-warning" id="totalSignals">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Win Rate</div>
+                    <div class="metric-value text-success" id="winRate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION CONTRÔLES & CONFIGURATION -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>⚙️ Configuration Stratégie</h3>
                 
                 <!-- Champs API cachés mais fonctionnels -->
                 <div style="display: none;">
@@ -38,172 +66,179 @@
                     <input type="password" id="passphrase" value="Charmant16320Charmant16320">
                 </div>
                 
-                <!-- Layout en 2 colonnes -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    
-                    <!-- Colonne Gauche - Paramètres de base -->
-                    <div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Capital (%):</label>
-                            <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; max-width: 200px;">
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Pourcentage du capital total à utiliser</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Levier:</label>
-                            <select id="leverage" style="width: 100%; max-width: 200px;">
-                                <option value="2" selected>2x (Recommandé)</option>
-                                <option value="3">3x</option>
-                                <option value="5">5x</option>
-                                <option value="10">10x</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Multiplicateur de position</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">Trailing Stop (%):</label>
-                            <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; max-width: 200px;">
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Distance de protection en %</small>
-                        </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>💰 Capital (%)</label>
+                        <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1">
+                        <small>Pourcentage du capital total utilisé</small>
                     </div>
                     
-                    <!-- Colonne Droite - Nouveaux paramètres -->
-                    <div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">⏱️ Timeframe MACD:</label>
-                            <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%; max-width: 200px;">
-                                <option value="5m" selected>5 minutes</option>
-                                <option value="15m">15 minutes</option>
-                                <option value="1h">1 heure</option>
-                                <option value="4h">4 heures</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Période d'analyse MACD</small>
+                    <div class="form-group">
+                        <label>📊 Levier</label>
+                        <select id="leverage">
+                            <option value="2" selected>2x (Recommandé)</option>
+                            <option value="3">3x</option>
+                            <option value="5">5x</option>
+                            <option value="10">10x</option>
+                        </select>
+                        <small>Multiplicateur de position</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🎯 Trailing Stop (%)</label>
+                        <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1">
+                        <small>Distance de protection dynamique</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>⏱️ Timeframe MACD</label>
+                        <select id="macdTimeframe" onchange="updateMacdTimeframe()">
+                            <option value="5m" selected>5 minutes</option>
+                            <option value="15m">15 minutes</option>
+                            <option value="1h">1 heure</option>
+                            <option value="4h">4 heures</option>
+                        </select>
+                        <small>Période d'analyse MACD</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🔢 Volume Analysé</label>
+                        <select id="topVolumeCount" onchange="updateTopVolumeCount()">
+                            <option value="5">TOP 5 Volume</option>
+                            <option value="10">TOP 10 Volume</option>
+                            <option value="20">TOP 20 Volume</option>
+                            <option value="30" selected>TOP 30 Volume</option>
+                            <option value="50">TOP 50 Volume</option>
+                        </select>
+                        <small>Nombre de cryptos surveillées</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📈 Configuration</label>
+                        <div class="metric-item">
+                            <div class="metric-value text-primary" id="currentSettings">5min • TOP 30</div>
                         </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">📊 Quantité analysée:</label>
-                            <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 100%; max-width: 200px;">
-                                <option value="5">TOP 5 Volume</option>
-                                <option value="10">TOP 10 Volume</option>
-                                <option value="20">TOP 20 Volume</option>
-                                <option value="30" selected>TOP 30 Volume</option>
-                                <option value="50">TOP 50 Volume</option>
-                            </select>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Nombre de cryptos à surveiller</small>
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px;">💳 Balance:</label>
-                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; font-size: 12px;">
-                                <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
-                                <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
-                            </div>
-                            <small style="font-size: 11px; display: block; margin-top: 3px;">Mise à jour automatique</small>
-                        </div>
-                        
-                        <div style="font-size: 12px; color: #666; margin-top: 8px; text-align: center;">
-                            <strong id="currentSettings">📈 5min | TOP 30</strong>
-                        </div>
+                        <small>Paramètres actuels</small>
                     </div>
                 </div>
                 
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn" onclick="startBot()" id="startBtn">▶️ Démarrer Stratégie</button>
-                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter Bot</button>
+                <div style="display: flex; gap: 15px; margin-top: 20px;">
+                    <button class="btn btn-success" onclick="testConnection()" style="flex: 1;">
+                        🔗 TESTER API
+                    </button>
+                    <button class="btn" onclick="startBot()" id="startBtn" style="flex: 2;">
+                        ▶️ DÉMARRER STRATÉGIE
+                    </button>
+                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="flex: 2;">
+                        ⏹️ ARRÊTER BOT
+                    </button>
                 </div>
                 
-                <div style="margin-top: 15px;">
-                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%;">🔄 Vérifier Stop Loss Manuellement</button>
+                <button class="btn" onclick="manageTrailingStops()" style="width: 100%; margin-top: 10px;">
+                    🔄 VÉRIFIER STOP LOSS
+                </button>
+            </div>
+            
+            <div class="card">
+                <h3>📊 Surveillance Marché</h3>
+                <div style="margin-bottom: 15px;">
+                    <div class="metric-item">
+                        <div class="metric-label">Paire analysée</div>
+                        <div class="metric-value text-warning" id="currentScanPair">--</div>
+                    </div>
+                </div>
+                
+                <div class="list-container" id="top20List">
+                    <div class="list-item">
+                        <span>🔄 Chargement des données...</span>
+                        <span class="text-muted">--</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 15px; background: var(--bg-primary); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="text-muted">Dernière MAJ:</span>
+                        <span class="text-primary" id="lastScanTime">--</span>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="grid">
+
+        <!-- SECTION POSITIONS & STATISTIQUES -->
+        <div class="dashboard-grid">
             <div class="card">
-                <h3 id="topVolumeTitle">📈 TOP 30 Volume (Surveillance)</h3>
-                <div style="margin-bottom: 10px;">
-                    <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
-                </div>
-                <div class="top20-list" id="top20List">
-                    <div class="pair-item">
-                        <span>Chargement...</span>
-                        <span>--</span>
+                <h3>💼 Positions Actives</h3>
+                
+                <div class="metrics-grid" style="margin-bottom: 20px;">
+                    <div class="metric-item">
+                        <div class="metric-label">Ouvertes</div>
+                        <div class="metric-value" id="openPositionsCount">0</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Capital Utilisé</div>
+                        <div class="metric-value text-warning" id="usedCapital">0 USDT</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Disponible</div>
+                        <div class="metric-value text-success" id="availableCapital">-- USDT</div>
                     </div>
                 </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <strong>Dernière MAJ:</strong> <span id="lastScanTime">--</span>
+                
+                <div id="positionsContainer" class="list-container">
+                    <div class="text-center" style="padding: 40px; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
+                        <div>Aucune position active</div>
+                        <small>Les positions s'afficheront ici une fois ouvertes</small>
+                    </div>
                 </div>
             </div>
             
             <div class="card">
-                <h3>💼 Positions & Statistiques</h3>
+                <h3>📈 Statistiques Performance</h3>
                 
-                <!-- Statistiques compactes en haut -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Signaux</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
+                <div class="metrics-grid" style="margin-bottom: 20px;">
+                    <div class="metric-item">
+                        <div class="metric-label">Fermées</div>
+                        <div class="metric-value" id="totalClosedPositions">0</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Ouvertes</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
+                    <div class="metric-item">
+                        <div class="metric-label">🟢 Gains</div>
+                        <div class="metric-value text-success" id="winningPositions">0 (+$0)</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Fermées</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🟢 Gains</div>
-                        <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
-                        <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
+                    <div class="metric-item">
+                        <div class="metric-label">🔴 Pertes</div>
+                        <div class="metric-value text-danger" id="losingPositions">0 (-$0)</div>
                     </div>
                 </div>
                 
-                <!-- Positions ouvertes -->
-                <div id="positionsContainer">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        Aucune position ouverte
+                <div style="padding: 20px; background: var(--bg-primary); border-radius: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span class="text-muted">P&L Journalier:</span>
+                        <span class="metric-value" id="dailyPnL">$0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span class="text-muted">Meilleur Trade:</span>
+                        <span class="metric-value text-success" id="bestTrade">$0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="text-muted">Pire Trade:</span>
+                        <span class="metric-value text-danger" id="worstTrade">$0.00</span>
                     </div>
                 </div>
                 
-                <!-- Capital en bas -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
-                    <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
-                    <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
+                <div style="text-align: center; padding: 15px;">
+                    <div style="font-size: 1.8rem; font-weight: 700; color: var(--success-color);" id="winRateDisplay">0%</div>
+                    <div class="text-muted">Taux de Réussite</div>
                 </div>
             </div>
         </div>
-        
-        <!-- Logs de Trading (Masqués - Cliquer pour afficher) -->
-        <div class="card" id="logsSection" style="display: none;">
-            <h3>📝 Logs de Trading</h3>
-            <div class="logs" id="logs">
-                [INFO] Bot de trading MACD TOP 20 initialisé...<br>
-                [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
-                [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
-                [INFO] En attente de configuration API...<br>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button class="btn" onclick="clearLogs()" style="flex: 1;">🗑️ Effacer logs</button>
-                <button class="btn" onclick="toggleLogs()" style="flex: 1;">👁️ Masquer logs</button>
-            </div>
-        </div>
-        
-        <!-- Bouton pour afficher les logs -->
-        <div class="card" id="logsToggleCard" style="text-align: center; padding: 15px;">
-            <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
-            <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
-        </div>
-        
-        <!-- NOUVELLE SECTION TRADINGVIEW & MACD -->
-        <div class="grid">
+
+        <!-- SECTION GRAPHIQUE TRADINGVIEW & MACD -->
+        <div class="dashboard-grid">
             <div class="card">
-                <h3>📊 Graphique TradingView & MACD</h3>
+                <h3>📊 Analyse Technique</h3>
                 <div class="form-group">
-                    <label id="chartSelectorLabel">Sélectionner une paire (TOP 30 Volume):</label>
+                    <label>Sélectionner une paire (TOP 30 Volume):</label>
                     <select id="chartSymbol" onchange="updateChart()">
                         <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
                     </select>
@@ -211,36 +246,69 @@
                 </div>
                 
                 <!-- TradingView Widget -->
-                <div class="tradingview-widget-container" style="height: 500px; margin-top: 15px;">
-                    <div id="tradingview_chart" style="height: 100%; border-radius: 8px; overflow: hidden;"></div>
+                <div class="tradingview-widget-container" style="height: 500px; margin-top: 15px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div id="tradingview_chart" style="height: 100%;"></div>
                 </div>
                 
-                <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button class="btn" onclick="refreshMACDData()" style="flex: 1;">🔄 Actualiser MACD</button>
-                    <button class="btn" onclick="scanMACDCrossover()" style="flex: 1;">🎯 Scanner Croisement</button>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn" onclick="refreshMACDData()" style="flex: 1;">🔄 ACTUALISER</button>
+                    <button class="btn btn-success" onclick="scanMACDCrossover()" style="flex: 1;">🎯 SCANNER</button>
                 </div>
             </div>
             
             <div class="card">
-                <h3>📈 Historique Croisements MACD (24h)</h3>
-                <div style="margin-bottom: 15px;">
-                    <strong>Paire analysée:</strong> <span id="currentMACDPair">BTC/USDT</span>
-                    <br>
-                    <strong>Dernière analyse:</strong> <span id="lastMACDScan">--</span>
-                </div>
-                
-                <div id="macdHistory" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        <p>🔍 Cliquez sur "Scanner Croisement" pour analyser les croisements MACD</p>
-                        <p>📊 Affichage des croisements haussiers des 24 dernières heures</p>
+                <h3>📈 Signaux MACD</h3>
+                <div class="metrics-grid" style="margin-bottom: 15px;">
+                    <div class="metric-item">
+                        <div class="metric-label">Paire</div>
+                        <div class="metric-value text-primary" id="currentMACDPair">BTC/USDT</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Analyse</div>
+                        <div class="metric-value text-muted" id="lastMACDScan">--</div>
                     </div>
                 </div>
                 
-                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; font-size: 12px;">
-                    <strong>ℹ️ Info:</strong> Les croisements MACD haussiers indiquent des signaux d'achat potentiels.<br>
-                    <strong>📊 Conditions:</strong> MACD > Signal Line (croisement vers le haut)
+                <div id="macdHistory" class="list-container">
+                    <div class="text-center" style="padding: 40px; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">🔍</div>
+                        <div>Cliquez sur "SCANNER" pour analyser</div>
+                        <small>Affichage des croisements haussiers des 24h</small>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 15px; background: var(--bg-primary); border-radius: 8px; font-size: 0.85rem;">
+                    <div class="text-primary" style="margin-bottom: 5px;"><strong>ℹ️ Conditions MACD:</strong></div>
+                    <div class="text-muted">• MACD > Signal Line (croisement haussier)</div>
+                    <div class="text-muted">• Volume confirmé sur 24h</div>
+                    <div class="text-muted">• Timeframe: <span class="text-warning" id="timeframeDisplay">5min</span></div>
                 </div>
             </div>
+        </div>
+
+        <!-- SECTION LOGS (MASQUÉE PAR DÉFAUT) -->
+        <div class="card" id="logsSection" style="display: none;">
+            <h3>📝 Journal de Trading</h3>
+            <div class="logs" id="logs">
+                [<span class="text-success">INFO</span>] 🚀 Terminal de Trading MACD initialisé<br>
+                [<span class="text-primary">CONFIG</span>] ⚙️ Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
+                [<span class="text-warning">SYSTEM</span>] 🔧 TRAILING STOP optimisé - moving_plan configuré<br>
+                [<span class="text-muted">WAIT</span>] ⏳ En attente de configuration API...<br>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-small" onclick="clearLogs()" style="flex: 1;">🗑️ EFFACER</button>
+                <button class="btn btn-small" onclick="toggleLogs()" style="flex: 1;">👁️ MASQUER</button>
+            </div>
+        </div>
+        
+        <!-- BOUTON TOGGLE LOGS -->
+        <div class="card" id="logsToggleCard" style="text-align: center; padding: 20px;">
+            <button class="btn" onclick="toggleLogs()" style="width: 250px;">
+                👁️ AFFICHER LOGS
+            </button>
+            <small style="display: block; margin-top: 8px; color: var(--text-muted);">
+                Journal de trading masqué pour une interface plus propre
+            </small>
         </div>
     </div>
 
@@ -271,10 +339,10 @@
                     "symbol": currentSymbol,
                     "interval": interval,
                     "timezone": "Europe/Paris",
-                    "theme": "light",
+                    "theme": "dark",
                     "style": "1",
                     "locale": "fr",
-                    "toolbar_bg": "#f1f3f6",
+                    "toolbar_bg": "#1A1F2E",
                     "enable_publishing": false,
                     "hide_top_toolbar": false,
                     "hide_legend": false,
@@ -285,9 +353,9 @@
                     ],
                     "overrides": {
                         "paneProperties.backgroundType": "solid",
-                        "paneProperties.background": "#ffffff",
-                        "paneProperties.vertGridProperties.color": "#f0f0f0",
-                        "paneProperties.horzGridProperties.color": "#f0f0f0"
+                        "paneProperties.background": "#0A0E17",
+                        "paneProperties.vertGridProperties.color": "#2D3441",
+                        "paneProperties.horzGridProperties.color": "#2D3441"
                     }
                 });
                 
@@ -404,413 +472,127 @@
             await scanMACDCrossoverRealTime();
         }
 
-        // ⚡ OPTIMISATION 5: Détection temps réel des nouveaux croisements
+        // ⚡ OPTIMISATION 5: Scan MACD temps réel
         async function scanMACDCrossoverRealTime() {
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            
-            const macdData = await getMACDDataOptimized(selectedSymbol, 100);
-            
-            if (!macdData || macdData.macd.length < 2) {
-                return;
-            }
-
-            // Vérifier seulement les 3 derniers points pour détecter les nouveaux croisements
-            const recentData = {
-                dates: macdData.dates.slice(-3),
-                macd: macdData.macd.slice(-3),
-                signal: macdData.signal.slice(-3),
-                histogram: macdData.histogram.slice(-3)
-            };
-
-            // Chercher nouveau croisement haussier
-            for (let i = 1; i < recentData.macd.length; i++) {
-                const prevMACD = recentData.macd[i - 1];
-                const prevSignal = recentData.signal[i - 1];
-                const currMACD = recentData.macd[i];
-                const currSignal = recentData.signal[i];
+            try {
+                const selectedSymbol = document.getElementById('chartSymbol').value;
+                const macdData = await getMACDDataOptimized(selectedSymbol, 50);
                 
-                if (prevMACD <= prevSignal && currMACD > currSignal) {
-                    const crossoverTime = recentData.dates[i];
-                    const now = new Date();
-                    const delayMinutes = Math.round((now - crossoverTime) / 60000);
+                if (macdData && macdData.macd.length > 2) {
+                    const lastIndex = macdData.macd.length - 1;
+                    const currentMACD = macdData.macd[lastIndex];
+                    const currentSignal = macdData.signal[lastIndex];
+                    const prevMACD = macdData.macd[lastIndex - 1];
+                    const prevSignal = macdData.signal[lastIndex - 1];
                     
-                    // Vérifier si c'est un nouveau croisement (pas déjà détecté)
-                    if (!lastKnownMACD || crossoverTime > lastKnownMACD.time) {
-                        lastKnownMACD = {
-                            time: crossoverTime,
-                            macd: currMACD,
-                            signal: currSignal,
-                            histogram: recentData.histogram[i]
+                    // Détecter croisement haussier en temps réel
+                    if (prevMACD <= prevSignal && currentMACD > currentSignal) {
+                        const crossoverData = {
+                            symbol: selectedSymbol.split(':')[1],
+                            time: new Date(),
+                            macd: currentMACD.toFixed(6),
+                            signal: currentSignal.toFixed(6),
+                            strength: ((currentMACD - currentSignal) / currentSignal * 100).toFixed(2)
                         };
                         
-                        // Alerte temps réel
-                        log(`🚨 NOUVEAU CROISEMENT MACD DÉTECTÉ! ${symbolName}`, 'SUCCESS');
-                        log(`⚡ Délai: ${delayMinutes} minute(s) | MACD: ${currMACD.toFixed(6)}`, 'SUCCESS');
+                        // Ajouter à l'historique
+                        macdHistoryData.unshift(crossoverData);
+                        if (macdHistoryData.length > 10) {
+                            macdHistoryData = macdHistoryData.slice(0, 10);
+                        }
                         
-                        // Mettre à jour l'affichage immédiatement
-                        await refreshCompleteHistory();
+                        // Notification de nouveau signal
+                        log(`🎯 NOUVEAU SIGNAL MACD: ${crossoverData.symbol} - Force: ${crossoverData.strength}%`, 'SUCCESS');
+                        
+                        // Déclencher potentiellement un trade
+                        if (parseFloat(crossoverData.strength) > 1.0) {
+                            log(`🚀 Signal fort détecté - Évaluation pour trade automatique...`, 'SUCCESS');
+                        }
                     }
-                }
-            }
-        }
-
-        // ⚡ OPTIMISATION 6: Rafraîchissement intelligent
-        async function refreshCompleteHistory() {
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            
-            const macdData = await getMACDDataOptimized(selectedSymbol, 300);
-            
-            if (!macdData) return;
-
-            const crossovers = [];
-            
-            for (let i = 1; i < macdData.macd.length; i++) {
-                const prevMACD = macdData.macd[i - 1];
-                const prevSignal = macdData.signal[i - 1];
-                const currMACD = macdData.macd[i];
-                const currSignal = macdData.signal[i];
-                
-                if (prevMACD <= prevSignal && currMACD > currSignal) {
-                    crossovers.push({
-                        time: macdData.dates[i],
-                        macd: currMACD,
-                        signal: currSignal,
-                        histogram: macdData.histogram[i]
-                    });
-                }
-            }
-
-            const now = new Date();
-            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const recent24h = crossovers.filter(c => c.time >= yesterday);
-
-            displayMACDHistoryOptimized(recent24h, symbolName);
-        }
-
-        // ⚡ OPTIMISATION 7: Affichage avec délai calculé
-        function displayMACDHistoryOptimized(crossovers, symbolName) {
-            const container = document.getElementById('macdHistory');
-            
-            if (crossovers.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        <p>📊 Aucun croisement haussier MACD détecté sur ${symbolName}</p>
-                        <p>⚡ Mode temps réel activé (scan toutes les 30s)</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = `<div style="margin-bottom: 10px; font-weight: bold; color: #48bb78;">
-                🎯 ${crossovers.length} croisement(s) haussier(s) - ${symbolName} ⚡ TEMPS RÉEL
-            </div>`;
-
-            crossovers.reverse().forEach((crossover, index) => {
-                const timeStr = crossover.time.toLocaleString('fr-FR');
-                const now = new Date();
-                const delayMinutes = Math.round((now - crossover.time) / 60000);
-                
-                // Convertir en heures si > 60 minutes
-                let delayText;
-                let delayColor;
-                
-                if (delayMinutes >= 60) {
-                    const hours = Math.floor(delayMinutes / 60);
-                    const remainingMinutes = delayMinutes % 60;
-                    delayText = remainingMinutes > 0 ? `${hours}h${remainingMinutes}min` : `${hours}h`;
-                    delayColor = '#f56565'; // Rouge pour les délais longs
-                } else {
-                    delayText = `${delayMinutes}min`;
-                    delayColor = delayMinutes <= 2 ? '#48bb78' : delayMinutes <= 5 ? '#f59e0b' : '#f56565';
-                }
-                
-                html += `
-                    <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin: 8px 0; background: #f8fffe;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: #1a202c;">🔔 Croisement #${crossovers.length - index}</strong>
-                            <span style="color: ${delayColor}; font-weight: bold;">⚡ ${delayText}</span>
-                        </div>
-                        <div style="font-size: 13px; color: #4a5568;">
-                            <div>⏰ Heure: ${timeStr}</div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = html;
-            document.getElementById('lastMACDScan').textContent = new Date().toLocaleTimeString();
-        }
-
-        // NOUVELLE FONCTION: Mettre à jour le sélecteur avec les TOP 30 Volume
-        function updateChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            if (top30Pairs && top30Pairs.length > 0) {
-                // Sauvegarder la sélection actuelle
-                const currentSelection = chartSelect.value;
-                
-                // Vider le sélecteur
-                chartSelect.innerHTML = '';
-                
-                // Ajouter les TOP 30 volume
-                top30Pairs.forEach((pair, index) => {
-                    const option = document.createElement('option');
-                    const symbol = pair.symbol.replace('USDT', '');
-                    const binanceSymbol = `BINANCE:${pair.symbol}`;
                     
-                    option.value = binanceSymbol;
-                    option.textContent = `${index + 1}. ${symbol}/USDT (${formatNumber(pair.usdtVolume || pair.volume24h)})`;
-                    
-                    chartSelect.appendChild(option);
-                });
-                
-                // Restaurer la sélection ou prendre le premier (BTC généralement)
-                if (currentSelection && Array.from(chartSelect.options).some(opt => opt.value === currentSelection)) {
-                    chartSelect.value = currentSelection;
-                } else {
-                    chartSelect.value = chartSelect.options[0].value;
-                    updateChart();
+                    // Mettre à jour l'affichage
+                    updateMACDHistoryDisplay();
+                    document.getElementById('lastMACDScan').textContent = new Date().toLocaleTimeString();
                 }
-                
-                log(`📊 Sélecteur graphique mis à jour avec ${top30Pairs.length} paires TOP volume`, 'INFO');
-            } else {
-                // Si pas de données TOP 30, garder quelques paires par défaut
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">Bitcoin (BTC/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:ETHUSDT">Ethereum (ETH/USDT) - En attente TOP 30</option>
-                `;
+            } catch (error) {
+                log(`❌ Erreur scan MACD temps réel: ${error.message}`, 'ERROR');
             }
         }
 
-        // Update chart when symbol changes + Auto-start scanning
+        // Update chart symbol
         function updateChart() {
             const selectedSymbol = document.getElementById('chartSymbol').value;
             currentSymbol = selectedSymbol;
             
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            document.getElementById('currentMACDPair').textContent = symbolName;
-            
-            // Détruire l'ancien widget et en créer un nouveau avec le nouveau symbole
             if (tvWidget) {
-                try {
-                    tvWidget.remove();
-                } catch(e) {
-                    console.log('Widget déjà supprimé');
-                }
+                tvWidget.setSymbol(selectedSymbol, '5');
+                log(`📊 Graphique mis à jour: ${selectedSymbol}`, 'INFO');
             }
             
-            // Recréer le widget avec le nouveau symbole
-            setTimeout(() => {
-                const timeframe = config.macdTimeframe || '5m';
-                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
-                
-                tvWidget = new TradingView.widget({
-                    "width": "100%",
-                    "height": 600,
-                    "symbol": selectedSymbol,
-                    "interval": interval,
-                    "timezone": "Europe/Paris",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "fr",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "container_id": "tradingview_chart",
-                    "studies": ["MACD@tv-basicstudies"],
-                    "overrides": {
-                        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-                        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-                        "paneProperties.background": "#ffffff"
-                    }
-                });
-                
-                log(`📊 Graphique recréé avec succès: ${symbolName} (${timeframe})`, 'SUCCESS');
-            }, 500);
-            
-            // Redémarrer le scan temps réel pour la nouvelle paire
-            startRealTimeScanning();
+            document.getElementById('currentMACDPair').textContent = selectedSymbol.split(':')[1];
         }
 
-        // Fonctions publiques (appelées par les boutons)
-        async function scanMACDCrossover() {
-            await startRealTimeScanning();
-        }
-
+        // Refresh MACD data
         async function refreshMACDData() {
-            await refreshCompleteHistory();
+            log('🔄 Actualisation des données MACD...', 'INFO');
+            await scanMACDCrossoverRealTime();
         }
 
-        // 🆕 NOUVELLES FONCTIONS: Gestion des paramètres MACD
-        function updateMacdTimeframe() {
-            const timeframe = document.getElementById('macdTimeframe').value;
-            config.macdTimeframe = timeframe;
+        // Scan MACD crossover (manual)
+        async function scanMACDCrossover() {
+            log('🎯 Scan manuel des croisements MACD...', 'INFO');
+            await scanMACDCrossoverRealTime();
             
-            const settingsElement = document.getElementById('currentSettings');
-            settingsElement.textContent = `📈 ${timeframe === '5m' ? '5min' : timeframe === '15m' ? '15min' : timeframe === '1h' ? '1h' : '4h'} | TOP ${config.topVolumeCount}`;
-            
-            log(`⏰ Timeframe MACD modifié: ${timeframe}`, 'INFO');
-            
-            // Mettre à jour le graphique TradingView si il existe
-            if (tvWidget) {
-                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
-                updateChart(); // Recréer avec le nouveau timeframe
-                log(`📊 Graphique TradingView mis à jour: ${timeframe}`, 'SUCCESS');
-            }
-            
-            // Si le bot tourne, informer de l'impact
-            if (botRunning) {
-                log(`⚠️ Changement appliqué - Redémarrez le bot pour une analyse optimale`, 'WARNING');
+            // Démarrer le scan temps réel si pas déjà actif
+            if (!realTimeInterval) {
+                await startRealTimeScanning();
             }
         }
 
-        function updateTopVolumeCount() {
-            const count = parseInt(document.getElementById('topVolumeCount').value);
-            config.topVolumeCount = count;
+        // Update MACD history display
+        function updateMACDHistoryDisplay() {
+            const historyContainer = document.getElementById('macdHistory');
             
-            const settingsElement = document.getElementById('currentSettings');
-            const timeframeText = config.macdTimeframe === '5m' ? '5min' : config.macdTimeframe === '15m' ? '15min' : config.macdTimeframe === '1h' ? '1h' : '4h';
-            settingsElement.textContent = `📈 ${timeframeText} | TOP ${count}`;
-            
-            log(`📊 Quantité modifiée: TOP ${count} Volume`, 'INFO');
-            
-            // Mettre à jour le titre de la section
-            const topSectionTitle = document.getElementById('topVolumeTitle');
-            if (topSectionTitle) {
-                topSectionTitle.textContent = `📈 TOP ${count} Volume (Surveillance)`;
+            if (macdHistoryData.length === 0) {
+                historyContainer.innerHTML = `
+                    <div class="text-center" style="padding: 40px; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">🔍</div>
+                        <div>Aucun croisement détecté</div>
+                        <small>Continuez le scan pour détecter les signaux</small>
+                    </div>
+                `;
+                return;
             }
             
-            // Mettre à jour le sélecteur de graphique
-            const chartLabel = document.getElementById('chartSelectorLabel');
-            if (chartLabel) {
-                chartLabel.textContent = `Sélectionner une paire (TOP ${count} Volume):`;
-            }
+            let html = '';
+            macdHistoryData.forEach(item => {
+                const strengthColor = parseFloat(item.strength) > 1.0 ? 'text-success' : 'text-warning';
+                html += `
+                    <div class="list-item">
+                        <div>
+                            <div style="font-weight: 600;">${item.symbol}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${item.time.toLocaleTimeString()}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="${strengthColor}" style="font-weight: 600;">${item.strength}%</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Force</div>
+                        </div>
+                    </div>
+                `;
+            });
             
-            // Relancer le scan si connecté
-            if (config.apiKey && top30Pairs.length > 0) {
-                log(`🔄 Mise à jour automatique du TOP ${count}...`, 'INFO');
-                setTimeout(() => {
-                    scanTop30Volume();
-                }, 1000);
-            }
-            
-            // Si le bot tourne, informer de l'impact
-            if (botRunning) {
-                log(`✅ TOP ${count} appliqué - Prochaine analyse dans ${count} paires`, 'SUCCESS');
-            }
-        }
-
-        // 👁️ FONCTION: Basculer l'affichage des logs
-        function toggleLogs() {
-            const logsSection = document.getElementById('logsSection');
-            const toggleCard = document.getElementById('logsToggleCard');
-            
-            if (logsSection.style.display === 'none') {
-                // Afficher les logs
-                logsSection.style.display = 'block';
-                toggleCard.style.display = 'none';
-            } else {
-                // Masquer les logs
-                logsSection.style.display = 'none';
-                toggleCard.style.display = 'block';
-            }
-        }
-
-        // 💰 AUTOMATISATION: Rafraîchissement automatique du solde
-        let autoBalanceInterval = null;
-        
-        function startAutoBalanceRefresh() {
-            if (autoBalanceInterval) {
-                clearInterval(autoBalanceInterval);
-            }
-            
-            // Rafraîchir immédiatement
-            refreshBalance();
-            
-            // Programmer le rafraîchissement toutes les minutes
-            autoBalanceInterval = setInterval(() => {
-                if (config.apiKey) {
-                    refreshBalance();
-                }
-            }, 60 * 1000); // 60 secondes
+            historyContainer.innerHTML = html;
         }
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Wait a bit for TradingView script to load
-            setTimeout(() => {
-                initTradingViewChart();
-            }, 2000);
+            initTradingViewChart();
             
-            // Initialiser le sélecteur avec des valeurs par défaut
-            setTimeout(() => {
-                initializeChartSelector();
-            }, 1000);
+            // Update timeframe display
+            document.getElementById('timeframeDisplay').textContent = config.macdTimeframe || '5min';
+            
+            log('🚀 Interface Trading Terminal chargée', 'SUCCESS');
         });
-        
-        // Fonction d'initialisation du sélecteur
-        function initializeChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            // Si pas encore de TOP 30, mettre des valeurs par défaut
-            if (!top30Pairs || top30Pairs.length === 0) {
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT)</option>
-                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT)</option>
-                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT)</option>
-                    <option value="BINANCE:ADAUSDT">4. Cardano (ADA/USDT)</option>
-                    <option value="BINANCE:SOLUSDT">5. Solana (SOL/USDT)</option>
-                `;
-                log('📊 Sélecteur initialisé avec paires par défaut', 'INFO');
-            }
-        }
-        
-        // Fonction globale accessible depuis api.js
-        window.updateChartSelector = function() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            if (window.top30Pairs && window.top30Pairs.length > 0) {
-                // Sauvegarder la sélection actuelle
-                const currentSelection = chartSelect.value;
-                
-                // Vider le sélecteur
-                chartSelect.innerHTML = '';
-                
-                // Ajouter les TOP 30 volume
-                window.top30Pairs.forEach((pair, index) => {
-                    const option = document.createElement('option');
-                    const symbol = pair.symbol.replace('USDT', '');
-                    const binanceSymbol = `BINANCE:${pair.symbol}`;
-                    
-                    option.value = binanceSymbol;
-                    option.textContent = `${index + 1}. ${symbol}/USDT (${formatNumber(pair.usdtVolume || pair.volume24h)})`;
-                    
-                    chartSelect.appendChild(option);
-                });
-                
-                // Restaurer la sélection ou prendre le premier
-                if (currentSelection && Array.from(chartSelect.options).some(opt => opt.value === currentSelection)) {
-                    chartSelect.value = currentSelection;
-                } else {
-                    chartSelect.value = chartSelect.options[0].value;
-                    updateChart();
-                }
-                
-                log(`📊 Sélecteur graphique mis à jour avec ${window.top30Pairs.length} paires TOP volume`, 'SUCCESS');
-            } else {
-                // Si pas de données TOP 30, garder quelques paires par défaut
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT) - En attente TOP 30</option>
-                `;
-                log('📊 Sélecteur en attente des données TOP 30', 'INFO');
-            }
-        };
     </script>
 </body>
 </html> 
