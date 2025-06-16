@@ -744,15 +744,23 @@
             }, 60 * 1000); // 60 secondes
         }
 
-        // 🆕 FONCTION: Contrôle de la visibilité des logs
+        // 🆕 FONCTION: Contrôle de la visibilité des logs - CORRIGÉE
         function toggleLogsVisibility() {
+            console.log('🔧 Toggle Logs appelé');
+            
             const logsToggle = document.getElementById('logsToggle');
             const logsStatus = document.getElementById('logsStatus');
             const logsSection = document.getElementById('logsSection');
             const logsToggleCard = document.getElementById('logsToggleCard');
             
+            if (!logsToggle || !logsStatus || !logsSection || !logsToggleCard) {
+                console.error('❌ Éléments logs manquants');
+                return;
+            }
+            
             // Récupérer l'état du toggle
             const isChecked = logsToggle.checked;
+            console.log('📝 Logs toggle état:', isChecked);
             
             if (isChecked) {
                 // Logs ON - Afficher les logs
@@ -760,17 +768,64 @@
                 logsToggleCard.style.display = 'none';
                 logsStatus.textContent = 'ON';
                 logsStatus.style.color = '#ffffff';
-                log('👁️ Logs activés', 'SUCCESS');
+                console.log('✅ Logs activés');
+                if (typeof log === 'function') {
+                    log('👁️ Logs activés via toggle', 'SUCCESS');
+                }
             } else {
                 // Logs OFF - Masquer complètement les logs
                 logsSection.style.display = 'none';
                 logsToggleCard.style.display = 'none';
                 logsStatus.textContent = 'OFF';
                 logsStatus.style.color = 'rgba(255,255,255,0.7)';
+                console.log('❌ Logs désactivés');
             }
         }
 
-        // 👁️ FONCTION: Basculer l'affichage des logs (ancienne fonction mise à jour)
+        // 🆕 FONCTION: Contrôle de la visibilité de l'historique MACD - CORRIGÉE
+        function toggleMacdVisibility() {
+            console.log('🔧 Toggle MACD appelé');
+            
+            const macdToggle = document.getElementById('macdToggle');
+            const macdStatus = document.getElementById('macdStatus');
+            const macdHistoryCard = document.getElementById('macdHistoryCard');
+            const tradingViewMacdGrid = document.getElementById('tradingViewMacdGrid');
+            
+            if (!macdToggle || !macdStatus || !macdHistoryCard || !tradingViewMacdGrid) {
+                console.error('❌ Éléments MACD manquants');
+                return;
+            }
+            
+            // Récupérer l'état du toggle
+            const isChecked = macdToggle.checked;
+            console.log('📊 MACD toggle état:', isChecked);
+            
+            if (isChecked) {
+                // MACD ON - Afficher l'historique MACD (Layout 2 colonnes)
+                macdHistoryCard.style.display = 'block';
+                tradingViewMacdGrid.classList.remove('macd-hidden');
+                tradingViewMacdGrid.style.gridTemplateColumns = '1fr 1fr';
+                macdStatus.textContent = 'ON';
+                macdStatus.style.color = '#ffffff';
+                console.log('✅ MACD activé - Layout 2 colonnes');
+                if (typeof log === 'function') {
+                    log('📊 Historique MACD activé - Layout 2 colonnes', 'SUCCESS');
+                }
+            } else {
+                // MACD OFF - Masquer l'historique MACD et étendre TradingView (pleine largeur)
+                macdHistoryCard.style.display = 'none';
+                tradingViewMacdGrid.classList.add('macd-hidden');
+                tradingViewMacdGrid.style.gridTemplateColumns = '1fr';
+                macdStatus.textContent = 'OFF';
+                macdStatus.style.color = 'rgba(255,255,255,0.7)';
+                console.log('❌ MACD désactivé - TradingView pleine largeur');
+                if (typeof log === 'function') {
+                    log('📊 Historique MACD masqué - TradingView étendu sur toute la largeur', 'INFO');
+                }
+            }
+        }
+
+        // 👁️ FONCTION: Basculer l'affichage des logs (compatibilité avec anciens boutons)
         function toggleLogs() {
             const logsToggle = document.getElementById('logsToggle');
             const logsSection = document.getElementById('logsSection');
@@ -868,35 +923,6 @@
                 log('📊 Sélecteur en attente des données TOP 30', 'INFO');
             }
         };
-
-        // 🆕 FONCTION: Contrôle de la visibilité de l'historique MACD
-        function toggleMacdVisibility() {
-            const macdToggle = document.getElementById('macdToggle');
-            const macdStatus = document.getElementById('macdStatus');
-            const macdHistoryCard = document.getElementById('macdHistoryCard');
-            const tradingViewMacdGrid = document.getElementById('tradingViewMacdGrid');
-            
-            // Récupérer l'état du toggle
-            const isChecked = macdToggle.checked;
-            
-            if (isChecked) {
-                // MACD ON - Afficher l'historique MACD (Layout 2 colonnes)
-                macdHistoryCard.style.display = 'block';
-                tradingViewMacdGrid.classList.remove('macd-hidden');
-                tradingViewMacdGrid.style.gridTemplateColumns = '1fr 1fr';
-                macdStatus.textContent = 'ON';
-                macdStatus.style.color = '#ffffff';
-                log('📊 Historique MACD activé - Layout 2 colonnes', 'SUCCESS');
-            } else {
-                // MACD OFF - Masquer l'historique MACD et étendre TradingView (pleine largeur)
-                macdHistoryCard.style.display = 'none';
-                tradingViewMacdGrid.classList.add('macd-hidden');
-                tradingViewMacdGrid.style.gridTemplateColumns = '1fr';
-                macdStatus.textContent = 'OFF';
-                macdStatus.style.color = 'rgba(255,255,255,0.7)';
-                log('📊 Historique MACD masqué - TradingView étendu sur toute la largeur', 'INFO');
-            }
-        }
     </script>
 </body>
 </html> 
