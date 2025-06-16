@@ -47,7 +47,7 @@ async function testConnection() {
         log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
         
-        // 🚀 AUTOMATISATION COMPLÈTE après connexion
+        // 🚀 AUTOMATISATION COMPLÈTE après connexion MANUELLE
         log('🤖 Démarrage de l\'automatisation complète...', 'SUCCESS');
         
         // 1. Scanner TOP 30 immédiatement
@@ -99,31 +99,12 @@ async function testConnection() {
     }
 }
 
-// 🆕 FONCTION: Connexion automatique au chargement de la page
+// 🆕 FONCTION: Connexion automatique au chargement de la page - DÉSACTIVÉE
+// Cette fonction n'est plus appelée automatiquement
 async function autoConnectOnLoad() {
-    if (autoConnectionAttempted) {
-        return;
-    }
-    
-    autoConnectionAttempted = true;
-    
-    // Vérifier si les clés API sont présentes
-    const apiKey = document.getElementById('apiKey').value;
-    const secretKey = document.getElementById('secretKey').value;
-    const passphrase = document.getElementById('passphrase').value;
-    
-    if (apiKey && secretKey && passphrase) {
-        log('🔄 Tentative de connexion automatique...', 'INFO');
-        const connected = await testConnection();
-        
-        if (connected) {
-            log('🚀 Connexion automatique réussie! Toutes les fonctionnalités sont actives.', 'SUCCESS');
-        } else {
-            log('⚠️ Connexion automatique échouée. Cliquez sur le bouton API pour reconnecter.', 'WARNING');
-        }
-    } else {
-        log('ℹ️ Clés API manquantes - Cliquez sur le bouton 🔗 API pour vous connecter', 'INFO');
-    }
+    // Fonction désactivée - la connexion se fait uniquement sur clic du bouton API
+    log('ℹ️ Connexion manuelle requise - Cliquez sur le bouton 🔗 API pour vous connecter', 'INFO');
+    return false;
 }
 
 async function refreshBalance() {
