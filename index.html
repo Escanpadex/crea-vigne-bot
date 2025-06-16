@@ -12,13 +12,26 @@
     <div class="container">
         <div class="header">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                    <div class="status">
-                        <div class="status-dot" id="connectionStatus"></div>
-                        <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <!-- Section Connexion API -->
+                    <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                        <div class="status">
+                            <div class="status-dot" id="connectionStatus"></div>
+                            <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
+                        </div>
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
+                        <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
                     </div>
-                    <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
-                    <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
+                    
+                    <!-- Section Contrôle Logs -->
+                    <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📝 Logs</div>
+                        <div class="toggle-switch" onclick="toggleLogsVisibility()">
+                            <input type="checkbox" id="logsToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span id="logsStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">ON</span>
+                    </div>
                 </div>
                 <div>
                     <h1>🚀 Bot Trading Bitget Futures</h1>
@@ -128,11 +141,9 @@
         
         <div class="grid">
             <div class="card">
-                <h3>💼 Positions & Statistiques</h3>
-                
-                <!-- Bouton Vérifier Stop Loss déplacé ici -->
-                <div style="margin-bottom: 15px;">
-                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%; padding: 10px; font-size: 14px; background: linear-gradient(45deg, #f59e0b, #d97706);">🔄 Vérifier Stop Loss Manuellement</button>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0;">💼 Positions & Statistiques</h3>
+                    <button class="btn" onclick="manageTrailingStops()" style="padding: 8px 15px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
                 </div>
                 
                 <!-- Statistiques compactes en haut -->
@@ -704,22 +715,6 @@
             }
         }
 
-        // 👁️ FONCTION: Basculer l'affichage des logs
-        function toggleLogs() {
-            const logsSection = document.getElementById('logsSection');
-            const toggleCard = document.getElementById('logsToggleCard');
-            
-            if (logsSection.style.display === 'none') {
-                // Afficher les logs
-                logsSection.style.display = 'block';
-                toggleCard.style.display = 'none';
-            } else {
-                // Masquer les logs
-                logsSection.style.display = 'none';
-                toggleCard.style.display = 'block';
-            }
-        }
-
         // 💰 AUTOMATISATION: Rafraîchissement automatique du solde
         let autoBalanceInterval = null;
         
@@ -739,14 +734,59 @@
             }, 60 * 1000); // 60 secondes
         }
 
+        // 🆕 FONCTION: Contrôle de la visibilité des logs
+        function toggleLogsVisibility() {
+            const logsToggle = document.getElementById('logsToggle');
+            const logsStatus = document.getElementById('logsStatus');
+            const logsSection = document.getElementById('logsSection');
+            const logsToggleCard = document.getElementById('logsToggleCard');
+            
+            // Basculer l'état
+            const isChecked = logsToggle.checked;
+            
+            if (isChecked) {
+                // Logs ON - Afficher les logs
+                logsSection.style.display = 'block';
+                logsToggleCard.style.display = 'none';
+                logsStatus.textContent = 'ON';
+                logsStatus.style.color = '#ffffff';
+                log('👁️ Logs activés', 'SUCCESS');
+            } else {
+                // Logs OFF - Masquer complètement les logs
+                logsSection.style.display = 'none';
+                logsToggleCard.style.display = 'none';
+                logsStatus.textContent = 'OFF';
+                logsStatus.style.color = 'rgba(255,255,255,0.7)';
+            }
+        }
+
+        // 👁️ FONCTION: Basculer l'affichage des logs (ancienne fonction mise à jour)
+        function toggleLogs() {
+            const logsToggle = document.getElementById('logsToggle');
+            const logsSection = document.getElementById('logsSection');
+            const toggleCard = document.getElementById('logsToggleCard');
+            
+            if (logsSection.style.display === 'none') {
+                // Afficher les logs et mettre à jour le toggle
+                logsSection.style.display = 'block';
+                toggleCard.style.display = 'none';
+                logsToggle.checked = true;
+                document.getElementById('logsStatus').textContent = 'ON';
+                document.getElementById('logsStatus').style.color = '#ffffff';
+            } else {
+                // Masquer les logs et mettre à jour le toggle
+                logsSection.style.display = 'none';
+                toggleCard.style.display = 'block';
+                logsToggle.checked = false;
+                document.getElementById('logsStatus').textContent = 'OFF';
+                document.getElementById('logsStatus').style.color = 'rgba(255,255,255,0.7)';
+            }
+        }
+
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // 🚀 AUTOMATISATION: Connexion automatique au chargement
-            setTimeout(async () => {
-                if (typeof autoConnectOnLoad === 'function') {
-                    await autoConnectOnLoad();
-                }
-            }, 1000);
+            // 🚀 CONNEXION MANUELLE UNIQUEMENT - Pas de connexion automatique
+            // L'utilisateur doit cliquer sur le bouton 🔗 API pour se connecter
             
             // Wait a bit for TradingView script to load
             setTimeout(() => {
