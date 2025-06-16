@@ -54,32 +54,24 @@ async function testConnection() {
         log('🔄 Lancement automatique du scan TOP 30 Volume...', 'INFO');
         await scanTop30Volume();
         
-        // 2. Démarrer le scan MACD automatique dès que le TOP 30 est chargé
+        // 2. NOUVEAU: Démarrer le scan MACD optimisé depuis main.js
         if (top30Pairs && top30Pairs.length > 0) {
             log('🎯 Démarrage automatique du scan MACD temps réel...', 'SUCCESS');
             
             // Vérifier que le toggle MACD est activé
             const macdToggle = document.getElementById('macdToggle');
             if (macdToggle && macdToggle.checked) {
-                log('✅ Toggle MACD activé - Lancement du scan', 'INFO');
+                log('✅ Toggle MACD activé - Démarrage du nouveau système d\'analyse', 'INFO');
                 
-                // Attendre que TradingView soit initialisé
-                setTimeout(async () => {
-                    if (typeof startRealTimeScanning === 'function') {
-                        await startRealTimeScanning();
-                        log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
+                // Attendre que le système soit prêt puis démarrer le scan MACD optimisé
+                setTimeout(() => {
+                    if (typeof startMacdScanning === 'function') {
+                        startMacdScanning();
+                        log('⚡ Nouveau scan MACD multi-tokens activé (toutes les 30 secondes)', 'SUCCESS');
                     } else {
-                        // Fallback si la fonction n'est pas encore chargée
-                        setTimeout(async () => {
-                            if (typeof startRealTimeScanning === 'function') {
-                                await startRealTimeScanning();
-                                log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
-                            } else {
-                                log('❌ Fonction startRealTimeScanning non trouvée', 'ERROR');
-                            }
-                        }, 2000);
+                        log('⚠️ Fonction startMacdScanning non encore chargée - sera activée par le toggle', 'WARNING');
                     }
-                }, 3000);
+                }, 2000);
             } else {
                 log('⚠️ Toggle MACD désactivé - Scan MACD non démarré', 'WARNING');
                 log('💡 Activez le toggle MACD dans le header pour démarrer l\'analyse', 'INFO');
