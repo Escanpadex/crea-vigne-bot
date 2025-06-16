@@ -9,8 +9,6 @@
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
-    <div class="version">🕐 Dernière MAJ: 07/01/2025 14:30</div>
-    
     <div class="container">
         <div class="header">
             <h1>🚀 Bot Trading Bitget Futures</h1>
@@ -514,6 +512,37 @@
             
             historyContainer.innerHTML = html;
         }
+
+        // Update chart selector with TOP 30 pairs
+        function updateChartSelector() {
+            const selector = document.getElementById('chartSymbol');
+            if (!selector || !top30Pairs || top30Pairs.length === 0) {
+                return;
+            }
+            
+            // Sauvegarder la sélection actuelle
+            const currentSelection = selector.value;
+            
+            // Vider et remplir avec les nouvelles paires
+            selector.innerHTML = '';
+            
+            top30Pairs.forEach((pair, index) => {
+                const option = document.createElement('option');
+                option.value = `BINANCE:${pair.symbol}`;
+                option.textContent = `#${index + 1} ${pair.symbol} (${formatNumber(pair.usdtVolume)})`;
+                selector.appendChild(option);
+            });
+            
+            // Restaurer la sélection si elle existe toujours
+            if (currentSelection && Array.from(selector.options).some(opt => opt.value === currentSelection)) {
+                selector.value = currentSelection;
+            } else if (selector.options.length > 0) {
+                selector.value = selector.options[0].value;
+            }
+        }
+        
+        // Make function globally available
+        window.updateChartSelector = updateChartSelector;
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
