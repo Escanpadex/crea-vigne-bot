@@ -57,21 +57,35 @@ async function testConnection() {
         // 2. Démarrer le scan MACD automatique dès que le TOP 30 est chargé
         if (top30Pairs && top30Pairs.length > 0) {
             log('🎯 Démarrage automatique du scan MACD temps réel...', 'SUCCESS');
-            // Attendre que TradingView soit initialisé
-            setTimeout(async () => {
-                if (typeof startRealTimeScanning === 'function') {
-                    await startRealTimeScanning();
-                    log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
-                } else {
-                    // Fallback si la fonction n'est pas encore chargée
-                    setTimeout(async () => {
-                        if (typeof startRealTimeScanning === 'function') {
-                            await startRealTimeScanning();
-                            log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
-                        }
-                    }, 2000);
-                }
-            }, 3000);
+            
+            // Vérifier que le toggle MACD est activé
+            const macdToggle = document.getElementById('macdToggle');
+            if (macdToggle && macdToggle.checked) {
+                log('✅ Toggle MACD activé - Lancement du scan', 'INFO');
+                
+                // Attendre que TradingView soit initialisé
+                setTimeout(async () => {
+                    if (typeof startRealTimeScanning === 'function') {
+                        await startRealTimeScanning();
+                        log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
+                    } else {
+                        // Fallback si la fonction n'est pas encore chargée
+                        setTimeout(async () => {
+                            if (typeof startRealTimeScanning === 'function') {
+                                await startRealTimeScanning();
+                                log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
+                            } else {
+                                log('❌ Fonction startRealTimeScanning non trouvée', 'ERROR');
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            } else {
+                log('⚠️ Toggle MACD désactivé - Scan MACD non démarré', 'WARNING');
+                log('💡 Activez le toggle MACD dans le header pour démarrer l\'analyse', 'INFO');
+            }
+        } else {
+            log('⚠️ Aucune donnée TOP volume - Scan MACD reporté', 'WARNING');
         }
         
         // 3. Programmer le scan automatique TOP 30 toutes les 30 minutes
