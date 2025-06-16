@@ -23,62 +23,6 @@ function clearLogs() {
     document.getElementById('logs').innerHTML = '';
 }
 
-function toggleLogs() {
-    const logsSection = document.getElementById('logsSection');
-    const logsToggleCard = document.getElementById('logsToggleCard');
-    
-    if (logsSection.style.display === 'none') {
-        logsSection.style.display = 'block';
-        logsToggleCard.style.display = 'none';
-    } else {
-        logsSection.style.display = 'none';
-        logsToggleCard.style.display = 'block';
-    }
-}
-
-function updateTopVolumeCount() {
-    const selectedCount = parseInt(document.getElementById('topVolumeCount').value);
-    const title = document.getElementById('topVolumeTitle');
-    const settings = document.getElementById('currentSettings');
-    const timeframe = document.getElementById('macdTimeframe').value;
-    
-    // Mettre à jour la configuration
-    config.topVolumeCount = selectedCount;
-    
-    if (title) {
-        title.textContent = `📈 TOP ${selectedCount} Volume (Surveillance)`;
-    }
-    
-    if (settings) {
-        settings.textContent = `📈 ${timeframe} | TOP ${selectedCount}`;
-    }
-    
-    log(`⚙️ Configuration mise à jour: TOP ${selectedCount} Volume`, 'INFO');
-    
-    // Si connecté, relancer le scan avec le nouveau nombre
-    if (document.getElementById('connectionStatus').classList.contains('online')) {
-        log(`🔄 Relancement du scan avec TOP ${selectedCount}...`, 'INFO');
-        if (typeof scanTop30Volume === 'function') {
-            scanTop30Volume();
-        }
-    }
-}
-
-function updateMacdTimeframe() {
-    const timeframe = document.getElementById('macdTimeframe').value;
-    const topCount = document.getElementById('topVolumeCount').value;
-    const settings = document.getElementById('currentSettings');
-    
-    // Mettre à jour la configuration
-    config.macdTimeframe = timeframe;
-    
-    if (settings) {
-        settings.textContent = `📈 ${timeframe} | TOP ${topCount}`;
-    }
-    
-    log(`⚙️ Timeframe MACD mis à jour: ${timeframe}`, 'INFO');
-}
-
 function formatNumber(num) {
     if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
     if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
