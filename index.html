@@ -207,8 +207,8 @@
         </div>
         
         <!-- NOUVELLE SECTION TRADINGVIEW & MACD -->
-        <div class="grid">
-            <div class="card">
+        <div class="grid" id="tradingViewMacdGrid">
+            <div class="card" id="tradingViewCard">
                 <h3>📊 Graphique TradingView & MACD</h3>
                 <div class="form-group">
                     <label id="chartSelectorLabel">Sélectionner une paire (TOP 30 Volume):</label>
@@ -229,8 +229,19 @@
                 </div>
             </div>
             
-            <div class="card">
-                <h3>📈 Historique Croisements MACD (24h)</h3>
+            <div class="card" id="macdHistoryCard">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                    <h3 style="margin: 0;">📈 Historique Croisements MACD (24h)</h3>
+                    <!-- Contrôle MACD similaire aux logs -->
+                    <div style="display: flex; align-items: center; gap: 10px; background: rgba(102, 126, 234, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(102, 126, 234, 0.2);">
+                        <div style="font-size: 11px; color: #667eea; font-weight: 600;">📊 MACD</div>
+                        <div class="toggle-switch" onclick="toggleMacdVisibility()">
+                            <input type="checkbox" id="macdToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span id="macdStatus" style="font-size: 12px; color: #667eea; font-weight: 700;">ON</span>
+                    </div>
+                </div>
                 <div style="margin-bottom: 15px;">
                     <strong>Paire analysée:</strong> <span id="currentMACDPair">BTC/USDT</span>
                     <br>
@@ -858,6 +869,33 @@
                 log('📊 Sélecteur en attente des données TOP 30', 'INFO');
             }
         };
+
+        // 🆕 FONCTION: Contrôle de la visibilité de l'historique MACD
+        function toggleMacdVisibility() {
+            const macdToggle = document.getElementById('macdToggle');
+            const macdStatus = document.getElementById('macdStatus');
+            const macdHistoryCard = document.getElementById('macdHistoryCard');
+            const tradingViewMacdGrid = document.getElementById('tradingViewMacdGrid');
+            
+            // Basculer l'état
+            const isChecked = macdToggle.checked;
+            
+            if (isChecked) {
+                // MACD ON - Afficher l'historique MACD
+                macdHistoryCard.style.display = 'block';
+                tradingViewMacdGrid.classList.remove('macd-hidden');
+                macdStatus.textContent = 'ON';
+                macdStatus.style.color = '#667eea';
+                log('📊 Historique MACD activé - Layout 2 colonnes', 'SUCCESS');
+            } else {
+                // MACD OFF - Masquer l'historique MACD et étendre TradingView
+                macdHistoryCard.style.display = 'none';
+                tradingViewMacdGrid.classList.add('macd-hidden');
+                macdStatus.textContent = 'OFF';
+                macdStatus.style.color = 'rgba(102, 126, 234, 0.5)';
+                log('📊 Historique MACD masqué - TradingView étendu sur toute la largeur', 'INFO');
+            }
+        }
     </script>
 </body>
 </html> 
