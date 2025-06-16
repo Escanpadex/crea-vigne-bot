@@ -429,11 +429,18 @@
             const selectedSymbol = document.getElementById('chartSymbol').value;
             const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
             
+            // LOG: Début d'analyse
+            log(`🔍 Analyse MACD en cours: ${symbolName}`, 'INFO');
+            
             const macdData = await getMACDDataOptimized(selectedSymbol, 100);
             
             if (!macdData || macdData.macd.length < 2) {
+                log(`⚠️ Données MACD insuffisantes pour ${symbolName}`, 'WARNING');
                 return;
             }
+
+            // LOG: Données récupérées
+            log(`📊 MACD données OK: ${macdData.macd.length} points pour ${symbolName}`, 'DEBUG');
 
             // Vérifier seulement les 3 derniers points pour détecter les nouveaux croisements
             const recentData = {
@@ -442,6 +449,14 @@
                 signal: macdData.signal.slice(-3),
                 histogram: macdData.histogram.slice(-3)
             };
+
+            // LOG: État actuel MACD
+            const lastMACD = recentData.macd[recentData.macd.length - 1];
+            const lastSignal = recentData.signal[recentData.signal.length - 1];
+            const trend = lastMACD > lastSignal ? '📈 Haussier' : '📉 Baissier';
+            log(`💡 ${symbolName}: MACD ${lastMACD.toFixed(6)} vs Signal ${lastSignal.toFixed(6)} ${trend}`, 'DEBUG');
+
+            let crossoverFound = false;
 
             // Chercher nouveau croisement haussier
             for (let i = 1; i < recentData.macd.length; i++) {
@@ -468,10 +483,17 @@
                         log(`🚨 NOUVEAU CROISEMENT MACD DÉTECTÉ! ${symbolName}`, 'SUCCESS');
                         log(`⚡ Délai: ${delayMinutes} minute(s) | MACD: ${currMACD.toFixed(6)}`, 'SUCCESS');
                         
+                        crossoverFound = true;
+                        
                         // Mettre à jour l'affichage immédiatement
                         await refreshCompleteHistory();
                     }
                 }
+            }
+
+            // LOG: Résultat de l'analyse
+            if (!crossoverFound) {
+                log(`✅ ${symbolName}: Analyse terminée - Aucun nouveau croisement`, 'DEBUG');
             }
         }
 
@@ -810,6 +832,12 @@
                 console.log('✅ MACD activé - Layout 2 colonnes');
                 if (typeof log === 'function') {
                     log('📊 Historique MACD activé - Layout 2 colonnes', 'SUCCESS');
+                    
+                    // Démarrer le scan MACD si pas déjà actif
+                    if (typeof startRealTimeScanning === 'function') {
+                        log('🚀 Redémarrage du scan MACD temps réel...', 'INFO');
+                        startRealTimeScanning();
+                    }
                 }
             } else {
                 // MACD OFF - Masquer l'historique MACD et étendre TradingView (pleine largeur)
@@ -820,7 +848,14 @@
                 macdStatus.style.color = 'rgba(255,255,255,0.7)';
                 console.log('❌ MACD désactivé - TradingView pleine largeur');
                 if (typeof log === 'function') {
-                    log('📊 Historique MACD masqué - TradingView étendu sur toute la largeur', 'INFO');
+                    log('📊 Historique MACD masqué - Scan MACD arrêté', 'INFO');
+                    
+                    // Arrêter le scan MACD
+                    if (realTimeInterval) {
+                        clearInterval(realTimeInterval);
+                        realTimeInterval = null;
+                        log('⏹️ Scan MACD temps réel arrêté', 'INFO');
+                    }
                 }
             }
         }
