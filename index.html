@@ -26,11 +26,21 @@
                     <!-- Section Contrôle Logs -->
                     <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
                         <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📝 Logs</div>
-                        <div class="toggle-switch" onclick="toggleLogsVisibility()">
-                            <input type="checkbox" id="logsToggle" checked>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="logsToggle" onchange="toggleLogsVisibility()">
                             <span class="toggle-slider"></span>
                         </div>
-                        <span id="logsStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">ON</span>
+                        <span id="logsStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">OFF</span>
+                    </div>
+                    
+                    <!-- Section Contrôle MACD -->
+                    <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📊 MACD</div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="macdToggle" checked onchange="toggleMacdVisibility()">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span id="macdStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">ON</span>
                     </div>
                 </div>
                 <div>
@@ -230,18 +240,7 @@
             </div>
             
             <div class="card" id="macdHistoryCard">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                    <h3 style="margin: 0;">📈 Historique Croisements MACD (24h)</h3>
-                    <!-- Contrôle MACD similaire aux logs -->
-                    <div style="display: flex; align-items: center; gap: 10px; background: rgba(102, 126, 234, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(102, 126, 234, 0.2);">
-                        <div style="font-size: 11px; color: #667eea; font-weight: 600;">📊 MACD</div>
-                        <div class="toggle-switch" onclick="toggleMacdVisibility()">
-                            <input type="checkbox" id="macdToggle" checked>
-                            <span class="toggle-slider"></span>
-                        </div>
-                        <span id="macdStatus" style="font-size: 12px; color: #667eea; font-weight: 700;">ON</span>
-                    </div>
-                </div>
+                <h3 style="margin-bottom: 15px;">📈 Historique Croisements MACD (24h)</h3>
                 <div style="margin-bottom: 15px;">
                     <strong>Paire analysée:</strong> <span id="currentMACDPair">BTC/USDT</span>
                     <br>
@@ -752,7 +751,7 @@
             const logsSection = document.getElementById('logsSection');
             const logsToggleCard = document.getElementById('logsToggleCard');
             
-            // Basculer l'état
+            // Récupérer l'état du toggle
             const isChecked = logsToggle.checked;
             
             if (isChecked) {
@@ -777,7 +776,7 @@
             const logsSection = document.getElementById('logsSection');
             const toggleCard = document.getElementById('logsToggleCard');
             
-            if (logsSection.style.display === 'none') {
+            if (logsSection.style.display === 'none' || logsSection.style.display === '') {
                 // Afficher les logs et mettre à jour le toggle
                 logsSection.style.display = 'block';
                 toggleCard.style.display = 'none';
@@ -877,22 +876,24 @@
             const macdHistoryCard = document.getElementById('macdHistoryCard');
             const tradingViewMacdGrid = document.getElementById('tradingViewMacdGrid');
             
-            // Basculer l'état
+            // Récupérer l'état du toggle
             const isChecked = macdToggle.checked;
             
             if (isChecked) {
-                // MACD ON - Afficher l'historique MACD
+                // MACD ON - Afficher l'historique MACD (Layout 2 colonnes)
                 macdHistoryCard.style.display = 'block';
                 tradingViewMacdGrid.classList.remove('macd-hidden');
+                tradingViewMacdGrid.style.gridTemplateColumns = '1fr 1fr';
                 macdStatus.textContent = 'ON';
-                macdStatus.style.color = '#667eea';
+                macdStatus.style.color = '#ffffff';
                 log('📊 Historique MACD activé - Layout 2 colonnes', 'SUCCESS');
             } else {
-                // MACD OFF - Masquer l'historique MACD et étendre TradingView
+                // MACD OFF - Masquer l'historique MACD et étendre TradingView (pleine largeur)
                 macdHistoryCard.style.display = 'none';
                 tradingViewMacdGrid.classList.add('macd-hidden');
+                tradingViewMacdGrid.style.gridTemplateColumns = '1fr';
                 macdStatus.textContent = 'OFF';
-                macdStatus.style.color = 'rgba(102, 126, 234, 0.5)';
+                macdStatus.style.color = 'rgba(255,255,255,0.7)';
                 log('📊 Historique MACD masqué - TradingView étendu sur toute la largeur', 'INFO');
             }
         }
