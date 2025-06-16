@@ -16,12 +16,12 @@
                     <h1>🚀 Bot Trading Bitget Futures</h1>
                     <p>Analyse MACD Temps Réel - Volume TOP Dynamique - Gestion Avancée</p>
                 </div>
-                <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px);">
+                <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
                     <div class="status">
                         <div class="status-dot" id="connectionStatus"></div>
-                        <span id="connectionText" style="font-size: 12px; color: white; font-weight: 600;">Déconnecté</span>
+                        <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
                     </div>
-                    <div style="font-size: 11px; color: rgba(255,255,255,0.8);">Connecté (Futures)</div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
                     <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
                 </div>
             </div>
@@ -225,16 +225,18 @@
                     <strong>Dernière analyse:</strong> <span id="lastMACDScan">--</span>
                 </div>
                 
-                <div id="macdHistory" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        <p>🔍 Cliquez sur "Scanner Croisement" pour analyser les croisements MACD</p>
-                        <p>📊 Affichage des croisements haussiers des 24 dernières heures</p>
+                <div id="macdHistory" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #fafafa;">
+                    <div style="text-align: center; color: #555; padding: 20px;">
+                        <p style="color: #333; font-weight: 600;">🤖 Analyse MACD Automatique Activée</p>
+                        <p style="color: #666;">📊 Scan automatique des croisements haussiers toutes les 30 secondes</p>
+                        <p style="color: #666;">🎯 Affichage des signaux MACD des 24 dernières heures</p>
                     </div>
                 </div>
                 
-                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; font-size: 12px;">
-                    <strong>ℹ️ Info:</strong> Les croisements MACD haussiers indiquent des signaux d'achat potentiels.<br>
-                    <strong>📊 Conditions:</strong> MACD > Signal Line (croisement vers le haut)
+                <div style="margin-top: 15px; padding: 10px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 8px; font-size: 12px;">
+                    <strong style="color: #2d5a2d;">ℹ️ Info:</strong> <span style="color: #333;">Les croisements MACD haussiers indiquent des signaux d'achat potentiels.</span><br>
+                    <strong style="color: #2d5a2d;">📊 Conditions:</strong> <span style="color: #333;">MACD > Signal Line (croisement vers le haut)</span><br>
+                    <strong style="color: #2d5a2d;">⚡ Automatique:</strong> <span style="color: #333;">Scan en temps réel après connexion API</span>
                 </div>
             </div>
         </div>
@@ -485,21 +487,22 @@
             displayMACDHistoryOptimized(recent24h, symbolName);
         }
 
-        // ⚡ OPTIMISATION 7: Affichage avec délai calculé
+        // ⚡ OPTIMISATION 7: Affichage avec délai calculé et couleurs corrigées
         function displayMACDHistoryOptimized(crossovers, symbolName) {
             const container = document.getElementById('macdHistory');
             
             if (crossovers.length === 0) {
                 container.innerHTML = `
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        <p>📊 Aucun croisement haussier MACD détecté sur ${symbolName}</p>
-                        <p>⚡ Mode temps réel activé (scan toutes les 30s)</p>
+                    <div style="text-align: center; color: #666; padding: 20px; background: #fafafa;">
+                        <p style="color: #333; font-weight: 600;">📊 Aucun croisement haussier MACD détecté sur ${symbolName}</p>
+                        <p style="color: #666;">⚡ Mode temps réel activé (scan toutes les 30s)</p>
+                        <p style="color: #2d5a2d;">🤖 Analyse automatique en cours...</p>
                     </div>
                 `;
                 return;
             }
 
-            let html = `<div style="margin-bottom: 10px; font-weight: bold; color: #48bb78;">
+            let html = `<div style="margin-bottom: 10px; font-weight: bold; color: #2d5a2d; background: #f0f8ff; padding: 8px; border-radius: 6px; border: 1px solid #b8e6b8;">
                 🎯 ${crossovers.length} croisement(s) haussier(s) - ${symbolName} ⚡ TEMPS RÉEL
             </div>`;
 
@@ -516,19 +519,19 @@
                     const hours = Math.floor(delayMinutes / 60);
                     const remainingMinutes = delayMinutes % 60;
                     delayText = remainingMinutes > 0 ? `${hours}h${remainingMinutes}min` : `${hours}h`;
-                    delayColor = '#f56565'; // Rouge pour les délais longs
+                    delayColor = '#d73527'; // Rouge foncé pour visibilité
                 } else {
                     delayText = `${delayMinutes}min`;
-                    delayColor = delayMinutes <= 2 ? '#48bb78' : delayMinutes <= 5 ? '#f59e0b' : '#f56565';
+                    delayColor = delayMinutes <= 2 ? '#2d5a2d' : delayMinutes <= 5 ? '#e68a00' : '#d73527';
                 }
                 
                 html += `
-                    <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin: 8px 0; background: #f8fffe;">
+                    <div style="border: 1px solid #b8e6b8; border-radius: 6px; padding: 12px; margin: 8px 0; background: #f8fff8;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: #1a202c;">🔔 Croisement #${crossovers.length - index}</strong>
+                            <strong style="color: #2d5a2d;">🔔 Croisement #${crossovers.length - index}</strong>
                             <span style="color: ${delayColor}; font-weight: bold;">⚡ ${delayText}</span>
                         </div>
-                        <div style="font-size: 13px; color: #4a5568;">
+                        <div style="font-size: 13px; color: #333;">
                             <div>⏰ Heure: ${timeStr}</div>
                         </div>
                     </div>
@@ -737,6 +740,13 @@
 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // 🚀 AUTOMATISATION: Connexion automatique au chargement
+            setTimeout(async () => {
+                if (typeof autoConnectOnLoad === 'function') {
+                    await autoConnectOnLoad();
+                }
+            }, 1000);
+            
             // Wait a bit for TradingView script to load
             setTimeout(() => {
                 initTradingViewChart();
