@@ -472,7 +472,7 @@ input:focus, select:focus {
     font-weight: 700 !important;
 }
 
-/* Toggle Switch pour les Logs */
+/* Toggle Switch pour les Logs et MACD - CORRIGÉ */
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -495,10 +495,10 @@ input:focus, select:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(220, 53, 69, 0.3);
-    border: 1px solid rgba(220, 53, 69, 0.7);
+    background-color: rgba(220, 53, 69, 0.4);
+    border: 1px solid rgba(220, 53, 69, 0.8);
     border-radius: 20px;
-    transition: 0.3s;
+    transition: all 0.3s ease;
     backdrop-filter: blur(5px);
 }
 
@@ -511,29 +511,33 @@ input:focus, select:focus {
     bottom: 2px;
     background: linear-gradient(45deg, #dc3545, #c82333);
     border-radius: 50%;
-    transition: 0.3s;
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.5);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.6);
+    transform: translateX(0px);
 }
 
+/* État ON (checked) */
 .toggle-switch input:checked + .toggle-slider {
-    background-color: rgba(72, 187, 120, 0.3);
-    border-color: rgba(72, 187, 120, 0.7);
+    background-color: rgba(72, 187, 120, 0.4);
+    border-color: rgba(72, 187, 120, 0.8);
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(18px);
     background: linear-gradient(45deg, #48bb78, #38a169);
-    box-shadow: 0 2px 8px rgba(72, 187, 120, 0.5);
+    box-shadow: 0 2px 8px rgba(72, 187, 120, 0.6);
+    transform: translateX(18px);
 }
 
+/* État OFF (not checked) - par défaut */
 .toggle-switch input:not(:checked) + .toggle-slider {
-    background-color: rgba(220, 53, 69, 0.3);
-    border-color: rgba(220, 53, 69, 0.7);
+    background-color: rgba(220, 53, 69, 0.4);
+    border-color: rgba(220, 53, 69, 0.8);
 }
 
 .toggle-switch input:not(:checked) + .toggle-slider:before {
     background: linear-gradient(45deg, #dc3545, #c82333);
-    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.5);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.6);
+    transform: translateX(0px);
 }
 
 /* Gestion dynamique du layout TradingView/MACD */
