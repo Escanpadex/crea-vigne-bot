@@ -1,5 +1,8 @@
 // API Functions for Bitget Trading Bot
 
+// Auto-connection flag pour éviter les reconnexions multiples
+let autoConnectionAttempted = false;
+
 async function makeRequest(endpoint, options = {}) {
     try {
         const timestamp = Date.now().toString();
@@ -44,11 +47,34 @@ async function testConnection() {
         log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
         
-        // 🚀 AUTO: Lancer immédiatement le scan TOP 30 après connexion
+        // 🚀 AUTOMATISATION COMPLÈTE après connexion
+        log('🤖 Démarrage de l\'automatisation complète...', 'SUCCESS');
+        
+        // 1. Scanner TOP 30 immédiatement
         log('🔄 Lancement automatique du scan TOP 30 Volume...', 'INFO');
         await scanTop30Volume();
         
-        // 🔄 AUTO: Programmer le scan automatique toutes les 30 minutes
+        // 2. Démarrer le scan MACD automatique dès que le TOP 30 est chargé
+        if (top30Pairs && top30Pairs.length > 0) {
+            log('🎯 Démarrage automatique du scan MACD temps réel...', 'SUCCESS');
+            // Attendre que TradingView soit initialisé
+            setTimeout(async () => {
+                if (typeof startRealTimeScanning === 'function') {
+                    await startRealTimeScanning();
+                    log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
+                } else {
+                    // Fallback si la fonction n'est pas encore chargée
+                    setTimeout(async () => {
+                        if (typeof startRealTimeScanning === 'function') {
+                            await startRealTimeScanning();
+                            log('⚡ Scan MACD automatique activé (toutes les 30 secondes)', 'SUCCESS');
+                        }
+                    }, 2000);
+                }
+            }, 3000);
+        }
+        
+        // 3. Programmer le scan automatique TOP 30 toutes les 30 minutes
         if (window.autoScanInterval) {
             clearInterval(window.autoScanInterval);
         }
@@ -57,18 +83,46 @@ async function testConnection() {
             await scanTop30Volume();
         }, 30 * 60 * 1000); // 30 minutes
         
-        // 🔄 AUTO: Démarrer la synchronisation automatique des positions
+        // 4. Démarrer la synchronisation automatique des positions
         startAutoSyncPositions();
         
-        // 💰 AUTO: Démarrer le rafraîchissement automatique du solde
+        // 5. Rafraîchissement automatique du solde
         if (typeof startAutoBalanceRefresh === 'function') {
             startAutoBalanceRefresh();
         }
         
+        log('🎉 Automatisation complète activée: TOP 30 + MACD + Positions + Balance', 'SUCCESS');
         return true;
     } else {
         log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
         return false;
+    }
+}
+
+// 🆕 FONCTION: Connexion automatique au chargement de la page
+async function autoConnectOnLoad() {
+    if (autoConnectionAttempted) {
+        return;
+    }
+    
+    autoConnectionAttempted = true;
+    
+    // Vérifier si les clés API sont présentes
+    const apiKey = document.getElementById('apiKey').value;
+    const secretKey = document.getElementById('secretKey').value;
+    const passphrase = document.getElementById('passphrase').value;
+    
+    if (apiKey && secretKey && passphrase) {
+        log('🔄 Tentative de connexion automatique...', 'INFO');
+        const connected = await testConnection();
+        
+        if (connected) {
+            log('🚀 Connexion automatique réussie! Toutes les fonctionnalités sont actives.', 'SUCCESS');
+        } else {
+            log('⚠️ Connexion automatique échouée. Cliquez sur le bouton API pour reconnecter.', 'WARNING');
+        }
+    } else {
+        log('ℹ️ Clés API manquantes - Cliquez sur le bouton 🔗 API pour vous connecter', 'INFO');
     }
 }
 
