@@ -12,10 +12,6 @@
     <div class="container">
         <div class="header">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <div>
-                    <h1>🚀 Bot Trading Bitget Futures</h1>
-                    <p>Analyse MACD Temps Réel - Volume TOP Dynamique - Gestion Avancée</p>
-                </div>
                 <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
                     <div class="status">
                         <div class="status-dot" id="connectionStatus"></div>
@@ -23,6 +19,10 @@
                     </div>
                     <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
                     <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
+                </div>
+                <div>
+                    <h1>🚀 Bot Trading Bitget Futures</h1>
+                    <p>Analyse MACD Temps Réel - Volume TOP Dynamique - Gestion Avancée</p>
                 </div>
             </div>
         </div>
@@ -106,10 +106,6 @@
                     <button class="btn" onclick="startBot()" id="startBtn" style="flex: 1; padding: 10px; font-size: 14px;">▶️ Démarrer</button>
                     <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="flex: 1; padding: 10px; font-size: 14px;">⏹️ Arrêter</button>
                 </div>
-                
-                <div style="margin-top: 10px;">
-                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%; padding: 8px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
-                </div>
             </div>
             
             <!-- Section TOP 30 Volume - Côte à côte -->
@@ -133,6 +129,11 @@
         <div class="grid">
             <div class="card">
                 <h3>💼 Positions & Statistiques</h3>
+                
+                <!-- Bouton Vérifier Stop Loss déplacé ici -->
+                <div style="margin-bottom: 15px;">
+                    <button class="btn" onclick="manageTrailingStops()" style="width: 100%; padding: 10px; font-size: 14px; background: linear-gradient(45deg, #f59e0b, #d97706);">🔄 Vérifier Stop Loss Manuellement</button>
+                </div>
                 
                 <!-- Statistiques compactes en haut -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
