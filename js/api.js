@@ -63,15 +63,21 @@ async function testConnection() {
             if (macdToggle && macdToggle.checked) {
                 log('✅ Toggle MACD activé - Démarrage du nouveau système d\'analyse', 'INFO');
                 
-                // Attendre que le système soit prêt puis démarrer le scan MACD optimisé
-                setTimeout(() => {
+                // Fonction pour attendre que startMacdScanning soit disponible
+                function waitForMacdScanning(attempts = 0) {
                     if (typeof startMacdScanning === 'function') {
                         startMacdScanning();
                         log('⚡ Nouveau scan MACD multi-tokens activé (toutes les 30 secondes)', 'SUCCESS');
+                    } else if (attempts < 10) {
+                        // Réessayer toutes les 500ms pendant 5 secondes max
+                        setTimeout(() => waitForMacdScanning(attempts + 1), 500);
                     } else {
-                        log('⚠️ Fonction startMacdScanning non encore chargée - sera activée par le toggle', 'WARNING');
+                        log('⚠️ Fonction startMacdScanning non trouvée après 5 secondes - Activez manuellement le toggle MACD', 'WARNING');
                     }
-                }, 2000);
+                }
+                
+                // Commencer à attendre après 1 seconde
+                setTimeout(() => waitForMacdScanning(), 1000);
             } else {
                 log('⚠️ Toggle MACD désactivé - Scan MACD non démarré', 'WARNING');
                 log('💡 Activez le toggle MACD dans le header pour démarrer l\'analyse', 'INFO');
