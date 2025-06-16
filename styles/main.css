@@ -105,6 +105,31 @@ input:focus, select:focus {
     background: linear-gradient(45deg, #28a745, #1e7e34);
 }
 
+.btn-api-highlight {
+    background: linear-gradient(45deg, #48bb78, #38a169) !important;
+    box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4) !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    animation: pulse-green 2s infinite !important;
+    font-weight: bold !important;
+}
+
+.btn-api-highlight:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6) !important;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+    50% {
+        box-shadow: 0 6px 25px rgba(72, 187, 120, 0.8);
+    }
+    100% {
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+}
+
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
