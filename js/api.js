@@ -65,14 +65,28 @@ async function testConnection() {
                 
                 // Fonction pour attendre que startMacdScanning soit disponible
                 function waitForMacdScanning(attempts = 0) {
-                    if (typeof startMacdScanning === 'function') {
+                    console.log(`🔍 Tentative ${attempts + 1}/20 - Recherche startMacdScanning...`);
+                    
+                    if (window.macdFunctionsLoaded && typeof window.startMacdScanning === 'function') {
+                        console.log('✅ Fonctions MACD chargées et disponibles!');
+                        window.startMacdScanning();
+                        log('⚡ Nouveau scan MACD multi-tokens activé (toutes les 30 secondes)', 'SUCCESS');
+                    } else if (typeof startMacdScanning === 'function') {
+                        console.log('✅ Fonction startMacdScanning trouvée!');
                         startMacdScanning();
                         log('⚡ Nouveau scan MACD multi-tokens activé (toutes les 30 secondes)', 'SUCCESS');
-                    } else if (attempts < 10) {
-                        // Réessayer toutes les 500ms pendant 5 secondes max
+                    } else if (typeof window.startMacdScanning === 'function') {
+                        console.log('✅ Fonction window.startMacdScanning trouvée!');
+                        window.startMacdScanning();
+                        log('⚡ Nouveau scan MACD multi-tokens activé (toutes les 30 secondes)', 'SUCCESS');
+                    } else if (attempts < 20) {
+                        // Réessayer toutes les 500ms pendant 10 secondes max
+                        console.log(`⏳ main.js loaded: ${!!window.macdFunctionsLoaded}, startMacdScanning: ${typeof window.startMacdScanning}`);
                         setTimeout(() => waitForMacdScanning(attempts + 1), 500);
                     } else {
-                        log('⚠️ Fonction startMacdScanning non trouvée après 5 secondes - Activez manuellement le toggle MACD', 'WARNING');
+                        log('⚠️ Fonction startMacdScanning non trouvée après 10 secondes', 'WARNING');
+                        log('💡 Solution: Cliquez manuellement sur le toggle MACD (OFF puis ON)', 'INFO');
+                        log('🔧 Ou tapez dans la console: testMacdScanning()', 'INFO');
                     }
                 }
                 
