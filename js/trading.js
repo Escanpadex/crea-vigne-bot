@@ -265,7 +265,13 @@ async function openPosition(symbol, analysis) {
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        const initialStopPrice = analysis.price * 0.99;
+        // Get current price to ensure accuracy
+        const currentPrice = await getCurrentPrice(symbol);
+        const priceToUse = currentPrice || analysis.price;
+        const initialStopPrice = priceToUse * 0.99;
+        
+        // Format the trigger price with appropriate precision
+        const triggerPriceFormatted = parseFloat(initialStopPrice.toFixed(8)).toString();
         
         const stopLossData = {
             planType: "normal_plan",
@@ -273,8 +279,8 @@ async function openPosition(symbol, analysis) {
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
-            size: quantity,
-            triggerPrice: initialStopPrice.toString(),
+            size: quantity.toString(),
+            triggerPrice: triggerPriceFormatted,
             triggerType: "mark_price",
             side: "sell",
             tradeSide: "close",
@@ -372,6 +378,44 @@ async function syncLocalPositions() {
     return apiPositions;
 }
 
+// Fonction pour créer un stop loss d'urgence sur une position existante
+async function createEmergencyStopLoss(position, stopPrice) {
+    try {
+        const stopLossData = {
+            planType: "normal_plan",
+            symbol: position.symbol,
+            productType: "USDT-FUTURES",
+            marginMode: "isolated",
+            marginCoin: "USDT",
+            size: position.quantity.toString(),
+            triggerPrice: parseFloat(stopPrice.toFixed(8)).toString(),
+            triggerType: "mark_price",
+            side: "sell",
+            tradeSide: "close",
+            orderType: "market",
+            clientOid: `emergency_stop_${Date.now()}_${position.symbol}`,
+            reduceOnly: "YES"
+        };
+        
+        const result = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
+            method: 'POST',
+            body: JSON.stringify(stopLossData)
+        });
+        
+        if (result && result.code === '00000') {
+            position.stopLossId = result.data.orderId;
+            log(`🆘 Stop Loss d'urgence créé avec ID: ${result.data.orderId}`, 'SUCCESS');
+            return true;
+        } else {
+            log(`❌ Erreur création stop loss d'urgence: ${result?.msg || 'Erreur inconnue'}`, 'ERROR');
+            return false;
+        }
+    } catch (error) {
+        log(`❌ Exception création stop loss d'urgence: ${error.message}`, 'ERROR');
+        return false;
+    }
+}
+
 async function manageTrailingStops() {
     if (!botRunning || openPositions.length === 0) return;
     
@@ -382,8 +426,26 @@ async function manageTrailingStops() {
         
         for (const position of openPositions) {
             if (!position.stopLossId) {
-                log(`⚠️ ${position.symbol}: Pas de stop loss configuré`, 'WARNING');
-                continue;
+                log(`⚠️ ${position.symbol}: Pas de stop loss configuré - Création automatique...`, 'WARNING');
+                
+                // Créer un stop loss d'urgence automatiquement
+                const currentPrice = await getCurrentPrice(position.symbol);
+                if (currentPrice) {
+                    const urgentStopPrice = currentPrice * 0.99; // -1%
+                    const success = await createEmergencyStopLoss(position, urgentStopPrice);
+                    
+                    if (success) {
+                        log(`🆘 Stop Loss d'urgence créé pour ${position.symbol} @ ${urgentStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
+                        position.currentStopPrice = urgentStopPrice;
+                        position.highestPrice = currentPrice;
+                    } else {
+                        log(`❌ Échec création stop loss d'urgence pour ${position.symbol}`, 'ERROR');
+                        continue;
+                    }
+                } else {
+                    log(`❌ Impossible de récupérer le prix pour ${position.symbol}`, 'ERROR');
+                    continue;
+                }
             }
             
             const currentPrice = await getCurrentPrice(position.symbol);
