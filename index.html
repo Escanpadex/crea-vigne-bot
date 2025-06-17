@@ -25,22 +25,17 @@
                     
                     <!-- Section Contrôle Logs -->
                     <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📝 Logs</div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="logsToggle" onchange="toggleLogsVisibility()">
-                            <span class="toggle-slider"></span>
-                        </div>
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); cursor: pointer;">
+                            <input type="checkbox" id="logsToggle" onchange="toggleLogsVisibility()" style="transform: scale(1.2);">
+                            📝 Logs
+                        </label>
                         <span id="logsStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">OFF</span>
                     </div>
                     
-                    <!-- Section Contrôle MACD -->
+                    <!-- Section MACD toujours active -->
                     <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📊 MACD</div>
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="macdToggle" checked onchange="toggleMacdVisibility()">
-                            <span class="toggle-slider"></span>
-                        </div>
-                        <span id="macdStatus" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">ON</span>
+                        <span style="font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">📊 MACD</span>
+                        <span style="font-size: 12px; color: #4CAF50; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">TOUJOURS ACTIF</span>
                     </div>
                 </div>
                 <div>
