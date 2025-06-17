@@ -575,6 +575,77 @@ function updatePositionsDisplay() {
     });
 }
 
+// Fonction pour importer toutes les positions existantes depuis Bitget au démarrage
+async function importExistingPositions() {
+    try {
+        log('🔄 Importation des positions existantes depuis Bitget...', 'INFO');
+        
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        
+        if (result && result.code === '00000' && result.data) {
+            const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            
+            if (apiPositions.length === 0) {
+                log('ℹ️ Aucune position existante trouvée sur Bitget', 'INFO');
+                return;
+            }
+            
+            let imported = 0;
+            
+            for (const apiPos of apiPositions) {
+                // Vérifier si cette position n'est pas déjà dans le système local
+                const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
+                
+                if (!exists) {
+                    const position = {
+                        id: Date.now() + Math.random(),
+                        symbol: apiPos.symbol,
+                        side: apiPos.side.toUpperCase(),
+                        size: Math.abs(parseFloat(apiPos.contractSize) * parseFloat(apiPos.markPrice)),
+                        quantity: Math.abs(parseFloat(apiPos.contractSize)),
+                        entryPrice: parseFloat(apiPos.averageOpenPrice),
+                        status: 'OPEN',
+                        timestamp: new Date().toISOString(), // Timestamp d'importation
+                        orderId: `imported_${Date.now()}`,
+                        stopLossId: null, // Les positions importées n'ont pas de stop loss initial
+                        currentStopPrice: null,
+                        highestPrice: parseFloat(apiPos.markPrice),
+                        currentPrice: parseFloat(apiPos.markPrice),
+                        unrealizedPnL: parseFloat(apiPos.unrealizedPL || 0),
+                        pnlPercentage: ((parseFloat(apiPos.markPrice) - parseFloat(apiPos.averageOpenPrice)) / parseFloat(apiPos.averageOpenPrice)) * 100,
+                        reason: '📥 Position importée depuis Bitget'
+                    };
+                    
+                    openPositions.push(position);
+                    imported++;
+                    
+                    log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)}`, 'SUCCESS');
+                }
+            }
+            
+            if (imported > 0) {
+                log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
+                log(`⚠️ Positions importées SANS stop loss - Le système va les protéger automatiquement`, 'WARNING');
+                
+                // Mettre à jour l'affichage
+                updatePositionsDisplay();
+                updateStats();
+                
+                // Déclencher immédiatement la création de stop loss d'urgence
+                setTimeout(() => {
+                    manageTrailingStops();
+                }, 2000);
+            } else {
+                log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
+            }
+        } else {
+            log('❌ Erreur lors de l\'importation des positions', 'ERROR');
+        }
+    } catch (error) {
+        log(`❌ Erreur importation positions: ${error.message}`, 'ERROR');
+    }
+}
+
 // Improved function to check if positions were manually closed on Bitget
 async function checkPositionsStatus() {
     if (openPositions.length === 0) return;
