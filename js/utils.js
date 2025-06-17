@@ -1,4 +1,5 @@
 // Utility functions
+console.log('📁 Loading utils.js...');
 
 function log(message, type = 'INFO') {
     const logs = document.getElementById('logs');

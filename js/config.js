@@ -1,4 +1,5 @@
 // Configuration constants and variables
+console.log('📁 Loading config.js...');
 const API_BASE = 'https://api.crea-vigne.fr/api';
 
 // Bot state variables
@@ -8,6 +9,7 @@ let tradingLoopInterval = null;
 let statsInterval = null;
 let pnlUpdateInterval = null;
 let stopLossManagementInterval = null;
+let positionSyncInterval = null;
 let botStartTime = null;
 
 // Data storage

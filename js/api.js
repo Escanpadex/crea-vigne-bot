@@ -1,4 +1,5 @@
 // API Functions for Bitget Trading Bot
+console.log('📁 Loading api.js...');
 
 // Auto-connection flag pour éviter les reconnexions multiples
 let autoConnectionAttempted = false;

@@ -1,4 +1,5 @@
 // Trading Functions - MACD Strategy & Position Management
+console.log('📁 Loading trading.js...');
 
 function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
     const minRequired = slowPeriod + signalPeriod + 10;
