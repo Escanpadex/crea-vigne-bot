@@ -580,15 +580,37 @@ async function importExistingPositions() {
     try {
         log('🔄 Importation des positions existantes depuis Bitget...', 'INFO');
         
+        // Vérifier que makeRequest est disponible
+        if (typeof makeRequest !== 'function') {
+            log('❌ Fonction makeRequest non disponible pour l\'importation', 'ERROR');
+            return;
+        }
+        
+        // Vérifier la configuration API
+        if (!config.apiKey || !config.secretKey || !config.passphrase) {
+            log('❌ Configuration API manquante pour l\'importation', 'ERROR');
+            return;
+        }
+        
+        log('🔍 Récupération des positions depuis l\'API Bitget...', 'DEBUG');
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
+        log(`📊 Réponse API reçue: ${result ? 'OK' : 'NULL'}`, 'DEBUG');
+        
         if (result && result.code === '00000' && result.data) {
+            log(`📊 Données brutes reçues: ${result.data.length} positions total`, 'DEBUG');
             const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            log(`📊 Positions actives filtrées: ${apiPositions.length}`, 'DEBUG');
             
             if (apiPositions.length === 0) {
                 log('ℹ️ Aucune position existante trouvée sur Bitget', 'INFO');
                 return;
             }
+            
+            // Log des positions trouvées
+            apiPositions.forEach((pos, index) => {
+                log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side} - Size: ${pos.contractSize} - Price: ${pos.markPrice}`, 'DEBUG');
+            });
             
             let imported = 0;
             
@@ -645,6 +667,9 @@ async function importExistingPositions() {
         log(`❌ Erreur importation positions: ${error.message}`, 'ERROR');
     }
 }
+
+// Rendre la fonction globalement accessible
+window.importExistingPositions = importExistingPositions;
 
 // Improved function to check if positions were manually closed on Bitget
 async function checkPositionsStatus() {
