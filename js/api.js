@@ -54,41 +54,8 @@ async function testConnection() {
         log('🔄 Lancement automatique du scan TOP 30 Volume...', 'INFO');
         await scanTop30Volume();
         
-        // 2. NOUVEAU: Démarrer le scan MACD automatiquement (toujours actif)
-        if (top30Pairs && top30Pairs.length > 0) {
-            log('🎯 Démarrage automatique du scan MACD temps réel...', 'SUCCESS');
-            
-            // Fonction pour attendre que startMacdScanning soit disponible
-            function waitForMacdScanning(attempts = 0) {
-                console.log(`🔍 Tentative ${attempts + 1}/20 - Recherche startMacdScanning...`);
-                
-                if (window.macdFunctionsLoaded && typeof window.startMacdScanning === 'function') {
-                    console.log('✅ Fonctions MACD chargées et disponibles!');
-                    window.startMacdScanning();
-                    log('⚡ Scan MACD multi-tokens activé automatiquement (toutes les 30 secondes)', 'SUCCESS');
-                } else if (typeof startMacdScanning === 'function') {
-                    console.log('✅ Fonction startMacdScanning trouvée!');
-                    startMacdScanning();
-                    log('⚡ Scan MACD multi-tokens activé automatiquement (toutes les 30 secondes)', 'SUCCESS');
-                } else if (typeof window.startMacdScanning === 'function') {
-                    console.log('✅ Fonction window.startMacdScanning trouvée!');
-                    window.startMacdScanning();
-                    log('⚡ Scan MACD multi-tokens activé automatiquement (toutes les 30 secondes)', 'SUCCESS');
-                } else if (attempts < 20) {
-                    // Réessayer toutes les 500ms pendant 10 secondes max
-                    console.log(`⏳ main.js loaded: ${!!window.macdFunctionsLoaded}, startMacdScanning: ${typeof window.startMacdScanning}`);
-                    setTimeout(() => waitForMacdScanning(attempts + 1), 500);
-                } else {
-                    log('⚠️ Fonction startMacdScanning non trouvée après 10 secondes', 'WARNING');
-                    log('🔧 Le scan MACD sera disponible au démarrage du bot', 'INFO');
-                }
-            }
-            
-            // Commencer à attendre après 1 seconde
-            setTimeout(() => waitForMacdScanning(), 1000);
-        } else {
-            log('⚠️ Aucune donnée TOP volume - Scan MACD reporté', 'WARNING');
-        }
+        // 2. Simple: Les données TOP 30 sont prêtes pour le bot
+        log('✅ Données TOP 30 prêtes - Le MACD fonctionnera au démarrage du bot', 'SUCCESS');
         
         // 3. Programmer le scan automatique TOP 30 toutes les 30 minutes
         if (window.autoScanInterval) {
