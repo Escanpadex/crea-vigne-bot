@@ -421,6 +421,17 @@
 
         // ⚡ OPTIMISATION 5: Détection temps réel des nouveaux croisements
         async function scanMACDCrossoverRealTime() {
+            // Vérifier si le bot est en cours d'exécution
+            if (typeof botRunning !== 'undefined' && !botRunning) {
+                // Arrêter le scan si le bot n'est pas actif
+                if (realTimeInterval) {
+                    clearInterval(realTimeInterval);
+                    realTimeInterval = null;
+                    log('🛑 Scan MACD temps réel arrêté (bot inactif)', 'INFO');
+                }
+                return;
+            }
+            
             const selectedSymbol = document.getElementById('chartSymbol').value;
             const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
             
