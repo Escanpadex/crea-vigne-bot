@@ -134,13 +134,13 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
     };
 }
 
-async function analyzePairMACD(symbol) {
+async function analyzePairMACD(symbol, timeframe = '5m') {
     try {
         // Augmenter le nombre de bougies pour un calcul plus précis
-        const klines = await getKlineData(symbol, 150); // 150 bougies au lieu de 100
+        const klines = await getKlineData(symbol, 150, timeframe); // Utiliser le timeframe passé en paramètre
         
         if (klines.length < 80) {
-            return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes' };
+            return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes', timeframe };
         }
         
         const closePrices = klines.map(k => k.close);
@@ -154,22 +154,24 @@ async function analyzePairMACD(symbol) {
         let reason = '';
         
         if (macdData.macd === null || macdData.signal === null) {
-            reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol}`;
+            reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe})`;
         } else if (macdData.crossover && macdData.histogram > 0) {
             macdSignal = 'BUY';
             signalStrength = Math.abs(macdData.histogram) * 1000;
-            reason = `🔥 CROISEMENT HAUSSIER STRICT CONFIRMÉ! 
+            reason = `🔥 CROISEMENT HAUSSIER ${timeframe}! 
                      MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} 
-                     | Histogram: ${macdData.histogram.toFixed(6)} 
-                     | Prev MACD: ${macdData.previousMacd.toFixed(6)} < Prev Signal: ${macdData.previousSignal.toFixed(6)}`;
+                     | Histogram: ${macdData.histogram.toFixed(6)}`;
         } else if (macdData.macd > macdData.signal) {
-            reason = `📈 MACD au-dessus Signal mais PAS de croisement récent. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            macdSignal = 'BULLISH';
+            reason = `📈 MACD ${timeframe} au-dessus Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         } else {
-            reason = `📊 MACD en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            macdSignal = 'BEARISH';
+            reason = `📊 MACD ${timeframe} en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         }
         
         return {
             symbol,
+            timeframe,
             signal: macdSignal,
             strength: signalStrength,
             price: currentPrice,
@@ -191,9 +193,51 @@ async function analyzePairMACD(symbol) {
         };
         
     } catch (error) {
-        log(`❌ ERREUR ANALYSE ${symbol}: ${error.message}`, 'ERROR');
-        console.error(`Erreur analyse MACD ${symbol}:`, error);
-        return { symbol, signal: 'HOLD', strength: 0, reason: `Erreur: ${error.message}` };
+        log(`❌ ERREUR ANALYSE ${symbol} (${timeframe}): ${error.message}`, 'ERROR');
+        console.error(`Erreur analyse MACD ${symbol} (${timeframe}):`, error);
+        return { symbol, timeframe, signal: 'HOLD', strength: 0, reason: `Erreur: ${error.message}` };
+    }
+}
+
+// Nouvelle fonction pour analyser une crypto sur tous les timeframes avec filtrage progressif
+async function analyzeMultiTimeframe(symbol) {
+    try {
+        const timeframes = ['4h', '1h', '15m', '5m'];
+        const results = {};
+        
+        // Analyser chaque timeframe
+        for (const tf of timeframes) {
+            const analysis = await analyzePairMACD(symbol, tf);
+            results[tf] = analysis;
+            
+            // Filtrage progressif : si un timeframe n'est pas haussier, on arrête
+            if (tf !== '5m' && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
+                // Cette crypto est filtrée à ce timeframe
+                results.filtered = tf;
+                results.filterReason = `Filtré au ${tf}: ${analysis.signal}`;
+                break;
+            }
+        }
+        
+        // Si on arrive au 5m sans être filtré, vérifier le signal d'achat
+        if (!results.filtered) {
+            const signal5m = results['5m'];
+            if (signal5m.signal === 'BUY' && signal5m.crossover) {
+                results.finalDecision = 'BUY';
+                results.finalReason = 'Tous timeframes validés + croisement 5m détecté';
+            } else {
+                results.finalDecision = 'WAIT';
+                results.finalReason = 'Tous timeframes OK mais pas de croisement 5m';
+            }
+        } else {
+            results.finalDecision = 'FILTERED';
+        }
+        
+        return results;
+        
+    } catch (error) {
+        log(`❌ Erreur analyse multi-timeframe ${symbol}: ${error.message}`, 'ERROR');
+        return { symbol, error: error.message };
     }
 }
 
@@ -609,7 +653,9 @@ async function importExistingPositions() {
             
             // Log des positions trouvées
             apiPositions.forEach((pos, index) => {
-                log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side} - Size: ${pos.contractSize} - Price: ${pos.markPrice}`, 'DEBUG');
+                log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side || 'NO_SIDE'} - Size: ${pos.contractSize || 'NO_SIZE'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
+                // Log complet pour diagnostic
+                log(`📊 Structure complète: ${JSON.stringify(pos)}`, 'DEBUG');
             });
             
             let imported = 0;
@@ -619,29 +665,44 @@ async function importExistingPositions() {
                 const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
                 
                 if (!exists) {
+                    // Vérifications de sécurité pour éviter les erreurs
+                    const side = apiPos.side ? apiPos.side.toUpperCase() : 'LONG';
+                    const contractSize = parseFloat(apiPos.contractSize || 0);
+                    const markPrice = parseFloat(apiPos.markPrice || 0);
+                    const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
+                    const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                    
+                    // Log de debug pour voir les données reçues
+                    log(`🔍 Données position ${apiPos.symbol}: side=${apiPos.side}, contractSize=${apiPos.contractSize}, markPrice=${apiPos.markPrice}`, 'DEBUG');
+                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
-                        side: apiPos.side.toUpperCase(),
-                        size: Math.abs(parseFloat(apiPos.contractSize) * parseFloat(apiPos.markPrice)),
-                        quantity: Math.abs(parseFloat(apiPos.contractSize)),
-                        entryPrice: parseFloat(apiPos.averageOpenPrice),
+                        side: side,
+                        size: Math.abs(contractSize * markPrice),
+                        quantity: Math.abs(contractSize),
+                        entryPrice: averageOpenPrice,
                         status: 'OPEN',
                         timestamp: new Date().toISOString(), // Timestamp d'importation
                         orderId: `imported_${Date.now()}`,
                         stopLossId: null, // Les positions importées n'ont pas de stop loss initial
                         currentStopPrice: null,
-                        highestPrice: parseFloat(apiPos.markPrice),
-                        currentPrice: parseFloat(apiPos.markPrice),
-                        unrealizedPnL: parseFloat(apiPos.unrealizedPL || 0),
-                        pnlPercentage: ((parseFloat(apiPos.markPrice) - parseFloat(apiPos.averageOpenPrice)) / parseFloat(apiPos.averageOpenPrice)) * 100,
+                        highestPrice: markPrice,
+                        currentPrice: markPrice,
+                        unrealizedPnL: unrealizedPL,
+                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         reason: '📥 Position importée depuis Bitget'
                     };
                     
-                    openPositions.push(position);
-                    imported++;
-                    
-                    log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)}`, 'SUCCESS');
+                    // Vérifier que la position est valide avant de l'ajouter
+                    if (position.symbol && position.size > 0 && position.entryPrice > 0) {
+                        openPositions.push(position);
+                        imported++;
+                        
+                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)}`, 'SUCCESS');
+                    } else {
+                        log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides`, 'WARNING');
+                    }
                 }
             }
             

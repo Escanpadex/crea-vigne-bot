@@ -48,24 +48,17 @@ async function testConnection() {
         log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
         
-        // 🚀 AUTOMATISATION COMPLÈTE après connexion MANUELLE
-        log('🤖 Démarrage de l\'automatisation complète...', 'SUCCESS');
+        // 🚀 AUTOMATISATION pour la nouvelle stratégie MACD multi-timeframes
+        log('🤖 Préparation de la stratégie MACD multi-timeframes...', 'SUCCESS');
         
-        // 1. Scanner TOP 30 immédiatement
-        log('🔄 Lancement automatique du scan TOP 30 Volume...', 'INFO');
-        await scanTop30Volume();
-        
-        // 2. Simple: Les données TOP 30 sont prêtes pour le bot
-        log('✅ Données TOP 30 prêtes - Le MACD fonctionnera au démarrage du bot', 'SUCCESS');
-        
-        // 3. Programmer le scan automatique TOP 30 toutes les 30 minutes
-        if (window.autoScanInterval) {
-            clearInterval(window.autoScanInterval);
+        // 1. Test de récupération des paires disponibles
+        log('🔄 Test de récupération des paires disponibles...', 'INFO');
+        const testPairs = await getAllAvailablePairs();
+        if (testPairs.length > 0) {
+            log(`✅ ${testPairs.length} paires disponibles - Stratégie MACD prête`, 'SUCCESS');
+        } else {
+            log('⚠️ Aucune paire disponible trouvée', 'WARNING');
         }
-        window.autoScanInterval = setInterval(async () => {
-            log('🔄 Scan automatique TOP 30 Volume (30min)...', 'INFO');
-            await scanTop30Volume();
-        }, 30 * 60 * 1000); // 30 minutes
         
         // 4. Démarrer la synchronisation automatique des positions
         startAutoSyncPositions();
@@ -75,7 +68,7 @@ async function testConnection() {
             startAutoBalanceRefresh();
         }
         
-        log('🎉 Automatisation complète activée: TOP 30 + MACD + Positions + Balance', 'SUCCESS');
+        log('🎉 Stratégie MACD multi-timeframes activée: Analyse complète + Positions + Balance', 'SUCCESS');
         return true;
     } else {
         log('❌ Échec de la connexion. Vérifiez vos clés API Futures.', 'ERROR');
@@ -177,35 +170,13 @@ function startAutoSyncPositions() {
     }, 2 * 60 * 1000); // 2 minutes
 }
 
+// Fonction updateTop30Display supprimée - remplacée par updateMacdAnalysisDisplay
+// L'affichage des données est maintenant géré par la nouvelle interface MACD
+
+// Cette fonction n'est plus utilisée avec la nouvelle stratégie
 function updateTop30Display() {
-    const container = document.getElementById('top20List');
-    container.innerHTML = '';
-    
-    top30Pairs.forEach((pair, index) => {
-        const item = document.createElement('div');
-        item.className = 'pair-item';
-        if (index === currentScanIndex) {
-            item.classList.add('scanning');
-        }
-        
-        item.innerHTML = `
-            <span>#${index + 1} ${pair.symbol}</span>
-            <span>${formatNumber(pair.usdtVolume)}</span>
-        `;
-        container.appendChild(item);
-    });
-    
-    // NOUVEAU: Mettre à jour aussi le sélecteur de graphiques TradingView
-    if (typeof window.updateChartSelector === 'function') {
-        window.updateChartSelector();
-    } else {
-        // Fallback si la fonction n'est pas encore chargée
-        setTimeout(() => {
-            if (typeof window.updateChartSelector === 'function') {
-                window.updateChartSelector();
-            }
-        }, 500);
-    }
+    // Fonction désactivée - utiliser updateMacdAnalysisDisplay à la place
+    return;
 }
 
 async function setLeverage(symbol, leverage) {
@@ -232,9 +203,40 @@ async function setLeverage(symbol, leverage) {
     }
 }
 
-async function getKlineData(symbol, limit = 50) {
+async function getAllAvailablePairs() {
     try {
-        const timeframe = config.macdTimeframe || '5m';
+        log('🔍 Récupération de toutes les paires disponibles sur Bitget...', 'INFO');
+        
+        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+        const data = await response.json();
+        
+        if (data.code === '00000' && data.data) {
+            const allPairs = data.data
+                .filter(pair => {
+                    const volume = parseFloat(pair.usdtVolume || 0);
+                    return volume > 1000000 && pair.symbol.endsWith('USDT'); // Volume minimum 1M
+                })
+                .map(pair => ({
+                    symbol: pair.symbol,
+                    volume: parseFloat(pair.usdtVolume),
+                    price: parseFloat(pair.lastPr)
+                }))
+                .sort((a, b) => b.volume - a.volume);
+            
+            log(`✅ ${allPairs.length} paires récupérées pour l'analyse MACD`, 'SUCCESS');
+            return allPairs;
+        } else {
+            log('❌ Erreur lors de la récupération des paires', 'ERROR');
+            return [];
+        }
+    } catch (error) {
+        log(`❌ Erreur getAllAvailablePairs: ${error.message}`, 'ERROR');
+        return [];
+    }
+}
+
+async function getKlineData(symbol, limit = 50, timeframe = '5m') {
+    try {
         const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
         const data = await response.json();
         
