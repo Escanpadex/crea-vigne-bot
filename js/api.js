@@ -237,6 +237,13 @@ async function getAllAvailablePairs() {
 
 async function getKlineData(symbol, limit = 50, timeframe = '5m') {
     try {
+        // 🔧 Validation du timeframe pour éviter les erreurs
+        const validTimeframes = ['1min', '5min', '15min', '30min', '1h', '4h', '6h', '12h', '1day', '3day', '1week', '1M'];
+        if (!validTimeframes.includes(timeframe)) {
+            console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 5min par défaut.`);
+            timeframe = '5min';
+        }
+        
         const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
         const data = await response.json();
         
@@ -250,11 +257,33 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
                 volume: parseFloat(candle[5])
             })).reverse();
             
+            // 🔧 Log de debug spécial pour 4h
+            if (timeframe === '4h' && window.klineDebugCount < 3) {
+                if (!window.klineDebugCount) window.klineDebugCount = 0;
+                window.klineDebugCount++;
+                console.log(`🔍 DEBUG KLINES 4H ${symbol}:`);
+                console.log(`   URL: ${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
+                console.log(`   Réponse API: code=${data.code}, data.length=${data.data?.length || 0}`);
+                console.log(`   Klines traitées: ${klines.length}`);
+                if (klines.length > 0) {
+                    console.log(`   Dernière bougie: open=${klines[klines.length-1].open}, close=${klines[klines.length-1].close}`);
+                }
+            }
+            
             log(`📊 ${symbol}: ${klines.length} bougies ${timeframe} récupérées`, 'DEBUG');
             return klines;
+        } else {
+            // 🔧 Log d'erreur détaillé pour le debug
+            console.error(`❌ Erreur API klines ${symbol} (${timeframe}):`, {
+                code: data.code,
+                msg: data.msg,
+                data: data.data
+            });
+            log(`❌ Erreur récupération klines ${symbol} (${timeframe}): ${data.msg || 'Erreur API'}`, 'ERROR');
         }
     } catch (error) {
-        console.error(`Erreur klines ${symbol}:`, error);
+        console.error(`❌ Erreur klines ${symbol} (${timeframe}):`, error);
+        log(`❌ Erreur réseau klines ${symbol} (${timeframe}): ${error.message}`, 'ERROR');
     }
     return [];
 }
@@ -315,4 +344,44 @@ async function modifyStopLoss(symbol, stopLossId, newStopPrice, quantity) {
         log(`❌ Erreur modification stop loss ${symbol}: ${error.message}`, 'ERROR');
         return false;
     }
-} 
+}
+
+// 🔧 FONCTION DE TEST: Tester manuellement l'API 4H (à appeler depuis la console)
+async function testMacd4hAPI() {
+    console.log('🧪 Test de l\'API MACD 4H...');
+    
+    const testSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+    
+    for (const symbol of testSymbols) {
+        console.log(`\n🔍 Test ${symbol}:`);
+        
+        // Test récupération klines 4h
+        const klines = await getKlineData(symbol, 50, '4h');
+        console.log(`   Klines 4h récupérées: ${klines.length}`);
+        
+        if (klines.length > 0) {
+            // Test calcul MACD
+            const closePrices = klines.map(k => k.close);
+            const macdData = calculateMACD(closePrices);
+            
+            console.log(`   MACD calculé: ${macdData.macd?.toFixed(6) || 'null'}`);
+            console.log(`   Signal: ${macdData.signal?.toFixed(6) || 'null'}`);
+            console.log(`   Histogram: ${macdData.histogram?.toFixed(6) || 'null'}`);
+            
+            // Test analyse complète
+            const analysis = await analyzePairMACD(symbol, '4h');
+            console.log(`   Signal final: ${analysis.signal}`);
+            console.log(`   Raison: ${analysis.reason}`);
+        } else {
+            console.log(`   ❌ Aucune donnée klines pour ${symbol}`);
+        }
+        
+        // Petit délai entre les tests
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('\n✅ Test terminé. Vérifiez les résultats ci-dessus.');
+}
+
+// Rendre la fonction accessible globalement
+window.testMacd4hAPI = testMacd4hAPI; 
