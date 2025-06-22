@@ -95,15 +95,12 @@
                     </div>
                     
                     <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">📊 Quantité analysée:</label>
-                        <select id="topVolumeCount" onchange="updateTopVolumeCount()" style="width: 100%; padding: 8px; font-size: 13px;">
-                            <option value="5">TOP 5 Volume</option>
-                            <option value="10">TOP 10 Volume</option>
-                            <option value="20">TOP 20 Volume</option>
-                            <option value="30" selected>TOP 30 Volume</option>
-                            <option value="50">TOP 50 Volume</option>
-                        </select>
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">Cryptos à surveiller</small>
+                        <label style="font-size: 13px;">📊 Stratégie:</label>
+                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px; text-align: center;">
+                            <strong>Multi-Timeframes</strong><br>
+                            <span style="color: #666;">4H → 1H → 15M → 5M</span>
+                        </div>
+                        <small style="font-size: 10px; display: block; margin-top: 2px;">Filtrage progressif</small>
                     </div>
                     
                     <div class="form-group" style="margin-bottom: 8px;">
@@ -117,7 +114,7 @@
                 </div>
                 
                 <div style="font-size: 12px; color: #666; margin: 8px 0; text-align: center;">
-                    <strong id="currentSettings">📈 5min | TOP 30</strong>
+                    <strong id="currentSettings">📊 MACD Multi-Timeframes</strong>
                 </div>
                 
                 <div style="display: flex; gap: 8px;">
@@ -126,20 +123,46 @@
                 </div>
             </div>
             
-            <!-- Section TOP 30 Volume - Côte à côte -->
+            <!-- Section Analyse MACD -->
             <div class="card">
-                <h3 id="topVolumeTitle">📈 TOP 30 Volume (Surveillance)</h3>
+                <h3>📊 Analyse MACD Multi-Timeframes</h3>
                 <div style="margin-bottom: 10px;">
                     <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
                 </div>
-                <div class="top20-list" id="top20List">
-                    <div class="pair-item">
-                        <span>Chargement...</span>
-                        <span>--</span>
+                <div id="macdAnalysisContainer">
+                    <div class="macd-timeframe-stats">
+                        <div class="timeframe-stat">
+                            <h4>4 Heures</h4>
+                            <div class="stat-numbers">
+                                <span class="bullish">-- haussiers</span>
+                                <span class="bearish">-- baissiers</span>
+                            </div>
+                        </div>
+                        <div class="timeframe-stat">
+                            <h4>1 Heure</h4>
+                            <div class="stat-numbers">
+                                <span class="bullish">-- haussiers</span>
+                                <span class="bearish">-- baissiers</span>
+                            </div>
+                        </div>
+                        <div class="timeframe-stat">
+                            <h4>15 Minutes</h4>
+                            <div class="stat-numbers">
+                                <span class="bullish">-- haussiers</span>
+                                <span class="bearish">-- baissiers</span>
+                            </div>
+                        </div>
+                        <div class="timeframe-stat">
+                            <h4>5 Minutes</h4>
+                            <div class="stat-numbers">
+                                <span class="bullish">-- haussiers</span>
+                                <span class="bearish">-- baissiers</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <strong>Dernière MAJ:</strong> <span id="lastScanTime">--</span>
+                    <strong>Stratégie:</strong> Filtrage progressif 4H → 1H → 15M → 5M
                 </div>
             </div>
         </div>
