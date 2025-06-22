@@ -560,6 +560,14 @@ input:focus, select:focus {
     font-size: 12px;
 }
 
+.stat-numbers small {
+    color: #6c757d;
+    font-size: 10px;
+    font-weight: 500;
+    margin-top: 2px;
+    display: block;
+}
+
 /* Animation pour les mises à jour en temps réel */
 .timeframe-stat.updating {
     background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
