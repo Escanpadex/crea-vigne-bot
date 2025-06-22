@@ -15,13 +15,10 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         for (let i = 0; i < period; i++) {
             sum += data[i];
         }
-        let prevEma = sum / period;
-        emaArray[period - 1] = prevEma;
+        emaArray[period - 1] = sum / period;
         
         for (let i = period; i < data.length; i++) {
-            const ema = data[i] * k + prevEma * (1 - k);
-            emaArray[i] = ema;
-            prevEma = ema;
+            emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
         }
         
         return emaArray;
@@ -37,85 +34,72 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         return ema12 - ema26;
     });
     
-    const macdForSignal = [];
-    let startIndex = -1;
+    const validMacdValues = [];
+    let macdStartIndex = -1;
     
     for (let i = 0; i < macdArray.length; i++) {
         if (macdArray[i] !== null) {
-            if (startIndex === -1) startIndex = i;
-            macdForSignal.push(macdArray[i]);
+            if (macdStartIndex === -1) macdStartIndex = i;
+            validMacdValues.push(macdArray[i]);
         }
     }
     
     let signalArray = new Array(prices.length).fill(null);
     
-    if (macdForSignal.length >= signalPeriod) {
-        const signalEMA = calculateEMA(macdForSignal, signalPeriod);
+    if (validMacdValues.length >= signalPeriod) {
+        const signalEMA = calculateEMA(validMacdValues, signalPeriod);
         
         for (let i = 0; i < signalEMA.length; i++) {
-            if (signalEMA[i] !== null) {
-                const originalIndex = startIndex + i;
-                if (originalIndex < prices.length) {
-                    signalArray[originalIndex] = signalEMA[i];
-                }
+            if (signalEMA[i] !== null && macdStartIndex + i < prices.length) {
+                signalArray[macdStartIndex + i] = signalEMA[i];
             }
         }
     }
     
-    // Prendre les TROIS dernières valeurs pour détecter un vrai croisement
     let currentMacd = null, previousMacd = null, previousMacd2 = null;
     let currentSignal = null, previousSignal = null, previousSignal2 = null;
     
-    // Récupérer les 3 dernières valeurs MACD
-    for (let i = macdArray.length - 1; i >= 0; i--) {
+    for (let i = macdArray.length - 1; i >= 0 && previousMacd2 === null; i--) {
         if (macdArray[i] !== null) {
             if (currentMacd === null) {
                 currentMacd = macdArray[i];
             } else if (previousMacd === null) {
                 previousMacd = macdArray[i];
-            } else if (previousMacd2 === null) {
+            } else {
                 previousMacd2 = macdArray[i];
-                break;
             }
         }
     }
     
-    // Récupérer les 3 dernières valeurs Signal
-    for (let i = signalArray.length - 1; i >= 0; i--) {
+    for (let i = signalArray.length - 1; i >= 0 && previousSignal2 === null; i--) {
         if (signalArray[i] !== null) {
             if (currentSignal === null) {
                 currentSignal = signalArray[i];
             } else if (previousSignal === null) {
                 previousSignal = signalArray[i];
-            } else if (previousSignal2 === null) {
+            } else {
                 previousSignal2 = signalArray[i];
-                break;
             }
         }
     }
     
-    // Vérifier qu'on a toutes les valeurs nécessaires
-    if (currentMacd === null || previousMacd === null || previousMacd2 === null ||
-        currentSignal === null || previousSignal === null || previousSignal2 === null) {
+    if (currentMacd === null || currentSignal === null) {
         return { macd: currentMacd, signal: currentSignal, histogram: null, crossover: false };
     }
     
     const currentHistogram = currentMacd - currentSignal;
-    const previousHistogram = previousMacd - previousSignal;
-    const previousHistogram2 = previousMacd2 - previousSignal2;
+    const previousHistogram = (previousMacd !== null && previousSignal !== null) ? previousMacd - previousSignal : null;
+    const previousHistogram2 = (previousMacd2 !== null && previousSignal2 !== null) ? previousMacd2 - previousSignal2 : null;
     
-    // CROISEMENT HAUSSIER STRICT :
-    // 1. Les 2 périodes précédentes MACD était SOUS Signal (confirmation tendance baissière)
-    // 2. Période précédente : MACD encore SOUS Signal
-    // 3. Période actuelle : MACD CROISE AU-DESSUS de Signal
-    // 4. Histogram passe de négatif à positif
-    const strictCrossover = 
-        (previousMacd2 < previousSignal2) &&     // Il y a 2 périodes : MACD < Signal
-        (previousMacd < previousSignal) &&       // Période précédente : MACD < Signal  
-        (currentMacd > currentSignal) &&         // Maintenant : MACD > Signal
-        (previousHistogram < 0) &&               // Histogram était négatif
-        (currentHistogram > 0) &&                // Histogram devient positif
-        (currentHistogram > previousHistogram);  // Histogram s'améliore
+    let strictCrossover = false;
+    
+    if (previousMacd !== null && previousSignal !== null) {
+        const wasBelow = previousMacd <= previousSignal;
+        const nowAbove = currentMacd > currentSignal;
+        const histogramImproving = previousHistogram !== null && currentHistogram > previousHistogram;
+        
+        strictCrossover = wasBelow && nowAbove && histogramImproving;
+    }
     
     return {
         macd: currentMacd,
@@ -124,7 +108,6 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         crossover: strictCrossover,
         macdArray: macdArray,
         signalArray: signalArray,
-        // Debug info
         previousMacd: previousMacd,
         previousMacd2: previousMacd2,
         previousSignal: previousSignal,
@@ -134,10 +117,31 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
     };
 }
 
+// 🔧 FONCTION DE DIAGNOSTIC MACD (pour vérifier les corrections)
+function debugMACDAnalysis(symbol, macdData, signal, timeframe) {
+    if (window.macdDebugCount > 10) return; // Limiter les logs de debug
+    
+    if (!window.macdDebugCount) window.macdDebugCount = 0;
+    window.macdDebugCount++;
+    
+    console.log(`🔍 DEBUG MACD ${symbol} (${timeframe}):`);
+    console.log(`   MACD: ${macdData.macd?.toFixed(6) || 'null'}`);
+    console.log(`   Signal: ${macdData.signal?.toFixed(6) || 'null'}`);
+    console.log(`   Histogram: ${macdData.histogram?.toFixed(6) || 'null'}`);
+    console.log(`   Crossover: ${macdData.crossover}`);
+    console.log(`   Signal déterminé: ${signal}`);
+    console.log(`   MACD > Signal: ${macdData.macd > macdData.signal}`);
+    
+    if (macdData.previousMacd !== null) {
+        console.log(`   Previous MACD: ${macdData.previousMacd.toFixed(6)}`);
+        console.log(`   Previous Signal: ${macdData.previousSignal?.toFixed(6) || 'null'}`);
+        console.log(`   Previous Histogram: ${macdData.previousHistogram?.toFixed(6) || 'null'}`);
+    }
+}
+
 async function analyzePairMACD(symbol, timeframe = '5m') {
     try {
-        // Augmenter le nombre de bougies pour un calcul plus précis
-        const klines = await getKlineData(symbol, 150, timeframe); // Utiliser le timeframe passé en paramètre
+        const klines = await getKlineData(symbol, 150, timeframe);
         
         if (klines.length < 80) {
             return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes', timeframe };
@@ -166,7 +170,12 @@ async function analyzePairMACD(symbol, timeframe = '5m') {
             reason = `📈 MACD ${timeframe} au-dessus Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         } else {
             macdSignal = 'BEARISH';
-            reason = `📊 MACD ${timeframe} en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            reason = `📉 MACD ${timeframe} en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+        }
+        
+        // 🔧 Debug pour les premières analyses
+        if (timeframe === '4h' && window.macdDebugCount < 5) {
+            debugMACDAnalysis(symbol, macdData, macdSignal, timeframe);
         }
         
         return {
@@ -181,7 +190,6 @@ async function analyzePairMACD(symbol, timeframe = '5m') {
             histogram: macdData.histogram,
             crossover: macdData.crossover,
             reason: reason,
-            // Debug data
             debugData: {
                 previousMacd: macdData.previousMacd,
                 previousMacd2: macdData.previousMacd2,
@@ -199,27 +207,22 @@ async function analyzePairMACD(symbol, timeframe = '5m') {
     }
 }
 
-// Nouvelle fonction pour analyser une crypto sur tous les timeframes avec filtrage progressif
 async function analyzeMultiTimeframe(symbol) {
     try {
         const timeframes = ['4h', '1h', '15m', '5m'];
         const results = {};
         
-        // Analyser chaque timeframe
         for (const tf of timeframes) {
             const analysis = await analyzePairMACD(symbol, tf);
             results[tf] = analysis;
             
-            // Filtrage progressif : si un timeframe n'est pas haussier, on arrête
             if (tf !== '5m' && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
-                // Cette crypto est filtrée à ce timeframe
                 results.filtered = tf;
                 results.filterReason = `Filtré au ${tf}: ${analysis.signal}`;
                 break;
             }
         }
         
-        // Si on arrive au 5m sans être filtré, vérifier le signal d'achat
         if (!results.filtered) {
             const signal5m = results['5m'];
             if (signal5m.signal === 'BUY' && signal5m.crossover) {
@@ -251,13 +254,11 @@ function hasOpenPosition(symbol) {
 }
 
 async function openPosition(symbol, analysis) {
-    // Vérifications préalables
     if (hasOpenPosition(symbol)) {
         log(`⚠️ Position déjà ouverte sur ${symbol}`, 'WARNING');
         return false;
     }
     
-    // NEW: Vérifier le cooldown
     if (isPairInCooldown(symbol)) {
         const remainingMinutes = getRemainingCooldown(symbol);
         log(`⏰ ${symbol} en cooldown encore ${remainingMinutes} minutes`, 'WARNING');
@@ -304,17 +305,14 @@ async function openPosition(symbol, analysis) {
         
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
         
-        // NEW: Ajouter immédiatement au cooldown
         addPairToCooldown(symbol);
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Get current price to ensure accuracy
         const currentPrice = await getCurrentPrice(symbol);
         const priceToUse = currentPrice || analysis.price;
         const initialStopPrice = priceToUse * 0.99;
         
-        // Format the trigger price with appropriate precision
         const triggerPriceFormatted = parseFloat(initialStopPrice.toFixed(8)).toString();
         
         const stopLossData = {
@@ -396,7 +394,6 @@ async function syncLocalPositions() {
         removedPositions.forEach(pos => {
             log(`🔚 Position fermée détectée: ${pos.symbol} (Stop Loss déclenché)`, 'SUCCESS');
             
-            // Mettre à jour les statistiques de trading
             botStats.totalClosedPositions++;
             const pnl = pos.unrealizedPnL || 0;
             
@@ -406,7 +403,7 @@ async function syncLocalPositions() {
                 log(`🟢 Position gagnante: +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
             } else if (pnl < 0) {
                 botStats.losingPositions++;
-                botStats.totalLossAmount += pnl; // pnl est négatif
+                botStats.totalLossAmount += pnl;
                 log(`🔴 Position perdante: ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
             }
         });
@@ -422,7 +419,6 @@ async function syncLocalPositions() {
     return apiPositions;
 }
 
-// Fonction pour créer un stop loss d'urgence sur une position existante
 async function createEmergencyStopLoss(position, stopPrice) {
     try {
         const stopLossData = {
@@ -472,10 +468,9 @@ async function manageTrailingStops() {
             if (!position.stopLossId) {
                 log(`⚠️ ${position.symbol}: Pas de stop loss configuré - Création automatique...`, 'WARNING');
                 
-                // Créer un stop loss d'urgence automatiquement
                 const currentPrice = await getCurrentPrice(position.symbol);
                 if (currentPrice) {
-                    const urgentStopPrice = currentPrice * 0.99; // -1%
+                    const urgentStopPrice = currentPrice * 0.99;
                     const success = await createEmergencyStopLoss(position, urgentStopPrice);
                     
                     if (success) {
@@ -619,18 +614,15 @@ function updatePositionsDisplay() {
     });
 }
 
-// Fonction pour importer toutes les positions existantes depuis Bitget au démarrage
 async function importExistingPositions() {
     try {
         log('🔄 Importation des positions existantes depuis Bitget...', 'INFO');
         
-        // Vérifier que makeRequest est disponible
         if (typeof makeRequest !== 'function') {
             log('❌ Fonction makeRequest non disponible pour l\'importation', 'ERROR');
             return;
         }
         
-        // Vérifier la configuration API
         if (!config.apiKey || !config.secretKey || !config.passphrase) {
             log('❌ Configuration API manquante pour l\'importation', 'ERROR');
             return;
@@ -651,28 +643,23 @@ async function importExistingPositions() {
                 return;
             }
             
-            // Log des positions trouvées
             apiPositions.forEach((pos, index) => {
                 log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side || 'NO_SIDE'} - Size: ${pos.contractSize || 'NO_SIZE'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
-                // Log complet pour diagnostic
                 log(`📊 Structure complète: ${JSON.stringify(pos)}`, 'DEBUG');
             });
             
             let imported = 0;
             
             for (const apiPos of apiPositions) {
-                // Vérifier si cette position n'est pas déjà dans le système local
                 const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
                 
                 if (!exists) {
-                    // Vérifications de sécurité pour éviter les erreurs
                     const side = apiPos.side ? apiPos.side.toUpperCase() : 'LONG';
                     const contractSize = parseFloat(apiPos.contractSize || 0);
                     const markPrice = parseFloat(apiPos.markPrice || 0);
                     const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
                     
-                    // Log de debug pour voir les données reçues
                     log(`🔍 Données position ${apiPos.symbol}: side=${apiPos.side}, contractSize=${apiPos.contractSize}, markPrice=${apiPos.markPrice}`, 'DEBUG');
                     
                     const position = {
@@ -683,9 +670,9 @@ async function importExistingPositions() {
                         quantity: Math.abs(contractSize),
                         entryPrice: averageOpenPrice,
                         status: 'OPEN',
-                        timestamp: new Date().toISOString(), // Timestamp d'importation
+                        timestamp: new Date().toISOString(),
                         orderId: `imported_${Date.now()}`,
-                        stopLossId: null, // Les positions importées n'ont pas de stop loss initial
+                        stopLossId: null,
                         currentStopPrice: null,
                         highestPrice: markPrice,
                         currentPrice: markPrice,
@@ -694,7 +681,6 @@ async function importExistingPositions() {
                         reason: '📥 Position importée depuis Bitget'
                     };
                     
-                    // Vérifier que la position est valide avant de l'ajouter
                     if (position.symbol && position.size > 0 && position.entryPrice > 0) {
                         openPositions.push(position);
                         imported++;
@@ -710,11 +696,9 @@ async function importExistingPositions() {
                 log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
                 log(`⚠️ Positions importées SANS stop loss - Le système va les protéger automatiquement`, 'WARNING');
                 
-                // Mettre à jour l'affichage
                 updatePositionsDisplay();
                 updateStats();
                 
-                // Déclencher immédiatement la création de stop loss d'urgence
                 setTimeout(() => {
                     manageTrailingStops();
                 }, 2000);
@@ -729,33 +713,27 @@ async function importExistingPositions() {
     }
 }
 
-// Rendre la fonction globalement accessible
 window.importExistingPositions = importExistingPositions;
 
-// Improved function to check if positions were manually closed on Bitget
 async function checkPositionsStatus() {
     if (openPositions.length === 0) return;
     
     try {
-        // Récupérer les positions actives depuis l'API Bitget
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
         if (result && result.code === '00000' && result.data) {
             const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
             const currentSymbols = apiPositions.map(pos => pos.symbol);
             
-            // Détecter les positions fermées manuellement
             const closedPositions = openPositions.filter(localPos => 
                 !currentSymbols.includes(localPos.symbol)
             );
             
-            // Si des positions ont été fermées manuellement
             if (closedPositions.length > 0) {
                 for (const closedPos of closedPositions) {
                     log(`🔚 Position fermée MANUELLEMENT détectée: ${closedPos.symbol}`, 'WARNING');
                     log(`💰 ${closedPos.symbol} fermée par l'utilisateur sur Bitget`, 'INFO');
                     
-                    // Mettre à jour les statistiques de trading
                     botStats.totalClosedPositions++;
                     const pnl = closedPos.unrealizedPnL || 0;
                     
@@ -765,11 +743,10 @@ async function checkPositionsStatus() {
                         log(`🟢 Position gagnante (manuelle): +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
                     } else if (pnl < 0) {
                         botStats.losingPositions++;
-                        botStats.totalLossAmount += pnl; // pnl est négatif
+                        botStats.totalLossAmount += pnl;
                         log(`🔴 Position perdante (manuelle): ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
                     }
                     
-                    // Annuler le stop loss associé si il existe encore
                     if (closedPos.stopLossId) {
                         try {
                             const cancelResult = await makeRequest('/bitget/api/v2/mix/order/cancel-plan-order', {
@@ -791,7 +768,6 @@ async function checkPositionsStatus() {
                     }
                 }
                 
-                // Supprimer les positions fermées de la liste locale
                 openPositions = openPositions.filter(localPos => 
                     currentSymbols.includes(localPos.symbol)
                 );
@@ -804,7 +780,6 @@ async function checkPositionsStatus() {
                 updateStats();
             }
             
-            // Mettre à jour les PnL des positions restantes
             for (const localPos of openPositions) {
                 const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
                 if (apiPos) {
@@ -812,7 +787,6 @@ async function checkPositionsStatus() {
                     localPos.unrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
                     localPos.pnlPercentage = ((localPos.currentPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
                     
-                    // Mettre à jour le prix le plus haut pour le trailing stop
                     if (localPos.currentPrice > localPos.highestPrice) {
                         localPos.highestPrice = localPos.currentPrice;
                     }
