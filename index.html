@@ -421,98 +421,25 @@
             
             log('🚀 Démarrage scan MACD temps réel (30s)', 'SUCCESS');
             
-            // Scanner toutes les 30 secondes au lieu d'attendre un clic
-            realTimeInterval = setInterval(async () => {
-                await scanMACDCrossoverRealTime();
-            }, 30000);
+            // DÉSACTIVÉ - Remplacé par la nouvelle stratégie multi-timeframes
+            // realTimeInterval = setInterval(async () => {
+            //     await scanMACDCrossoverRealTime();
+            // }, 30000);
             
-            // Premier scan immédiat
-            await scanMACDCrossoverRealTime();
+            // Premier scan immédiat - DÉSACTIVÉ
+            // await scanMACDCrossoverRealTime();
+            
+            log('ℹ️ Scan MACD temps réel désactivé - Utilise la nouvelle stratégie multi-timeframes', 'INFO');
         }
 
-        // ⚡ OPTIMISATION 5: Détection temps réel des nouveaux croisements
+        // ⚡ OPTIMISATION 5: Détection temps réel des nouveaux croisements - DÉSACTIVÉE
         async function scanMACDCrossoverRealTime() {
-            // Vérifier si le bot est en cours d'exécution
-            if (typeof botRunning !== 'undefined' && !botRunning) {
-                // Arrêter le scan si le bot n'est pas actif
-                if (realTimeInterval) {
-                    clearInterval(realTimeInterval);
-                    realTimeInterval = null;
-                    log('🛑 Scan MACD temps réel arrêté (bot inactif)', 'INFO');
-                }
-                return;
-            }
-            
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            
-            // LOG: Début d'analyse
-            log(`🔍 Analyse MACD en cours: ${symbolName}`, 'INFO');
-            
-            const macdData = await getMACDDataOptimized(selectedSymbol, 100);
-            
-            if (!macdData || macdData.macd.length < 2) {
-                log(`⚠️ Données MACD insuffisantes pour ${symbolName}`, 'WARNING');
-                return;
-            }
-
-            // LOG: Données récupérées
-            log(`📊 MACD données OK: ${macdData.macd.length} points pour ${symbolName}`, 'DEBUG');
-
-            // Vérifier seulement les 3 derniers points pour détecter les nouveaux croisements
-            const recentData = {
-                dates: macdData.dates.slice(-3),
-                macd: macdData.macd.slice(-3),
-                signal: macdData.signal.slice(-3),
-                histogram: macdData.histogram.slice(-3)
-            };
-
-            // LOG: État actuel MACD
-            const lastMACD = recentData.macd[recentData.macd.length - 1];
-            const lastSignal = recentData.signal[recentData.signal.length - 1];
-            const trend = lastMACD > lastSignal ? '📈 Haussier' : '📉 Baissier';
-            log(`💡 ${symbolName}: MACD ${lastMACD.toFixed(6)} vs Signal ${lastSignal.toFixed(6)} ${trend}`, 'DEBUG');
-
-            let crossoverFound = false;
-
-            // Chercher nouveau croisement haussier
-            for (let i = 1; i < recentData.macd.length; i++) {
-                const prevMACD = recentData.macd[i - 1];
-                const prevSignal = recentData.signal[i - 1];
-                const currMACD = recentData.macd[i];
-                const currSignal = recentData.signal[i];
-                
-                if (prevMACD <= prevSignal && currMACD > currSignal) {
-                    const crossoverTime = recentData.dates[i];
-                    const now = new Date();
-                    const delayMinutes = Math.round((now - crossoverTime) / 60000);
-                    
-                    // Vérifier si c'est un nouveau croisement (pas déjà détecté)
-                    if (!lastKnownMACD || crossoverTime > lastKnownMACD.time) {
-                        lastKnownMACD = {
-                            time: crossoverTime,
-                            macd: currMACD,
-                            signal: currSignal,
-                            histogram: recentData.histogram[i]
-                        };
-                        
-                        // Alerte temps réel
-                        log(`🚨 NOUVEAU CROISEMENT MACD DÉTECTÉ! ${symbolName}`, 'SUCCESS');
-                        log(`⚡ Délai: ${delayMinutes} minute(s) | MACD: ${currMACD.toFixed(6)}`, 'SUCCESS');
-                        
-                        crossoverFound = true;
-                        
-                        // Mettre à jour l'affichage immédiatement
-                        await refreshCompleteHistory();
-                    }
-                }
-            }
-
-            // LOG: Résultat de l'analyse
-            if (!crossoverFound) {
-                log(`✅ ${symbolName}: Analyse terminée - Aucun nouveau croisement`, 'DEBUG');
-            }
+            // FONCTION DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
+            log('ℹ️ scanMACDCrossoverRealTime() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
+            return;
         }
+
+        // Code de l'ancienne fonction scanMACDCrossoverRealTime complètement supprimé
 
         // ⚡ OPTIMISATION 6: Rafraîchissement intelligent
         async function refreshCompleteHistory() {
@@ -603,45 +530,11 @@
             document.getElementById('lastMACDScan').textContent = new Date().toLocaleTimeString();
         }
 
-        // NOUVELLE FONCTION: Mettre à jour le sélecteur avec les TOP 30 Volume
+        // FONCTION DÉSACTIVÉE: updateChartSelector() pour éviter les conflits
         function updateChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            if (top30Pairs && top30Pairs.length > 0) {
-                // Sauvegarder la sélection actuelle
-                const currentSelection = chartSelect.value;
-                
-                // Vider le sélecteur
-                chartSelect.innerHTML = '';
-                
-                // Ajouter les TOP 30 volume
-                top30Pairs.forEach((pair, index) => {
-                    const option = document.createElement('option');
-                    const symbol = pair.symbol.replace('USDT', '');
-                    const binanceSymbol = `BINANCE:${pair.symbol}`;
-                    
-                    option.value = binanceSymbol;
-                    option.textContent = `${index + 1}. ${symbol}/USDT (${formatNumber(pair.usdtVolume || pair.volume24h)})`;
-                    
-                    chartSelect.appendChild(option);
-                });
-                
-                // Restaurer la sélection ou prendre le premier (BTC généralement)
-                if (currentSelection && Array.from(chartSelect.options).some(opt => opt.value === currentSelection)) {
-                    chartSelect.value = currentSelection;
-                } else {
-                    chartSelect.value = chartSelect.options[0].value;
-                    updateChart();
-                }
-                
-                log(`📊 Sélecteur graphique mis à jour avec ${top30Pairs.length} paires TOP volume`, 'INFO');
-            } else {
-                // Si pas de données TOP 30, garder quelques paires par défaut
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">Bitcoin (BTC/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:ETHUSDT">Ethereum (ETH/USDT) - En attente TOP 30</option>
-                `;
-            }
+            // FONCTION DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
+            log('ℹ️ updateChartSelector() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
+            return;
         }
 
         // Update chart when symbol changes + Auto-start scanning
@@ -752,13 +645,13 @@
                 chartLabel.textContent = `Sélectionner une paire (TOP ${count} Volume):`;
             }
             
-            // Relancer le scan si connecté
-            if (config.apiKey && top30Pairs.length > 0) {
-                log(`🔄 Mise à jour automatique du TOP ${count}...`, 'INFO');
-                setTimeout(() => {
-                    scanTop30Volume();
-                }, 1000);
-            }
+            // DÉSACTIVÉ - Ancien système TOP 30 remplacé par la stratégie multi-timeframes
+            // if (config.apiKey && top30Pairs.length > 0) {
+            //     log(`🔄 Mise à jour automatique du TOP ${count}...`, 'INFO');
+            //     setTimeout(() => {
+            //         scanTop30Volume();
+            //     }, 1000);
+            // }
             
             // Si le bot tourne, informer de l'impact
             if (botRunning) {
@@ -828,60 +721,21 @@
         function initializeChartSelector() {
             const chartSelect = document.getElementById('chartSymbol');
             
-            // Si pas encore de TOP 30, mettre des valeurs par défaut
-            if (!top30Pairs || top30Pairs.length === 0) {
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT)</option>
-                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT)</option>
-                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT)</option>
-                    <option value="BINANCE:ADAUSDT">4. Cardano (ADA/USDT)</option>
-                    <option value="BINANCE:SOLUSDT">5. Solana (SOL/USDT)</option>
-                `;
-                log('📊 Sélecteur initialisé avec paires par défaut', 'INFO');
-            }
+            // Utiliser des valeurs par défaut (ancien système TOP 30 désactivé)
+            chartSelect.innerHTML = `
+                <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT)</option>
+                <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT)</option>
+                <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT)</option>
+                <option value="BINANCE:ADAUSDT">4. Cardano (ADA/USDT)</option>
+                <option value="BINANCE:SOLUSDT">5. Solana (SOL/USDT)</option>
+            `;
+            log('📊 Sélecteur initialisé avec paires par défaut (TOP 30 désactivé)', 'INFO');
         }
         
-        // Fonction globale accessible depuis api.js
+        // Fonction globale DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
         window.updateChartSelector = function() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            if (window.top30Pairs && window.top30Pairs.length > 0) {
-                // Sauvegarder la sélection actuelle
-                const currentSelection = chartSelect.value;
-                
-                // Vider le sélecteur
-                chartSelect.innerHTML = '';
-                
-                // Ajouter les TOP 30 volume
-                window.top30Pairs.forEach((pair, index) => {
-                    const option = document.createElement('option');
-                    const symbol = pair.symbol.replace('USDT', '');
-                    const binanceSymbol = `BINANCE:${pair.symbol}`;
-                    
-                    option.value = binanceSymbol;
-                    option.textContent = `${index + 1}. ${symbol}/USDT (${formatNumber(pair.usdtVolume || pair.volume24h)})`;
-                    
-                    chartSelect.appendChild(option);
-                });
-                
-                // Restaurer la sélection ou prendre le premier
-                if (currentSelection && Array.from(chartSelect.options).some(opt => opt.value === currentSelection)) {
-                    chartSelect.value = currentSelection;
-                } else {
-                    chartSelect.value = chartSelect.options[0].value;
-                    updateChart();
-                }
-                
-                log(`📊 Sélecteur graphique mis à jour avec ${window.top30Pairs.length} paires TOP volume`, 'SUCCESS');
-            } else {
-                // Si pas de données TOP 30, garder quelques paires par défaut
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT) - En attente TOP 30</option>
-                    <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT) - En attente TOP 30</option>
-                `;
-                log('📊 Sélecteur en attente des données TOP 30', 'INFO');
-            }
+            log('ℹ️ window.updateChartSelector() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
+            return;
         };
     </script>
 </body>
