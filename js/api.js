@@ -124,11 +124,10 @@ async function scanTop30Volume() {
                 .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
                 .slice(0, topCount);
             
-            top30Pairs = validPairs;
-            window.top30Pairs = validPairs;
-            currentScanIndex = 0;
-            
-            updateTop30Display();
+            // Ancien système TOP 30 désactivé - utiliser getAllAvailablePairs() à la place
+            // top30Pairs = validPairs;
+            // window.top30Pairs = validPairs;
+            // currentScanIndex = 0;
             
             const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
             log(`✅ TOP ${topCount} mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
@@ -137,7 +136,8 @@ async function scanTop30Volume() {
                 log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
             });
             
-            document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
+            // Ancien système d'affichage désactivé
+            // document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
             return true;
         } else {
             log('❌ Erreur lors du scan des volumes', 'ERROR');
