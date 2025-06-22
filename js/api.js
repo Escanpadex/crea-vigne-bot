@@ -238,15 +238,16 @@ async function getAllAvailablePairs() {
 async function getKlineData(symbol, limit = 50, timeframe = '5m') {
     try {
         // 🔧 Validation et conversion du timeframe pour l'API Bitget
+        const originalTimeframe = timeframe; // Sauvegarder l'original pour les logs
         const timeframeMapping = {
-            '1min': '1min',
-            '5min': '5min', 
-            '15min': '15min',
-            '30min': '30min',
-            '1h': '1H',     // API Bitget utilise H majuscule
-            '4h': '4H',     // 🔧 CORRECTION: 4h → 4H
-            '6h': '6H',     // API Bitget utilise H majuscule
-            '12h': '12H',   // API Bitget utilise H majuscule
+            '1min': '1m',      // 🔧 CORRECTION: 1min → 1m
+            '5min': '5m',      // 🔧 CORRECTION: 5min → 5m  
+            '15min': '15m',    // 🔧 CORRECTION: 15min → 15m
+            '30min': '30m',    // 🔧 CORRECTION: 30min → 30m
+            '1h': '1H',        // API Bitget utilise H majuscule
+            '4h': '4H',        // 🔧 CORRECTION: 4h → 4H
+            '6h': '6H',        // API Bitget utilise H majuscule
+            '12h': '12H',      // API Bitget utilise H majuscule
             '1day': '1D',
             '3day': '3D',
             '1week': '1W',
@@ -254,8 +255,8 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
         };
         
         if (!timeframeMapping[timeframe]) {
-            console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 5min par défaut.`);
-            timeframe = '5min';
+            console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 5m par défaut.`);
+            timeframe = '5m';
         } else {
             timeframe = timeframeMapping[timeframe]; // Conversion pour l'API
         }
@@ -274,7 +275,7 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
             })).reverse();
             
             // 🔧 Log de debug spécial pour 4h
-            if (timeframe === '4h' && window.klineDebugCount < 3) {
+            if (originalTimeframe === '4h' && window.klineDebugCount < 3) {
                 if (!window.klineDebugCount) window.klineDebugCount = 0;
                 window.klineDebugCount++;
                 console.log(`🔍 DEBUG KLINES 4H ${symbol}:`);
