@@ -511,4 +511,78 @@ input:focus, select:focus {
     font-size: 12px !important;
 }
 
-/* Correction pour les logs */ 
+/* Correction pour les logs */
+
+/* Styles pour l'analyse MACD multi-timeframes */
+.macd-timeframe-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.timeframe-stat {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.timeframe-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.timeframe-stat h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #495057;
+    font-weight: 600;
+}
+
+.stat-numbers {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-numbers .bullish {
+    color: #28a745;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.stat-numbers .bearish {
+    color: #dc3545;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+/* Animation pour les mises à jour en temps réel */
+.timeframe-stat.updating {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-color: #f0ad4e;
+}
+
+/* Style responsive pour mobile */
+@media (max-width: 768px) {
+    .macd-timeframe-stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .timeframe-stat {
+        padding: 10px;
+    }
+    
+    .timeframe-stat h4 {
+        font-size: 13px;
+    }
+    
+    .stat-numbers .bullish,
+    .stat-numbers .bearish {
+        font-size: 11px;
+    }
+} 
