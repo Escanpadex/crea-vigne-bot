@@ -237,11 +237,27 @@ async function getAllAvailablePairs() {
 
 async function getKlineData(symbol, limit = 50, timeframe = '5m') {
     try {
-        // 🔧 Validation du timeframe pour éviter les erreurs
-        const validTimeframes = ['1min', '5min', '15min', '30min', '1h', '4h', '6h', '12h', '1day', '3day', '1week', '1M'];
-        if (!validTimeframes.includes(timeframe)) {
+        // 🔧 Validation et conversion du timeframe pour l'API Bitget
+        const timeframeMapping = {
+            '1min': '1min',
+            '5min': '5min', 
+            '15min': '15min',
+            '30min': '30min',
+            '1h': '1H',     // API Bitget utilise H majuscule
+            '4h': '4H',     // 🔧 CORRECTION: 4h → 4H
+            '6h': '6H',     // API Bitget utilise H majuscule
+            '12h': '12H',   // API Bitget utilise H majuscule
+            '1day': '1D',
+            '3day': '3D',
+            '1week': '1W',
+            '1M': '1M'
+        };
+        
+        if (!timeframeMapping[timeframe]) {
             console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 5min par défaut.`);
             timeframe = '5min';
+        } else {
+            timeframe = timeframeMapping[timeframe]; // Conversion pour l'API
         }
         
         const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
