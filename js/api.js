@@ -1,5 +1,6 @@
 // API Functions for Bitget Trading Bot
 console.log('📁 Loading api.js...');
+console.log('🔧 API.JS VERSION: 4H-FIX-v2 - Timeframe mapping corrigé');
 
 // Auto-connection flag pour éviter les reconnexions multiples
 let autoConnectionAttempted = false;
@@ -261,7 +262,15 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
             timeframe = timeframeMapping[timeframe]; // Conversion pour l'API
         }
         
-        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`);
+        const url = `${API_BASE}/bitget/api/v2/mix/market/candles?symbol=${symbol}&productType=usdt-futures&granularity=${timeframe}&limit=${limit}`;
+        
+        // 🔧 DEBUG: Log de l'URL générée pour vérifier le timeframe
+        if (originalTimeframe === '4h') {
+            console.log(`🔍 DEBUG URL 4H pour ${symbol}:`, url);
+            console.log(`🔍 Original timeframe: ${originalTimeframe} → Converted: ${timeframe}`);
+        }
+        
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.code === '00000' && data.data) {
@@ -291,16 +300,17 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
             return klines;
         } else {
             // 🔧 Log d'erreur détaillé pour le debug
-            console.error(`❌ Erreur API klines ${symbol} (${timeframe}):`, {
+            console.error(`❌ Erreur API klines ${symbol} (${originalTimeframe}→${timeframe}):`, {
                 code: data.code,
                 msg: data.msg,
-                data: data.data
+                data: data.data,
+                url: url
             });
-            log(`❌ Erreur récupération klines ${symbol} (${timeframe}): ${data.msg || 'Erreur API'}`, 'ERROR');
+            log(`❌ Erreur récupération klines ${symbol} (${originalTimeframe}→${timeframe}): ${data.msg || 'Erreur API'}`, 'ERROR');
         }
     } catch (error) {
-        console.error(`❌ Erreur klines ${symbol} (${timeframe}):`, error);
-        log(`❌ Erreur réseau klines ${symbol} (${timeframe}): ${error.message}`, 'ERROR');
+        console.error(`❌ Erreur klines ${symbol} (${originalTimeframe}→${timeframe}):`, error);
+        log(`❌ Erreur réseau klines ${symbol} (${originalTimeframe}→${timeframe}): ${error.message}`, 'ERROR');
     }
     return [];
 }
