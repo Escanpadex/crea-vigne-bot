@@ -73,8 +73,7 @@
                     <div class="form-group" style="margin-bottom: 8px;">
                         <label style="font-size: 13px;">⏱️ Timeframe MACD:</label>
                         <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%; padding: 8px; font-size: 13px;">
-                            <option value="5m" selected>5 minutes</option>
-                            <option value="15m">15 minutes</option>
+                            <option value="15m" selected>15 minutes (FINAL)</option>
                             <option value="1h">1 heure</option>
                             <option value="4h">4 heures</option>
                         </select>
@@ -84,8 +83,8 @@
                     <div class="form-group" style="margin-bottom: 8px;">
                         <label style="font-size: 13px;">📊 Stratégie:</label>
                         <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px; text-align: center;">
-                            <strong>Multi-Timeframes</strong><br>
-                            <span style="color: #666;">4H → 1H → 15M → 5M</span>
+                            <strong>Multi-Timeframes OPTIMISÉE</strong><br>
+                            <span style="color: #666;">4H → 1H → 15M</span>
                         </div>
                         <small style="font-size: 10px; display: block; margin-top: 2px;">Filtrage progressif</small>
                     </div>
@@ -139,17 +138,13 @@
                                 <span class="bearish">-- baissiers</span>
                             </div>
                         </div>
-                        <div class="timeframe-stat">
-                            <h4>5 Minutes</h4>
-                            <div class="stat-numbers">
-                                <span class="bullish">-- haussiers</span>
-                                <span class="bearish">-- baissiers</span>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
-                <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                    <strong>Stratégie:</strong> Filtrage progressif 4H → 1H → 15M → 5M
+                <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 4px; font-size: 12px;">
+                    <strong style="color: #2d5a2d;">🎯 STRATÉGIE OPTIMISÉE:</strong> 
+                    <span style="color: #666;">Filtrage progressif</span><br>
+                    <span style="color: #2c5aa0; font-weight: bold;">🥇 4H (FILTRE 1) → 🥈 1H (FILTRE 2) → 🥉 15M (SIGNAL FINAL)</span>
                 </div>
             </div>
         </div>
@@ -221,6 +216,25 @@
             <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
             <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
         </div>
+
+        <!-- 🆘 SECTION DIAGNOSTIC STOP LOSS -->
+        <div class="card" style="border: 2px solid #ff6b6b; background: #fff5f5;">
+            <h3 style="color: #d63031;">🆘 Diagnostic & Protection Stop Loss</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <button class="btn" onclick="runStopLossDiagnosis()" style="background: #0984e3; color: white;">
+                    🔍 Diagnostic Complet
+                </button>
+                <button class="btn" onclick="forceProtectPositions()" style="background: #e17055; color: white;">
+                    🆘 Protéger Toutes Positions
+                </button>
+            </div>
+            <div id="diagnosisResults" style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto;">
+                <p style="color: #666; text-align: center;">Cliquez sur "Diagnostic Complet" pour analyser les problèmes de stop loss</p>
+            </div>
+            <div style="margin-top: 10px; padding: 8px; background: #ffeaa7; border-radius: 5px; font-size: 11px;">
+                <strong>⚠️ Utilisation:</strong> Si vous avez des positions sans stop loss, utilisez ces outils pour diagnostiquer et corriger le problème.
+            </div>
+        </div>
         
         <!-- NOUVELLE SECTION TRADINGVIEW & MACD -->
         <div class="grid" id="tradingViewMacdGrid">
@@ -277,6 +291,91 @@
     <script src="js/trading.js"></script>
     <script src="js/main.js"></script>
     
+    <!-- 🆘 FONCTIONS DIAGNOSTIC STOP LOSS -->
+    <script>
+        async function runStopLossDiagnosis() {
+            const resultsDiv = document.getElementById('diagnosisResults');
+            resultsDiv.innerHTML = '<p style="color: #0984e3;">🔄 Diagnostic en cours...</p>';
+            
+            try {
+                // Capturer les logs de la console
+                const originalLog = console.log;
+                let diagnosticLogs = [];
+                
+                console.log = (...args) => {
+                    diagnosticLogs.push(args.join(' '));
+                    originalLog.apply(console, args);
+                };
+                
+                // Exécuter le diagnostic
+                const result = await window.diagnosisStopLoss();
+                
+                // Restaurer console.log
+                console.log = originalLog;
+                
+                // Afficher les résultats
+                let html = '<div style="color: #2d3436; line-height: 1.4;">';
+                html += `<strong>📊 RÉSULTATS DIAGNOSTIC:</strong><br>`;
+                html += `• API configurée: ${result.apiConfigured ? '✅' : '❌'}<br>`;
+                html += `• Fonctions disponibles: ${result.functionsAvailable ? '✅' : '❌'}<br>`;
+                html += `• Positions ouvertes: ${result.positionsCount}<br>`;
+                html += `• Positions protégées: ${result.protectedPositions} ✅<br>`;
+                html += `• Positions NON protégées: ${result.unprotectedPositions} ❌<br>`;
+                html += `• Bot en cours: ${result.botRunning ? '✅' : '❌'}<br>`;
+                html += `• Surveillance active: ${result.intervalActive ? '✅' : '❌'}<br><br>`;
+                
+                if (result.unprotectedPositions > 0) {
+                    html += `<strong style="color: #d63031;">⚠️ ATTENTION: ${result.unprotectedPositions} position(s) à risque!</strong><br>`;
+                    html += `<em>Utilisez "Protéger Toutes Positions" pour corriger.</em><br><br>`;
+                }
+                
+                // Afficher les logs détaillés
+                html += '<details><summary><strong>📋 Logs détaillés (cliquer pour voir)</strong></summary>';
+                html += '<div style="background: #2d3436; color: #00b894; padding: 8px; margin-top: 5px; border-radius: 3px; font-size: 10px;">';
+                diagnosticLogs.forEach(log => {
+                    html += log.replace(/\n/g, '<br>') + '<br>';
+                });
+                html += '</div></details>';
+                html += '</div>';
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: #d63031;">❌ Erreur diagnostic: ${error.message}</p>`;
+            }
+        }
+        
+        async function forceProtectPositions() {
+            const resultsDiv = document.getElementById('diagnosisResults');
+            resultsDiv.innerHTML = '<p style="color: #e17055;">🆘 Protection forcée en cours...</p>';
+            
+            try {
+                const result = await window.forceProtectAllPositions();
+                
+                let html = '<div style="color: #2d3436; line-height: 1.4;">';
+                html += `<strong>🆘 PROTECTION FORCÉE:</strong><br>`;
+                html += `• Positions analysées: ${result.total}<br>`;
+                html += `• Positions protégées: ${result.protected} ✅<br>`;
+                html += `• Échecs: ${result.failed} ❌<br>`;
+                html += `• Statut: ${result.success ? '✅ SUCCÈS' : '❌ ÉCHEC'}<br>`;
+                html += `• Message: ${result.message}<br>`;
+                
+                if (result.success) {
+                    html += '<br><strong style="color: #00b894;">✅ Toutes les positions sont maintenant protégées!</strong>';
+                } else if (result.failed > 0) {
+                    html += '<br><strong style="color: #d63031;">⚠️ Certaines positions n\'ont pas pu être protégées.</strong><br>';
+                    html += '<em>Vérifiez les logs pour plus de détails.</em>';
+                }
+                
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: #d63031;">❌ Erreur protection: ${error.message}</p>`;
+            }
+        }
+    </script>
+    
     <!-- TradingView & MACD Functions OPTIMISÉES -->
     <script>
         let tvWidget = null;
@@ -288,8 +387,8 @@
         // Initialize TradingView Chart
         function initTradingViewChart() {
             if (typeof TradingView !== 'undefined') {
-                const timeframe = config.macdTimeframe || '5m';
-                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                const timeframe = config.macdTimeframe || '15m';
+                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
@@ -556,8 +655,8 @@
             
             // Recréer le widget avec le nouveau symbole
             setTimeout(() => {
-                const timeframe = config.macdTimeframe || '5m';
-                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                const timeframe = config.macdTimeframe || '15m';
+                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
@@ -606,13 +705,13 @@
             config.macdTimeframe = timeframe;
             
             const settingsElement = document.getElementById('currentSettings');
-            settingsElement.textContent = `📈 ${timeframe === '5m' ? '5min' : timeframe === '15m' ? '15min' : timeframe === '1h' ? '1h' : '4h'} | TOP ${config.topVolumeCount}`;
+            settingsElement.textContent = `📈 ${timeframe === '15m' ? '15min' : timeframe === '1h' ? '1h' : '4h'} | TOP ${config.topVolumeCount}`;
             
             log(`⏰ Timeframe MACD modifié: ${timeframe}`, 'INFO');
             
             // Mettre à jour le graphique TradingView si il existe
             if (tvWidget) {
-                const interval = timeframe === '5m' ? '5' : timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
                 updateChart(); // Recréer avec le nouveau timeframe
                 log(`📊 Graphique TradingView mis à jour: ${timeframe}`, 'SUCCESS');
             }
@@ -628,7 +727,7 @@
             config.topVolumeCount = count;
             
             const settingsElement = document.getElementById('currentSettings');
-            const timeframeText = config.macdTimeframe === '5m' ? '5min' : config.macdTimeframe === '15m' ? '15min' : config.macdTimeframe === '1h' ? '1h' : '4h';
+            const timeframeText = config.macdTimeframe === '15m' ? '15min' : config.macdTimeframe === '1h' ? '1h' : '4h';
             settingsElement.textContent = `📈 ${timeframeText} | TOP ${count}`;
             
             log(`📊 Quantité modifiée: TOP ${count} Volume`, 'INFO');
