@@ -303,7 +303,7 @@ async function getKlineData(symbol, limit = 50, timeframe = '15m') {
                 }
             }
             
-            log(`📊 ${symbol}: ${klines.length} bougies ${timeframe} récupérées`, 'DEBUG');
+            // log(`📊 ${symbol}: ${klines.length} bougies ${timeframe} récupérées`, 'DEBUG'); // Supprimé pour réduire le spam
             return klines;
         } else {
             // 🔧 Log d'erreur détaillé pour le debug
