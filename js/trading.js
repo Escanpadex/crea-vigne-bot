@@ -186,18 +186,49 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         
         if (macdData.macd === null || macdData.signal === null) {
             reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe})`;
-        } else if (macdData.crossover && macdData.histogram > 0) {
-            macdSignal = 'BUY';
-            signalStrength = Math.abs(macdData.histogram) * 1000;
-            reason = `🔥 CROISEMENT HAUSSIER ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal})! 
-                     MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} 
-                     | Histogram: ${macdData.histogram.toFixed(6)}`;
-        } else if (macdData.macd > macdData.signal) {
-            macdSignal = 'BULLISH';
-            reason = `📈 MACD ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal}) au-dessus Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         } else {
-            macdSignal = 'BEARISH';
-            reason = `📉 MACD ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal}) en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            // 🚨 NOUVELLE LOGIQUE CORRIGÉE : Analyse de tendance plus stricte
+            const currentHistogram = macdData.histogram;
+            const previousHistogram = macdData.previousHistogram;
+            const previousHistogram2 = macdData.previousHistogram2;
+            
+            // Vérifier la tendance de l'histogramme sur 3 périodes
+            let histogramTrend = 'NEUTRAL';
+            if (previousHistogram !== null && previousHistogram2 !== null) {
+                const trend1 = currentHistogram > previousHistogram;
+                const trend2 = previousHistogram > previousHistogram2;
+                
+                if (trend1 && trend2) {
+                    histogramTrend = 'IMPROVING'; // Histogramme s'améliore sur 2 périodes
+                } else if (!trend1 && !trend2) {
+                    histogramTrend = 'DETERIORATING'; // Histogramme se détériore sur 2 périodes
+                }
+            }
+            
+            // 🎯 LOGIQUE STRICTE : Croisement récent ET momentum positif
+            if (macdData.crossover && currentHistogram > 0 && histogramTrend === 'IMPROVING') {
+                macdSignal = 'BUY';
+                signalStrength = Math.abs(currentHistogram) * 1000;
+                reason = `🔥 CROISEMENT HAUSSIER FORT ${timeframe}! MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)}, Histogram: ${currentHistogram.toFixed(6)}, Tendance: ${histogramTrend}`;
+            }
+            // 🎯 LOGIQUE STRICTE : MACD au-dessus ET histogram positif ET tendance améliorante
+            else if (macdData.macd > macdData.signal && currentHistogram > 0 && histogramTrend === 'IMPROVING') {
+                macdSignal = 'BULLISH';
+                signalStrength = Math.abs(currentHistogram) * 500;
+                reason = `📈 MACD ${timeframe} HAUSSIER CONFIRMÉ - MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}, Histogram: ${currentHistogram.toFixed(6)}, Tendance: ${histogramTrend}`;
+            }
+            // 🎯 LOGIQUE STRICTE : Conditions haussières mais momentum faible
+            else if (macdData.macd > macdData.signal && currentHistogram > 0) {
+                macdSignal = 'WEAK_BULLISH';
+                signalStrength = Math.abs(currentHistogram) * 100;
+                reason = `📊 MACD ${timeframe} faiblement haussier - MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}, Histogram: ${currentHistogram.toFixed(6)}, Tendance: ${histogramTrend}`;
+            }
+            // 🚨 CLARIFICATION : Vraiment baissier
+            else {
+                macdSignal = 'BEARISH';
+                signalStrength = 0;
+                reason = `📉 MACD ${timeframe} BAISSIER - MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}, Histogram: ${currentHistogram.toFixed(6)}, Tendance: ${histogramTrend}`;
+            }
         }
         
         // 🔧 Debug pour les premières analyses

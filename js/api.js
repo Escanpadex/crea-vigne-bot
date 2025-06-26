@@ -417,5 +417,42 @@ async function testMacd4hAPI() {
     console.log('\n✅ Test terminé. Vérifiez les résultats ci-dessus.');
 }
 
-// Rendre la fonction accessible globalement
-window.testMacd4hAPI = testMacd4hAPI; 
+// 🆕 FONCTION DE DIAGNOSTIC : Analyser une paire spécifique sur tous les timeframes
+async function testSpecificPairMacd(symbol) {
+    console.log(`🔍 DIAGNOSTIC COMPLET MACD pour ${symbol}:`);
+    console.log('=' .repeat(60));
+    
+    const timeframes = ['4h', '1h', '15m'];
+    
+    for (const tf of timeframes) {
+        console.log(`\n📊 ${tf.toUpperCase()}:`);
+        
+        try {
+            const analysis = await analyzePairMACD(symbol, tf);
+            
+            console.log(`   Signal: ${analysis.signal}`);
+            console.log(`   Raison: ${analysis.reason}`);
+            console.log(`   MACD: ${analysis.macd?.toFixed(6) || 'null'}`);
+            console.log(`   Signal Line: ${analysis.macdSignal?.toFixed(6) || 'null'}`);
+            console.log(`   Histogram: ${analysis.histogram?.toFixed(6) || 'null'}`);
+            console.log(`   Crossover: ${analysis.crossover}`);
+            
+            if (analysis.debugData) {
+                console.log(`   Previous Histogram: ${analysis.debugData.previousHistogram?.toFixed(6) || 'null'}`);
+                console.log(`   Previous Histogram2: ${analysis.debugData.previousHistogram2?.toFixed(6) || 'null'}`);
+            }
+            
+        } catch (error) {
+            console.log(`   ❌ Erreur: ${error.message}`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log('\n' + '=' .repeat(60));
+    console.log('✅ Diagnostic terminé');
+}
+
+// Rendre les fonctions accessibles globalement
+window.testMacd4hAPI = testMacd4hAPI;
+window.testSpecificPairMacd = testSpecificPairMacd; 
