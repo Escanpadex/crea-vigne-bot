@@ -249,7 +249,7 @@ async function getKlineData(symbol, limit = 50, timeframe = '15m') {
         const originalTimeframe = timeframe; // Sauvegarder l'original pour les logs
         const timeframeMapping = {
             '1min': '1m',      // 🔧 CORRECTION: 1min → 1m
-            '5min': '5m',      // 🔧 CORRECTION: 5min → 5m  
+            // 5min supprimé - Plus utilisé dans la stratégie optimisée  
             '15min': '15m',    // 🔧 CORRECTION: 15min → 15m
             '30min': '30m',    // 🔧 CORRECTION: 30min → 30m
             '1h': '1H',        // API Bitget utilise H majuscule

@@ -370,11 +370,36 @@ async function openPosition(symbol, analysis) {
             body: JSON.stringify(stopLossData)
         });
         
+        let finalStopLossId = null;
+        let stopLossCreated = false;
+        
         if (stopLossResult && stopLossResult.code === '00000') {
+            finalStopLossId = stopLossResult.data.orderId;
+            stopLossCreated = true;
             log(`✅ Stop Loss initial créé: ${symbol} @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
-            log(`🆔 Stop Loss ID: ${stopLossResult.data.orderId}`, 'INFO');
+            log(`🆔 Stop Loss ID: ${finalStopLossId}`, 'INFO');
         } else {
-            log(`❌ ÉCHEC stop loss ${symbol}: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
+            log(`❌ ÉCHEC stop loss initial ${symbol}: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
+            log(`🔄 Tentative de création stop loss d'urgence...`, 'WARNING');
+            
+            // NOUVELLE LOGIQUE: Essayer de créer un stop loss d'urgence immédiatement
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Attendre 2s
+            
+            const tempPosition = {
+                symbol: symbol,
+                quantity: quantity
+            };
+            
+            const emergencySuccess = await createEmergencyStopLoss(tempPosition, initialStopPrice);
+            
+            if (emergencySuccess && tempPosition.stopLossId) {
+                finalStopLossId = tempPosition.stopLossId;
+                stopLossCreated = true;
+                log(`🆘 Stop Loss d'urgence créé avec succès: ${symbol} @ ${initialStopPrice.toFixed(4)}`, 'SUCCESS');
+            } else {
+                log(`❌ IMPOSSIBLE de créer un stop loss pour ${symbol} - POSITION À RISQUE !`, 'ERROR');
+                // On continue quand même mais on marque la position comme à risque
+            }
         }
         
         const position = {
@@ -387,7 +412,7 @@ async function openPosition(symbol, analysis) {
             status: 'OPEN',
             timestamp: new Date().toISOString(),
             orderId: orderResult.data.orderId,
-            stopLossId: stopLossResult?.data?.orderId || null,
+            stopLossId: finalStopLossId,
             currentStopPrice: initialStopPrice,
             highestPrice: analysis.price,
             reason: analysis.reason
@@ -399,7 +424,7 @@ async function openPosition(symbol, analysis) {
         log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
         log(`🎯 Raison: ${analysis.reason}`, 'INFO');
         
-        if (stopLossResult?.data?.orderId) {
+        if (finalStopLossId) {
             log(`🔒 Stop Loss actif @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
         } else {
             log(`⚠️ Position ouverte SANS stop loss - RISQUE ÉLEVÉ !`, 'WARNING');
@@ -863,4 +888,179 @@ async function checkPositionsStatus() {
     } catch (error) {
         log(`⚠️ Erreur vérification positions: ${error.message}`, 'WARNING');
     }
-} 
+}
+
+// 🧪 FONCTION DE DIAGNOSTIC: Tester la création de stop loss
+async function diagnosisStopLoss() {
+    console.log('🧪 DIAGNOSTIC STOP LOSS - Analyse des problèmes potentiels...');
+    
+    // Test 1: Vérifier les fonctions API
+    console.log('\n📊 Test 1: Vérification des fonctions API...');
+    console.log(`   makeRequest disponible: ${typeof makeRequest === 'function'}`);
+    console.log(`   getCurrentPrice disponible: ${typeof getCurrentPrice === 'function'}`);
+    console.log(`   modifyStopLoss disponible: ${typeof modifyStopLoss === 'function'}`);
+    
+    // Test 2: Vérifier la configuration API
+    console.log('\n🔑 Test 2: Configuration API...');
+    console.log(`   API Key: ${config.apiKey ? 'Configurée' : 'MANQUANTE'}`);
+    console.log(`   Secret Key: ${config.secretKey ? 'Configurée' : 'MANQUANTE'}`);
+    console.log(`   Passphrase: ${config.passphrase ? 'Configurée' : 'MANQUANTE'}`);
+    
+    // Test 3: Test de création de stop loss avec BTCUSDT
+    if (config.apiKey && config.secretKey && config.passphrase) {
+        console.log('\n🔄 Test 3: Test de création stop loss...');
+        
+        try {
+            // Récupérer le prix actuel de BTCUSDT
+            const currentPrice = await getCurrentPrice('BTCUSDT');
+            console.log(`   Prix BTCUSDT: ${currentPrice}`);
+            
+            if (currentPrice) {
+                const testStopPrice = currentPrice * 0.99;
+                console.log(`   Prix stop calculé: ${testStopPrice}`);
+                
+                // Créer un ordre de test (très petite quantité)
+                const testStopLossData = {
+                    planType: "normal_plan",
+                    symbol: "BTCUSDT",
+                    productType: "USDT-FUTURES",
+                    marginMode: "isolated",
+                    marginCoin: "USDT",
+                    size: "0.001", // Très petite quantité pour test
+                    triggerPrice: testStopPrice.toFixed(4),
+                    triggerType: "mark_price",
+                    side: "sell",
+                    tradeSide: "close",
+                    orderType: "market",
+                    clientOid: `test_stop_${Date.now()}`,
+                    reduceOnly: "YES"
+                };
+                
+                console.log('   Données stop loss test:', testStopLossData);
+                
+                // ⚠️ ATTENTION: Ce test ne créera PAS réellement l'ordre
+                // Il va juste tester la structure de la requête
+                console.log('   ⚠️ Test de structure seulement (pas de création réelle)');
+                
+            } else {
+                console.log('   ❌ Impossible de récupérer le prix BTCUSDT');
+            }
+            
+        } catch (error) {
+            console.log(`   ❌ Erreur test stop loss: ${error.message}`);
+        }
+    } else {
+        console.log('   ⚠️ Configuration API incomplète - Test impossible');
+    }
+    
+    // Test 4: Vérifier les positions actuelles
+    console.log('\n📊 Test 4: Positions actuelles...');
+    console.log(`   Positions ouvertes: ${openPositions.length}`);
+    
+    if (openPositions.length > 0) {
+        openPositions.forEach((pos, index) => {
+            console.log(`   Position ${index + 1}: ${pos.symbol}`);
+            console.log(`     Stop Loss ID: ${pos.stopLossId || 'MANQUANT'}`);
+            console.log(`     Stop Price: ${pos.currentStopPrice || 'MANQUANT'}`);
+            console.log(`     Status: ${pos.stopLossId ? '✅ Protégée' : '❌ NON PROTÉGÉE'}`);
+        });
+    }
+    
+    // Test 5: Vérifier les intervalles
+    console.log('\n⏰ Test 5: Intervalles actifs...');
+    console.log(`   Bot running: ${botRunning}`);
+    console.log(`   stopLossManagementInterval: ${stopLossManagementInterval ? 'Actif' : 'Inactif'}`);
+    
+    console.log('\n✅ Diagnostic terminé. Vérifiez les résultats ci-dessus.');
+    
+    return {
+        apiConfigured: !!(config.apiKey && config.secretKey && config.passphrase),
+        functionsAvailable: typeof makeRequest === 'function',
+        positionsCount: openPositions.length,
+        protectedPositions: openPositions.filter(pos => pos.stopLossId).length,
+        unprotectedPositions: openPositions.filter(pos => !pos.stopLossId).length,
+        botRunning: botRunning,
+        intervalActive: !!stopLossManagementInterval
+    };
+}
+
+// Rendre la fonction accessible globalement
+window.diagnosisStopLoss = diagnosisStopLoss;
+
+// 🆘 FONCTION CRITIQUE: Forcer la protection de toutes les positions non protégées
+async function forceProtectAllPositions() {
+    console.log('🆘 PROTECTION FORCÉE - Création stop loss pour toutes positions non protégées...');
+    
+    if (openPositions.length === 0) {
+        console.log('ℹ️ Aucune position ouverte');
+        return { success: true, message: 'Aucune position à protéger' };
+    }
+    
+    const unprotectedPositions = openPositions.filter(pos => !pos.stopLossId);
+    
+    if (unprotectedPositions.length === 0) {
+        console.log('✅ Toutes les positions sont déjà protégées');
+        return { success: true, message: 'Toutes positions déjà protégées' };
+    }
+    
+    console.log(`⚠️ ${unprotectedPositions.length} position(s) non protégée(s) détectée(s)`);
+    
+    let protected = 0;
+    let failed = 0;
+    
+    for (const position of unprotectedPositions) {
+        console.log(`🔄 Protection de ${position.symbol}...`);
+        
+        try {
+            const currentPrice = await getCurrentPrice(position.symbol);
+            
+            if (!currentPrice) {
+                console.log(`❌ ${position.symbol}: Impossible de récupérer le prix`);
+                failed++;
+                continue;
+            }
+            
+            // Calculer le stop loss à -1% du prix actuel
+            const stopPrice = currentPrice * 0.99;
+            
+            const success = await createEmergencyStopLoss(position, stopPrice);
+            
+            if (success) {
+                position.currentStopPrice = stopPrice;
+                position.highestPrice = currentPrice;
+                protected++;
+                console.log(`✅ ${position.symbol} protégée @ ${stopPrice.toFixed(4)} (-1%)`);
+            } else {
+                failed++;
+                console.log(`❌ ${position.symbol}: Échec création stop loss`);
+            }
+            
+            // Attendre 1 seconde entre chaque création
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+        } catch (error) {
+            failed++;
+            console.log(`❌ ${position.symbol}: Erreur ${error.message}`);
+        }
+    }
+    
+    const result = {
+        success: protected > 0,
+        total: unprotectedPositions.length,
+        protected: protected,
+        failed: failed,
+        message: `${protected} position(s) protégée(s), ${failed} échec(s)`
+    };
+    
+    console.log(`🎯 Résultat: ${result.message}`);
+    
+    if (protected > 0) {
+        updatePositionsDisplay();
+        log(`🆘 PROTECTION FORCÉE: ${protected} position(s) maintenant protégée(s)`, 'SUCCESS');
+    }
+    
+    return result;
+}
+
+// Rendre la fonction accessible globalement
+window.forceProtectAllPositions = forceProtectAllPositions; 
