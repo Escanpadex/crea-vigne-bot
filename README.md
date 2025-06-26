@@ -1,16 +1,16 @@
 # 🚀 Bot Trading Bitget Futures - Stratégie MACD Multi-Timeframes
 
-## ✨ Nouvelle Stratégie Implémentée
+## ✨ Stratégie Optimisée (Mise à Jour)
 
 ### 📊 Analyse Multi-Timeframes avec Filtrage Progressif
 
-Au lieu d'analyser seulement les TOP 30 cryptos par volume, le bot utilise désormais une approche révolutionnaire :
+Le bot utilise une approche révolutionnaire avec **filtrage progressif optimisé** :
 
 **🔍 Analyse Complète :**
 - Scanner **TOUTES** les cryptos disponibles sur Bitget (volume > 1M USDT)
-- Filtrage progressif sur 4 timeframes : **4H → 1H → 15M → 5M**
+- Filtrage progressif sur 3 timeframes : **4H → 1H → 15M**
 
-**⚡ Processus de Filtrage :**
+**⚡ Processus de Filtrage Optimisé :**
 
 1. **4 Heures** : Analyse MACD sur timeframe 4H
    - ✅ Si MACD haussier → Passer au timeframe suivant
@@ -20,13 +20,10 @@ Au lieu d'analyser seulement les TOP 30 cryptos par volume, le bot utilise déso
    - ✅ Si MACD haussier → Passer au timeframe suivant
    - ❌ Si MACD baissier → Crypto écartée
 
-3. **15 Minutes** : Analyse MACD sur timeframe 15M (seulement si 1H validé)
-   - ✅ Si MACD haussier → Passer au timeframe suivant
-   - ❌ Si MACD baissier → Crypto écartée
-
-4. **5 Minutes** : Analyse MACD sur timeframe 5M (seulement si 15M validé)
+3. **15 Minutes** ⚡ **(TIMEFRAME FINAL)** : Analyse MACD sur timeframe 15M (seulement si 1H validé)
    - 🎯 Si **croisement haussier MACD** détecté → **OUVERTURE POSITION**
-   - ⏳ Sinon → Attendre le croisement
+   - ⏳ Si MACD haussier sans croisement → Attendre le croisement
+   - ❌ Si MACD baissier → Crypto écartée
 
 ### 📈 Interface Utilisateur Améliorée
 
@@ -35,13 +32,14 @@ Au lieu d'analyser seulement les TOP 30 cryptos par volume, le bot utilise déso
 - Format : "X sur Y haussiers" et "X sur Y baissiers"
 - Exemple : "150 sur 600 haussiers" et "450 sur 600 baissiers"
 
-### 🎯 Avantages de Cette Stratégie
+### 🎯 Avantages de la Stratégie Optimisée
 
 1. **Couverture Maximale** : Analyse de toutes les opportunités du marché
-2. **Filtrage Intelligent** : Élimination précoce des cryptos non-prometteuses
-3. **Confirmation Multi-Timeframes** : Réduction drastique des faux signaux
-4. **Optimisation Performance** : Évite l'analyse inutile des timeframes courts
-5. **Précision Accrue** : Seules les cryptos avec alignement parfait sont tradées
+2. **Filtrage Intelligent** : Élimination précoce des cryptos non-prometteuses  
+3. **Confirmation Multi-Timeframes** : H4 et H1 haussiers requis
+4. **Performance Optimisée** : Suppression du timeframe 5M pour réduire le bruit
+5. **Signaux Plus Fiables** : 15M comme timeframe final pour des signaux plus robustes
+6. **Moins de Faux Signaux** : Réduction significative des entrées prématurées
 
 ### ⚙️ Configuration
 
@@ -76,8 +74,12 @@ L'interface affiche :
 ## 🔧 Fonctionnalités Techniques
 
 - **API Bitget** : Futures USDT
-- **Indicateur** : MACD (12, 26, 9)
-- **Timeframes** : 4H, 1H, 15M, 5M
+- **Indicateur** : MACD adaptatif par timeframe :
+  - **4H** : MACD(12, 26, 9) - Paramètres standards
+  - **1H** : MACD(30, 50, 20) - Plus réactif pour tendances moyennes
+  - **15M** : MACD(30, 50, 40) - Signal lissé pour réduire le bruit
+- **Timeframes** : 4H, 1H, 15M *(timeframe 5M supprimé)*
+- **Données** : 200-350 bougies par analyse selon timeframe
 - **Protection** : Stop loss trailing automatique
 - **Synchronisation** : Positions temps réel
 
