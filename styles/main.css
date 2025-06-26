@@ -521,6 +521,22 @@ input:focus, select:focus {
     margin: 15px 0;
 }
 
+/* 🎯 NOUVEAU: Ordre visuel du filtrage progressif */
+.macd-timeframe-stats .timeframe-stat[style*="order: 1"] {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 2px solid #f0ad4e;
+}
+
+.macd-timeframe-stats .timeframe-stat[style*="order: 2"] {
+    background: linear-gradient(135deg, #e8f4f8 0%, #b8e6b8 100%);
+    border: 2px solid #5bc0de;
+}
+
+.macd-timeframe-stats .timeframe-stat[style*="order: 3"] {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 2px solid #28a745;
+}
+
 .timeframe-stat {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border: 1px solid #dee2e6;
