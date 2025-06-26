@@ -70,15 +70,7 @@
                         <small style="font-size: 10px; display: block; margin-top: 2px;">Protection en %</small>
                     </div>
                     
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">⏱️ Timeframe MACD:</label>
-                        <select id="macdTimeframe" onchange="updateMacdTimeframe()" style="width: 100%; padding: 8px; font-size: 13px;">
-                            <option value="15m" selected>15 minutes (FINAL)</option>
-                            <option value="1h">1 heure</option>
-                            <option value="4h">4 heures</option>
-                        </select>
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">Période d'analyse</small>
-                    </div>
+                    <!-- Sélecteur de timeframe supprimé - Remplacé par le filtrage progressif 4H → 1H → 15M -->
                     
                     <div class="form-group" style="margin-bottom: 8px;">
                         <label style="font-size: 13px;">📊 Stratégie:</label>
@@ -387,8 +379,7 @@
         // Initialize TradingView Chart
         function initTradingViewChart() {
             if (typeof TradingView !== 'undefined') {
-                const timeframe = config.macdTimeframe || '15m';
-                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                const interval = '15'; // Toujours 15M pour le graphique (timeframe final du filtrage progressif)
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
@@ -416,7 +407,7 @@
                     }
                 });
                 
-                log(`📊 Graphique TradingView initialisé avec MACD (${timeframe})`, 'SUCCESS');
+                log(`📊 Graphique TradingView initialisé avec MACD (15M - timeframe final)`, 'SUCCESS');
             } else {
                 setTimeout(initTradingViewChart, 1000);
             }
@@ -655,8 +646,7 @@
             
             // Recréer le widget avec le nouveau symbole
             setTimeout(() => {
-                const timeframe = config.macdTimeframe || '15m';
-                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
+                const interval = '15'; // Toujours 15M pour le graphique (timeframe final du filtrage progressif)
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
@@ -681,7 +671,7 @@
                     }
                 });
                 
-                log(`📊 Graphique recréé avec succès: ${symbolName} (${timeframe})`, 'SUCCESS');
+                log(`📊 Graphique recréé avec succès: ${symbolName} (15M - timeframe final)`, 'SUCCESS');
             }, 500);
             
             // DÉSACTIVÉ - Utilise maintenant le nouveau système MACD multi-tokens
@@ -699,36 +689,14 @@
             await refreshCompleteHistory();
         }
 
-        // 🆕 NOUVELLES FONCTIONS: Gestion des paramètres MACD
-        function updateMacdTimeframe() {
-            const timeframe = document.getElementById('macdTimeframe').value;
-            config.macdTimeframe = timeframe;
-            
-            const settingsElement = document.getElementById('currentSettings');
-            settingsElement.textContent = `📈 ${timeframe === '15m' ? '15min' : timeframe === '1h' ? '1h' : '4h'} | TOP ${config.topVolumeCount}`;
-            
-            log(`⏰ Timeframe MACD modifié: ${timeframe}`, 'INFO');
-            
-            // Mettre à jour le graphique TradingView si il existe
-            if (tvWidget) {
-                const interval = timeframe === '15m' ? '15' : timeframe === '1h' ? '60' : '240';
-                updateChart(); // Recréer avec le nouveau timeframe
-                log(`📊 Graphique TradingView mis à jour: ${timeframe}`, 'SUCCESS');
-            }
-            
-            // Si le bot tourne, informer de l'impact
-            if (botRunning) {
-                log(`⚠️ Changement appliqué - Redémarrez le bot pour une analyse optimale`, 'WARNING');
-            }
-        }
+        // 🆕 FONCTION: Gestion du nombre de paires à analyser (fonction updateMacdTimeframe supprimée - plus nécessaire avec le filtrage progressif)
 
         function updateTopVolumeCount() {
             const count = parseInt(document.getElementById('topVolumeCount').value);
             config.topVolumeCount = count;
             
             const settingsElement = document.getElementById('currentSettings');
-            const timeframeText = config.macdTimeframe === '15m' ? '15min' : config.macdTimeframe === '1h' ? '1h' : '4h';
-            settingsElement.textContent = `📈 ${timeframeText} | TOP ${count}`;
+            settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP ${count}`;
             
             log(`📊 Quantité modifiée: TOP ${count} Volume`, 'INFO');
             
@@ -804,6 +772,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 🚀 CONNEXION MANUELLE UNIQUEMENT - Pas de connexion automatique
             // L'utilisateur doit cliquer sur le bouton 🔗 API pour se connecter
+            
+            // Initialiser l'affichage des paramètres
+            const settingsElement = document.getElementById('currentSettings');
+            if (settingsElement) {
+                settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP ${config.topVolumeCount}`;
+            }
             
             // Wait a bit for TradingView script to load
             setTimeout(() => {
