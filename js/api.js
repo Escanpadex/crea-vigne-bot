@@ -236,8 +236,15 @@ async function getAllAvailablePairs() {
     }
 }
 
-async function getKlineData(symbol, limit = 50, timeframe = '5m') {
+async function getKlineData(symbol, limit = 50, timeframe = '15m') {
     try {
+        // 🔧 Limiter le nombre de bougies selon les limites de l'API Bitget
+        const maxLimit = 1000; // Limite maximale de l'API Bitget
+        if (limit > maxLimit) {
+            console.warn(`⚠️ Limite ${limit} trop élevée pour ${symbol} ${timeframe}, réduction à ${maxLimit}`);
+            limit = maxLimit;
+        }
+        
         // 🔧 Validation et conversion du timeframe pour l'API Bitget
         const originalTimeframe = timeframe; // Sauvegarder l'original pour les logs
         const timeframeMapping = {
@@ -256,8 +263,8 @@ async function getKlineData(symbol, limit = 50, timeframe = '5m') {
         };
         
         if (!timeframeMapping[timeframe]) {
-            console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 5m par défaut.`);
-            timeframe = '5m';
+                    console.error(`❌ Timeframe invalide: ${timeframe}. Utilisation de 15m par défaut.`);
+        timeframe = '15m';
         } else {
             timeframe = timeframeMapping[timeframe]; // Conversion pour l'API
         }

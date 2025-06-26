@@ -38,7 +38,7 @@ let config = {
     trailingStop: 1.0,
     cooldownMinutes: 30,
     // NEW: MACD Strategy settings
-    macdTimeframe: '5m',            // Timeframe pour l'analyse MACD
+    macdTimeframe: '15m',           // Timeframe principal pour les signaux d'achat
     topVolumeCount: 30,             // Nombre de cryptos à analyser (TOP x)
     // Advanced trailing stop settings
     trailingStopSettings: {

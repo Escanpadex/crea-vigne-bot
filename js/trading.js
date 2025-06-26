@@ -1,9 +1,23 @@
 // Trading Functions - MACD Strategy & Position Management
 console.log('📁 Loading trading.js...');
 
+// 🎯 FONCTION: Paramètres MACD adaptés par timeframe
+function getMACDParameters(timeframe) {
+    const parameters = {
+        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 200 },
+        '1h': { fast: 30, slow: 50, signal: 20, minCandles: 300 },
+        '15m': { fast: 30, slow: 50, signal: 40, minCandles: 350 }
+    };
+    
+    const params = parameters[timeframe] || parameters['4h'];
+    console.log(`📊 MACD ${timeframe}: Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}, MinCandles=${params.minCandles}`);
+    return params;
+}
+
 function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
     const minRequired = slowPeriod + signalPeriod + 10;
     if (prices.length < minRequired) {
+        console.warn(`⚠️ MACD: Données insuffisantes - Reçu: ${prices.length}, Requis: ${minRequired} (${fastPeriod},${slowPeriod},${signalPeriod})`);
         return { macd: null, signal: null, histogram: null, crossover: false };
     }
     
@@ -139,19 +153,32 @@ function debugMACDAnalysis(symbol, macdData, signal, timeframe) {
     }
 }
 
-async function analyzePairMACD(symbol, timeframe = '5m') {
+async function analyzePairMACD(symbol, timeframe = '15m') {
     try {
-        const klines = await getKlineData(symbol, 150, timeframe);
+        // 🎯 Récupérer les paramètres MACD spécifiques au timeframe
+        const macdParams = getMACDParameters(timeframe);
         
-        if (klines.length < 80) {
-            return { symbol, signal: 'HOLD', strength: 0, reason: 'Données insuffisantes', timeframe };
+        // 🔄 Récupérer plus de bougies selon les paramètres MACD
+        const klines = await getKlineData(symbol, macdParams.minCandles, timeframe);
+        
+        // Vérifier si on a assez de données pour l'analyse MACD
+        const minRequired = macdParams.slow + macdParams.signal + 10;
+        if (klines.length < minRequired) {
+            return { 
+                symbol, 
+                signal: 'HOLD', 
+                strength: 0, 
+                reason: `Données insuffisantes: ${klines.length}/${minRequired} bougies (MACD ${macdParams.fast},${macdParams.slow},${macdParams.signal})`, 
+                timeframe 
+            };
         }
         
         const closePrices = klines.map(k => k.close);
         const currentPrice = closePrices[closePrices.length - 1];
         const volume24h = klines.slice(-288).reduce((sum, k) => sum + k.volume, 0);
         
-        const macdData = calculateMACD(closePrices);
+        // 🎯 Calculer MACD avec les paramètres spécifiques au timeframe
+        const macdData = calculateMACD(closePrices, macdParams.fast, macdParams.slow, macdParams.signal);
         
         let macdSignal = 'HOLD';
         let signalStrength = 0;
@@ -162,15 +189,15 @@ async function analyzePairMACD(symbol, timeframe = '5m') {
         } else if (macdData.crossover && macdData.histogram > 0) {
             macdSignal = 'BUY';
             signalStrength = Math.abs(macdData.histogram) * 1000;
-            reason = `🔥 CROISEMENT HAUSSIER ${timeframe}! 
+            reason = `🔥 CROISEMENT HAUSSIER ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal})! 
                      MACD: ${macdData.macd.toFixed(6)} > Signal: ${macdData.signal.toFixed(6)} 
                      | Histogram: ${macdData.histogram.toFixed(6)}`;
         } else if (macdData.macd > macdData.signal) {
             macdSignal = 'BULLISH';
-            reason = `📈 MACD ${timeframe} au-dessus Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            reason = `📈 MACD ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal}) au-dessus Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         } else {
             macdSignal = 'BEARISH';
-            reason = `📉 MACD ${timeframe} en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
+            reason = `📉 MACD ${timeframe} (${macdParams.fast},${macdParams.slow},${macdParams.signal}) en dessous Signal. MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}`;
         }
         
         // 🔧 Debug pour les premières analyses
@@ -209,14 +236,16 @@ async function analyzePairMACD(symbol, timeframe = '5m') {
 
 async function analyzeMultiTimeframe(symbol) {
     try {
-        const timeframes = ['4h', '1h', '15m', '5m'];
+        // NOUVELLE LOGIQUE: H4 → H1 → 15M (plus de 5M)
+        const timeframes = ['4h', '1h', '15m'];
         const results = {};
         
         for (const tf of timeframes) {
             const analysis = await analyzePairMACD(symbol, tf);
             results[tf] = analysis;
             
-            if (tf !== '5m' && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
+            // Filtrage progressif: H4 et H1 doivent être haussiers
+            if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
                 results.filtered = tf;
                 results.filterReason = `Filtré au ${tf}: ${analysis.signal}`;
                 break;
@@ -224,13 +253,17 @@ async function analyzeMultiTimeframe(symbol) {
         }
         
         if (!results.filtered) {
-            const signal5m = results['5m'];
-            if (signal5m.signal === 'BUY' && signal5m.crossover) {
+            // Si H4 et H1 sont haussiers, vérifier le signal 15M
+            const signal15m = results['15m'];
+            if (signal15m.signal === 'BUY' && signal15m.crossover) {
                 results.finalDecision = 'BUY';
-                results.finalReason = 'Tous timeframes validés + croisement 5m détecté';
-            } else {
+                results.finalReason = 'H4 et H1 haussiers + croisement 15M détecté';
+            } else if (signal15m.signal === 'BULLISH') {
                 results.finalDecision = 'WAIT';
-                results.finalReason = 'Tous timeframes OK mais pas de croisement 5m';
+                results.finalReason = 'H4 et H1 haussiers, 15M haussier mais pas de croisement';
+            } else {
+                results.finalDecision = 'FILTERED';
+                results.filterReason = 'Filtré au 15M: signal non haussier';
             }
         } else {
             results.finalDecision = 'FILTERED';
@@ -714,6 +747,38 @@ async function importExistingPositions() {
 }
 
 window.importExistingPositions = importExistingPositions;
+
+// 🧪 FONCTION DE TEST: Tester les nouveaux paramètres MACD par timeframe
+async function testMACDParameters() {
+    console.log('🧪 Test des paramètres MACD adaptatifs par timeframe...');
+    
+    const testSymbol = 'BTCUSDT';
+    const timeframes = ['4h', '1h', '15m'];
+    
+    for (const tf of timeframes) {
+        console.log(`\n🔍 Test ${tf.toUpperCase()}:`);
+        
+        const params = getMACDParameters(tf);
+        console.log(`   Paramètres: Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}`);
+        console.log(`   Bougies requises: ${params.minCandles}`);
+        
+        try {
+            const analysis = await analyzePairMACD(testSymbol, tf);
+            console.log(`   ✅ Analyse réussie: ${analysis.signal}`);
+            console.log(`   📊 Raison: ${analysis.reason}`);
+        } catch (error) {
+            console.log(`   ❌ Erreur analyse: ${error.message}`);
+        }
+        
+        // Délai entre les tests
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    console.log('\n✅ Test terminé. Vérifiez les résultats ci-dessus.');
+}
+
+// Rendre la fonction accessible globalement
+window.testMACDParameters = testMACDParameters;
 
 async function checkPositionsStatus() {
     if (openPositions.length === 0) return;
