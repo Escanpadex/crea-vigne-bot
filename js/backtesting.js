@@ -12,9 +12,9 @@ let backtestConfig = {
     strategy: 'macd',
     timeframe: '15m',
     duration: 7, // jours
-    capital: 1000,
+    capital: 1000, // Capital fixe
     positionSize: 10, // pourcentage
-    stopLoss: 2, // pourcentage
+    trailingStop: 1.5, // pourcentage
     takeProfit: 4, // pourcentage
     macdParams: {
         fast: 12,
@@ -31,6 +31,73 @@ let backtestConfig = {
         slow: 21
     }
 };
+
+// Récupérer les données 1 minute pour le trailing stop loss précis
+async function get1MinuteDataForTrailing(symbol, startTime, endTime) {
+    try {
+        // Calculer le nombre de minutes entre les deux timestamps
+        const minutes = Math.ceil((endTime - startTime) / (60 * 1000));
+        const limit = Math.min(1000, minutes); // Limite API Bitget
+        
+        // Récupérer les données 1 minute
+        const klines = await getKlineData(symbol, limit, '1min');
+        
+        // Filtrer les données dans la plage de temps
+        return klines.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
+    } catch (error) {
+        console.error('Erreur récupération données 1min pour trailing stop:', error);
+        return [];
+    }
+}
+
+// Vérifier le trailing stop loss avec précision 1 minute pour timeframes supérieurs
+async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
+    // Si le timeframe est déjà 1 minute, pas besoin de données supplémentaires
+    if (backtestConfig.timeframe === '1min') {
+        return null;
+    }
+    
+    // Récupérer les données 1 minute entre les deux bougies
+    const symbol = trade.symbol;
+    const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (getTimeframeMinutes(backtestConfig.timeframe) * 60 * 1000);
+    const minuteData = await get1MinuteDataForTrailing(symbol, currentCandle.timestamp, endTime);
+    
+    for (const minuteCandle of minuteData) {
+        if (trade.direction === 'LONG') {
+            // Mettre à jour le prix le plus haut
+            if (minuteCandle.high > trade.highestPrice) {
+                trade.highestPrice = minuteCandle.high;
+                trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+            }
+            
+            // Vérifier si le trailing stop est touché
+            if (minuteCandle.low <= trade.trailingStopPrice) {
+                return {
+                    exitPrice: trade.trailingStopPrice,
+                    exitTime: minuteCandle.timestamp,
+                    reason: 'Trailing Stop Loss (1min precision)'
+                };
+            }
+        } else { // SHORT
+            // Mettre à jour le prix le plus bas
+            if (minuteCandle.low < trade.lowestPrice) {
+                trade.lowestPrice = minuteCandle.low;
+                trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
+            }
+            
+            // Vérifier si le trailing stop est touché
+            if (minuteCandle.high >= trade.trailingStopPrice) {
+                return {
+                    exitPrice: trade.trailingStopPrice,
+                    exitTime: minuteCandle.timestamp,
+                    reason: 'Trailing Stop Loss (1min precision)'
+                };
+            }
+        }
+    }
+    
+    return null;
+}
 
 // Gestion des paramètres de stratégie
 function updateStrategyParams() {
@@ -128,9 +195,9 @@ async function updateBacktestConfig() {
         strategy: document.getElementById('backtestStrategy').value,
         timeframe: document.getElementById('backtestTimeframe').value,
         duration: parseInt(document.getElementById('backtestDuration').value),
-        capital: parseFloat(document.getElementById('backtestCapital').value),
+        capital: 1000, // Capital fixe
         positionSize: parseFloat(document.getElementById('backtestPositionSize').value),
-        stopLoss: parseFloat(document.getElementById('backtestStopLoss').value),
+        trailingStop: parseFloat(document.getElementById('backtestTrailingStop').value),
         takeProfit: parseFloat(document.getElementById('backtestTakeProfit').value),
         macdParams: {
             fast: parseInt(document.getElementById('macdFast').value),
@@ -151,18 +218,13 @@ async function updateBacktestConfig() {
 
 // Valider la configuration du backtesting
 function validateBacktestConfig() {
-    if (backtestConfig.capital < 100) {
-        alert('Le capital initial doit être d\'au moins 100 USDT');
-        return false;
-    }
-    
     if (backtestConfig.positionSize < 1 || backtestConfig.positionSize > 100) {
         alert('La taille de position doit être entre 1% et 100%');
         return false;
     }
     
-    if (backtestConfig.stopLoss < 0.1 || backtestConfig.stopLoss > 10) {
-        alert('Le stop loss doit être entre 0.1% et 10%');
+    if (backtestConfig.trailingStop < 0.1 || backtestConfig.trailingStop > 5) {
+        alert('Le trailing stop loss doit être entre 0.1% et 5%');
         return false;
     }
     
@@ -345,7 +407,7 @@ async function simulateTrades(indicators) {
         }
         
         // Vérifier les trades ouverts
-        checkOpenTrades(candle);
+        await checkOpenTrades(candle, i);
         
         // Mettre à jour l'équité
         updateEquity(candle);
@@ -483,53 +545,110 @@ function openTrade(candle, direction) {
         entryTime: candle.timestamp,
         quantity: quantity,
         positionValue: positionValue,
-        stopLoss: direction === 'LONG' ? 
-            candle.close * (1 - backtestConfig.stopLoss / 100) : 
-            candle.close * (1 + backtestConfig.stopLoss / 100),
+        // Trailing Stop Loss
+        trailingStopPrice: direction === 'LONG' ? 
+            candle.close * (1 - backtestConfig.trailingStop / 100) : 
+            candle.close * (1 + backtestConfig.trailingStop / 100),
+        highestPrice: direction === 'LONG' ? candle.close : candle.close,
+        lowestPrice: direction === 'SHORT' ? candle.close : candle.close,
         takeProfit: direction === 'LONG' ? 
             candle.close * (1 + backtestConfig.takeProfit / 100) : 
             candle.close * (1 - backtestConfig.takeProfit / 100)
     };
     
     backtestResults.openTrades.push(trade);
-    log(`📈 Ouverture trade ${direction}: ${trade.symbol} @ ${trade.entryPrice.toFixed(4)}`, 'INFO');
+    log(`📈 Ouverture trade ${direction}: ${trade.symbol} @ ${trade.entryPrice.toFixed(4)} (Trailing Stop: ${backtestConfig.trailingStop}%)`, 'INFO');
 }
 
-// Vérifier les trades ouverts
-function checkOpenTrades(candle) {
-    backtestResults.openTrades = backtestResults.openTrades.filter(trade => {
+// Vérifier les trades ouverts avec trailing stop loss
+async function checkOpenTrades(candle, candleIndex) {
+    const tradesToRemove = [];
+    
+    for (let i = 0; i < backtestResults.openTrades.length; i++) {
+        const trade = backtestResults.openTrades[i];
         let shouldClose = false;
         let exitReason = '';
+        let exitPrice = 0;
+        let exitTime = candle.timestamp;
         
         if (trade.direction === 'LONG') {
-            if (candle.low <= trade.stopLoss) {
-                shouldClose = true;
-                exitReason = 'Stop Loss';
-                trade.exitPrice = trade.stopLoss;
-            } else if (candle.high >= trade.takeProfit) {
-                shouldClose = true;
-                exitReason = 'Take Profit';
-                trade.exitPrice = trade.takeProfit;
+            // Mettre à jour le prix le plus haut atteint
+            if (candle.high > trade.highestPrice) {
+                trade.highestPrice = candle.high;
+                // Ajuster le trailing stop loss
+                trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
             }
-        } else { // SHORT
-            if (candle.high >= trade.stopLoss) {
-                shouldClose = true;
-                exitReason = 'Stop Loss';
-                trade.exitPrice = trade.stopLoss;
-            } else if (candle.low <= trade.takeProfit) {
+            
+            // Vérifier take profit en premier
+            if (candle.high >= trade.takeProfit) {
                 shouldClose = true;
                 exitReason = 'Take Profit';
-                trade.exitPrice = trade.takeProfit;
+                exitPrice = trade.takeProfit;
+            }
+            // Vérifier trailing stop loss avec précision 1 minute pour timeframes > 1min
+            else if (backtestConfig.timeframe !== '1min') {
+                const nextCandle = backtestData[candleIndex + 1];
+                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
+                
+                if (precisionResult) {
+                    shouldClose = true;
+                    exitReason = precisionResult.reason;
+                    exitPrice = precisionResult.exitPrice;
+                    exitTime = precisionResult.exitTime;
+                }
+            }
+            // Pour les données 1 minute, vérification directe
+            else if (candle.low <= trade.trailingStopPrice) {
+                shouldClose = true;
+                exitReason = 'Trailing Stop Loss';
+                exitPrice = trade.trailingStopPrice;
+            }
+            
+        } else { // SHORT
+            // Mettre à jour le prix le plus bas atteint
+            if (candle.low < trade.lowestPrice) {
+                trade.lowestPrice = candle.low;
+                // Ajuster le trailing stop loss
+                trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
+            }
+            
+            // Vérifier take profit en premier
+            if (candle.low <= trade.takeProfit) {
+                shouldClose = true;
+                exitReason = 'Take Profit';
+                exitPrice = trade.takeProfit;
+            }
+            // Vérifier trailing stop loss avec précision 1 minute pour timeframes > 1min
+            else if (backtestConfig.timeframe !== '1min') {
+                const nextCandle = backtestData[candleIndex + 1];
+                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
+                
+                if (precisionResult) {
+                    shouldClose = true;
+                    exitReason = precisionResult.reason;
+                    exitPrice = precisionResult.exitPrice;
+                    exitTime = precisionResult.exitTime;
+                }
+            }
+            // Pour les données 1 minute, vérification directe
+            else if (candle.high >= trade.trailingStopPrice) {
+                shouldClose = true;
+                exitReason = 'Trailing Stop Loss';
+                exitPrice = trade.trailingStopPrice;
             }
         }
         
         if (shouldClose) {
-            closeTrade(trade, candle.timestamp, exitReason);
-            return false; // Retirer le trade de la liste
+            trade.exitPrice = exitPrice;
+            closeTrade(trade, exitTime, exitReason);
+            tradesToRemove.push(i);
         }
-        
-        return true; // Garder le trade ouvert
-    });
+    }
+    
+    // Retirer les trades fermés (en ordre inverse pour éviter les problèmes d'index)
+    for (let i = tradesToRemove.length - 1; i >= 0; i--) {
+        backtestResults.openTrades.splice(tradesToRemove[i], 1);
+    }
 }
 
 // Fermer un trade
@@ -873,10 +992,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Fonction pour mettre à jour la paire sélectionnée
+function updateSelectedPair() {
+    const selectedPair = document.getElementById('chartSymbol').value;
+    const symbol = selectedPair.split(':')[1]; // Enlever le préfixe BINANCE:
+    
+    log(`🔄 Paire sélectionnée pour le backtesting: ${symbol}`, 'INFO');
+    
+    // Arrêter le backtesting en cours si il y en a un
+    if (backtestRunning) {
+        stopBacktest();
+        log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
+    }
+}
+
 // Rendre les fonctions accessibles globalement
 window.startBacktest = startBacktest;
 window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateChartTimeframe = updateChartTimeframe;
+window.updateSelectedPair = updateSelectedPair;
 
 console.log('✅ Backtesting system loaded successfully');
