@@ -642,20 +642,28 @@
             return num.toString();
         }
         
-        // SOLUTION SIMPLE : Utiliser directement la fonction existante du bot
+        // SOLUTION ULTRA-SIMPLE : Utiliser les données déjà récupérées par le bot
         async function updateBacktestPairs() {
             try {
-                // Utiliser la fonction existante getAllAvailablePairs() qui fonctionne déjà
+                // Vérifier que la fonction existe
+                if (typeof window.getAllAvailablePairs !== 'function') {
+                    log('⚠️ Fonction getAllAvailablePairs pas encore disponible', 'WARNING');
+                    return false;
+                }
+                
+                // Les paires sont déjà récupérées par le bot principal !
                 const pairs = await window.getAllAvailablePairs();
                 if (pairs && pairs.length > 0) {
                     backtestVolumeData = pairs.slice(0, 30); // TOP 30
                     lastVolumeUpdate = new Date();
-                    populateChartSelector(); // Fonction simple pour remplir le sélecteur
+                    populateChartSelector();
+                    log(`✅ TOP 30 Volume récupéré: ${backtestVolumeData.length} paires pour backtesting`, 'SUCCESS');
                     return true;
                 }
+                log('⚠️ Aucune paire récupérée', 'WARNING');
                 return false;
             } catch (error) {
-                log(`❌ Erreur récupération paires: ${error.message}`, 'ERROR');
+                log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
                 return false;
             }
         }
@@ -690,10 +698,10 @@
         
         // Fonction d'initialisation SIMPLE
         function initializeChartSelector() {
-            // Essayer de récupérer les vraies données directement
+            // Attendre que le bot principal soit prêt (il récupère déjà les paires)
             setTimeout(() => {
                 updateBacktestPairs();
-            }, 1000); // Délai de 1 seconde
+            }, 3000); // Délai de 3 secondes pour laisser le bot principal se connecter
         }
         
         // Fonction globale pour forcer la mise à jour du TOP 30 Volume
