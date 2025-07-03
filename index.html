@@ -696,35 +696,35 @@
          
          // Utiliser des paires par défaut en cas d'erreur API
          function useDefaultPairs() {
-             if (top30VolumeData.length === 0) {
-                 log('🔄 Utilisation des paires par défaut...', 'INFO');
-                 
-                 const defaultPairs = [
-                     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
-                     'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
-                     'LINKUSDT', 'UNIUSDT', 'LTCUSDT', 'ATOMUSDT', 'ETCUSDT',
-                     'NEARUSDT', 'ALGOUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT',
-                     'ICPUSDT', 'VETUSDT', 'FILUSDT', 'TRXUSDT', 'AAVEUSDT',
-                     'AXSUSDT', 'THETAUSDT', 'GRTUSDT', 'GALAUSDT', 'APEUSDT'
-                 ];
-                 
-                 top30VolumeData = defaultPairs.map((symbol, index) => ({
-                     symbol: symbol,
-                     volume: 1000000000 - (index * 10000000), // Volume fictif décroissant
-                     price: 100,
-                     rank: index + 1
-                 }));
-                 
-                 lastVolumeUpdate = new Date();
-                 updateChartSelector();
-                 
-                 // Mettre à jour l'indicateur d'erreur
-                 const updateIndicator = document.getElementById('lastVolumeUpdate');
-                 if (updateIndicator) {
-                     updateIndicator.textContent = 'Erreur API - Paires par défaut';
-                     updateIndicator.style.color = '#dc3545'; // Rouge pour indiquer une erreur
-                 }
+             log('🔄 Chargement des paires par défaut...', 'INFO');
+             
+             const defaultPairs = [
+                 'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
+                 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
+                 'LINKUSDT', 'UNIUSDT', 'LTCUSDT', 'ATOMUSDT', 'ETCUSDT',
+                 'NEARUSDT', 'ALGOUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT',
+                 'ICPUSDT', 'VETUSDT', 'FILUSDT', 'TRXUSDT', 'AAVEUSDT',
+                 'AXSUSDT', 'THETAUSDT', 'GRTUSDT', 'GALAUSDT', 'APEUSDT'
+             ];
+             
+             top30VolumeData = defaultPairs.map((symbol, index) => ({
+                 symbol: symbol,
+                 volume: 1000000000 - (index * 10000000), // Volume fictif décroissant
+                 price: 100,
+                 rank: index + 1
+             }));
+             
+             lastVolumeUpdate = new Date();
+             updateChartSelector();
+             
+             // Mettre à jour l'indicateur pour indiquer que c'est par défaut
+             const updateIndicator = document.getElementById('lastVolumeUpdate');
+             if (updateIndicator) {
+                 updateIndicator.textContent = 'Paires par défaut - Chargement API...';
+                 updateIndicator.style.color = '#ffc107'; // Jaune pour indiquer que c'est temporaire
              }
+             
+             log('✅ 30 paires par défaut chargées, récupération du volume réel en cours...', 'SUCCESS');
         }
         
         // Mettre à jour le sélecteur avec les données de volume
@@ -773,15 +773,17 @@
                 clearInterval(volumeUpdateInterval);
             }
             
-            // Récupérer immédiatement
-            fetchTop30Volume();
+            // Récupérer les données réelles en arrière-plan
+            setTimeout(() => {
+                fetchTop30Volume();
+            }, 500); // Petit délai pour ne pas bloquer l'interface
             
             // Programmer la mise à jour toutes les heures (3600000 ms)
             volumeUpdateInterval = setInterval(() => {
                 fetchTop30Volume();
             }, 60 * 60 * 1000); // 1 heure
             
-                         log('⏰ Mise à jour automatique du TOP 30 Volume activée (toutes les heures)', 'SUCCESS');
+            log('⏰ Mise à jour automatique du TOP 30 Volume activée (toutes les heures)', 'SUCCESS');
              
              // Démarrer le compteur de temps restant
              startCountdownTimer();
@@ -810,8 +812,13 @@
         
         // Fonction d'initialisation du sélecteur (ancienne version remplacée)
         function initializeChartSelector() {
-            // Démarrer les mises à jour de volume automatiques
-            startVolumeUpdates();
+            // Charger immédiatement les paires par défaut pour éviter l'attente
+            useDefaultPairs();
+            
+            // Puis démarrer les mises à jour de volume automatiques en arrière-plan
+            setTimeout(() => {
+                startVolumeUpdates();
+            }, 2000); // Délai de 2 secondes pour éviter de bloquer l'interface
         }
         
         // Fonction globale pour forcer la mise à jour du TOP 30 Volume
