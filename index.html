@@ -632,6 +632,7 @@
         let top30VolumeData = [];
         let volumeUpdateInterval = null;
         let lastVolumeUpdate = null;
+        let isLoadingVolume = false; // Protection contre les appels multiples
         
         // Fonction utilitaire pour formater les nombres (locale si utils.js pas disponible)
         function formatNumber(num) {
@@ -647,6 +648,14 @@
         
         // Récupérer le TOP 30 Volume depuis Bitget
         async function fetchTop30Volume() {
+            // Protection contre les appels multiples
+            if (isLoadingVolume) {
+                log('⚠️ Récupération déjà en cours, ignoré', 'WARNING');
+                return false;
+            }
+            
+            isLoadingVolume = true;
+            
             try {
                 log('🔄 Récupération du TOP 30 Volume Bitget...', 'INFO');
                 
@@ -680,19 +689,19 @@
                     updateChartSelector();
                     
                     return true;
-                                 } else {
-                     log('❌ Erreur API Bitget pour récupération volumes', 'ERROR');
-                     // Utiliser des paires par défaut en cas d'erreur
-                     useDefaultPairs();
-                     return false;
-                 }
-             } catch (error) {
-                 log(`❌ Erreur récupération TOP 30 Volume: ${error.message}`, 'ERROR');
-                 // Utiliser des paires par défaut en cas d'erreur
-                 useDefaultPairs();
-                 return false;
-             }
-         }
+                } else {
+                    log('❌ Erreur API Bitget pour récupération volumes', 'ERROR');
+                    // Ne pas rappeler useDefaultPairs() pour éviter la boucle
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ Erreur récupération TOP 30 Volume: ${error.message}`, 'ERROR');
+                // Ne pas rappeler useDefaultPairs() pour éviter la boucle
+                return false;
+            } finally {
+                isLoadingVolume = false; // Libérer le verrou
+            }
+        }
          
          // Utiliser des paires par défaut en cas d'erreur API
          function useDefaultPairs() {
@@ -823,6 +832,10 @@
         
         // Fonction globale pour forcer la mise à jour du TOP 30 Volume
         window.updateChartSelector = function() {
+            if (isLoadingVolume) {
+                log('⚠️ Mise à jour déjà en cours...', 'WARNING');
+                return;
+            }
             log('🔄 Mise à jour forcée du TOP 30 Volume...', 'INFO');
             fetchTop30Volume();
         };
