@@ -39,6 +39,7 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
         // Conversion des timeframes pour Binance
         const binanceIntervals = {
             '1m': '1m',
+            '3m': '3m',
             '5m': '5m',
             '15m': '15m',
             '30m': '30m',
@@ -74,7 +75,7 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
                 volume: parseFloat(candle[5])
             }));
             
-            log(`📊 Binance: ${symbol} - ${klines.length} bougies ${interval} récupérées`, 'DEBUG');
+            log(`📊 Binance: ${symbol} - ${klines.length} bougies ${interval} récupérées`, 'INFO');
             return klines;
         } else {
             log(`❌ Erreur API Binance: ${data.msg || 'Réponse invalide'}`, 'ERROR');
@@ -86,105 +87,9 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
     }
 }
 
-// Récupérer les données 1 minute pour le trailing stop loss précis via API Binance
-async function get1MinuteDataForTrailing(symbol, startTime, endTime) {
-    try {
-        // Calculer le nombre de minutes entre les deux timestamps
-        const minutes = Math.ceil((endTime - startTime) / (60 * 1000));
-        
-        // Limiter strictement à 1000 et éviter les requêtes trop importantes
-        let limit = Math.min(1000, minutes);
-        
-        // Pour éviter les requêtes trop fréquentes, limiter à maximum 240 minutes (4h)
-        if (limit > 240) {
-            limit = 240;
-            log(`⚠️ Limitation trailing stop: ${minutes}min demandées, réduit à ${limit}min`, 'WARNING');
-        }
-        
-        // Éviter les requêtes pour des périodes trop courtes
-        if (limit < 1) {
-            return [];
-        }
-        
-        // Utiliser l'API Binance pour récupérer les données 1 minute
-        const klines = await getBinanceKlineData(symbol, limit, '1m');
-        
-        // Filtrer les données dans la plage de temps
-        return klines.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
-    } catch (error) {
-        console.error('Erreur récupération données 1min pour trailing stop:', error);
-        return [];
-    }
-}
+// Fonction supprimée - utilisait des appels API inutiles
 
-// Vérifier le trailing stop loss avec précision 1 minute pour timeframes supérieurs
-async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
-    // Si le timeframe est déjà 1 minute, pas besoin de données supplémentaires
-    if (backtestConfig.timeframe === '1min') {
-        return null;
-    }
-    
-    // Pour les timeframes élevés, simplifier en utilisant seulement les données de la bougie actuelle
-    // Cela évite les requêtes API excessives tout en gardant une précision raisonnable
-    const timeframeMinutes = getTimeframeMinutes(backtestConfig.timeframe);
-    
-    // Pour les timeframes > 1h, utiliser une approche simplifiée sans données 1min
-    if (timeframeMinutes >= 60) {
-        log(`📊 Trailing stop simplifié pour timeframe ${backtestConfig.timeframe} (évite requêtes API excessives)`, 'DEBUG');
-        return null; // Utiliser la logique standard de checkOpenTrades
-    }
-    
-    // Seulement pour les timeframes courts (15m, 30m), récupérer quelques données 1min
-    const symbol = trade.symbol;
-    const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (timeframeMinutes * 60 * 1000);
-    
-    // Limiter à maximum 30 minutes de données 1min pour éviter les erreurs API
-    const maxMinutes = Math.min(30, timeframeMinutes);
-    const limitedEndTime = currentCandle.timestamp + (maxMinutes * 60 * 1000);
-    const actualEndTime = Math.min(endTime, limitedEndTime);
-    
-    const minuteData = await get1MinuteDataForTrailing(symbol, currentCandle.timestamp, actualEndTime);
-    
-    if (minuteData.length === 0) {
-        return null; // Pas de données, utiliser la logique standard
-    }
-    
-    for (const minuteCandle of minuteData) {
-        if (trade.direction === 'LONG') {
-            // Mettre à jour le prix le plus haut
-            if (minuteCandle.high > trade.highestPrice) {
-                trade.highestPrice = minuteCandle.high;
-                trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
-            }
-            
-            // Vérifier si le trailing stop est touché
-            if (minuteCandle.low <= trade.trailingStopPrice) {
-                return {
-                    exitPrice: trade.trailingStopPrice,
-                    exitTime: minuteCandle.timestamp,
-                    reason: 'Trailing Stop Loss (1min precision)'
-                };
-            }
-        } else { // SHORT
-            // Mettre à jour le prix le plus bas
-            if (minuteCandle.low < trade.lowestPrice) {
-                trade.lowestPrice = minuteCandle.low;
-                trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
-            }
-            
-            // Vérifier si le trailing stop est touché
-            if (minuteCandle.high >= trade.trailingStopPrice) {
-                return {
-                    exitPrice: trade.trailingStopPrice,
-                    exitTime: minuteCandle.timestamp,
-                    reason: 'Trailing Stop Loss (1min precision)'
-                };
-            }
-        }
-    }
-    
-    return null;
-}
+// Fonction supprimée - utilisait des appels API inutiles
 
 // Gestion des paramètres de stratégie
 function updateStrategyParams() {
@@ -361,11 +266,18 @@ async function fetchBacktestData(symbol) {
 // Convertir timeframe en minutes
 function getTimeframeMinutes(timeframe) {
     const mapping = {
+        '1m': 1,
+        '3m': 3,
         '5m': 5,
         '15m': 15,
+        '30m': 30,
         '1h': 60,
         '4h': 240,
-        '1d': 1440
+        '6h': 360,
+        '12h': 720,
+        '1d': 1440,
+        '3d': 4320,
+        '1w': 10080
     };
     return mapping[timeframe] || 15;
 }
@@ -764,14 +676,26 @@ async function checkOpenTrades(candle, candleIndex) {
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
             }
-            // Vérifier trailing stop loss
-            else if (candle.low <= trade.trailingStopPrice) {
-                shouldClose = true;
-                exitReason = 'Trailing Stop Loss';
-                exitPrice = trade.trailingStopPrice;
+            // Vérifier trailing stop loss avec précision
+            else {
+                const nextCandle = backtestData[candleIndex + 1];
+                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
                 
-                if (candleIndex < 70) {
-                    log(`🔍 LONG - Stop déclenché: Low=${candle.low.toFixed(4)} <= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                if (precisionResult) {
+                    shouldClose = true;
+                    exitReason = precisionResult.reason;
+                    exitPrice = precisionResult.exitPrice;
+                    exitTime = precisionResult.exitTime;
+                }
+                // Fallback : vérification standard si pas de données précision
+                else if (candle.low <= trade.trailingStopPrice) {
+                    shouldClose = true;
+                    exitReason = 'Trailing Stop Loss';
+                    exitPrice = trade.trailingStopPrice;
+                    
+                    if (candleIndex < 70) {
+                        log(`🔍 LONG - Stop déclenché standard: Low=${candle.low.toFixed(4)} <= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                    }
                 }
             }
             
@@ -1188,6 +1112,118 @@ function toggleTakeProfit() {
         takeProfitInput.style.opacity = '0.5';
         log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
     }
+}
+
+// Mapping des timeframes d'analyse vers les timeframes de précision pour trailing stop
+function getPrecisionTimeframe(analysisTimeframe) {
+    const mapping = {
+        '15m': '3m',   // Analyse 15min → Précision 3min
+        '1h': '5m',    // Analyse 1h → Précision 5min
+        '4h': '15m',   // Analyse 4h → Précision 15min
+        '1d': '1h',    // Analyse 1d → Précision 1h
+        '5m': '1m',    // Analyse 5min → Précision 1min
+        '30m': '5m'    // Analyse 30min → Précision 5min
+    };
+    return mapping[analysisTimeframe] || '1m'; // Par défaut 1min si non trouvé
+}
+
+// Récupérer les données de précision pour le trailing stop
+async function getPrecisionDataForTrailing(symbol, startTime, endTime, analysisTimeframe) {
+    try {
+        const precisionTimeframe = getPrecisionTimeframe(analysisTimeframe);
+        
+        // Calculer le nombre de bougies nécessaires
+        const precisionMinutes = getTimeframeMinutes(precisionTimeframe);
+        const totalMinutes = Math.ceil((endTime - startTime) / (60 * 1000));
+        let limit = Math.ceil(totalMinutes / precisionMinutes);
+        
+        // Limiter à 1000 bougies maximum (limite API Binance)
+        if (limit > 1000) {
+            limit = 1000;
+            log(`⚠️ Limitation précision trailing stop: ${limit} bougies ${precisionTimeframe} (max 1000)`, 'WARNING');
+        }
+        
+        // Éviter les requêtes pour des périodes trop courtes
+        if (limit < 2) {
+            return [];
+        }
+        
+        log(`📊 Récupération ${limit} bougies ${precisionTimeframe} pour précision trailing stop`, 'DEBUG');
+        
+        // Utiliser l'API Binance pour récupérer les données de précision
+        const klines = await getBinanceKlineData(symbol, limit, precisionTimeframe);
+        
+        // Filtrer les données dans la plage de temps
+        return klines.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
+    } catch (error) {
+        log(`❌ Erreur récupération données précision trailing stop: ${error.message}`, 'ERROR');
+        return [];
+    }
+}
+
+// Vérifier le trailing stop loss avec précision selon le timeframe
+async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
+    const analysisTimeframe = backtestConfig.timeframe;
+    const precisionTimeframe = getPrecisionTimeframe(analysisTimeframe);
+    
+    // Si le timeframe d'analyse est déjà le plus précis, pas besoin de données supplémentaires
+    if (analysisTimeframe === precisionTimeframe) {
+        return null;
+    }
+    
+    const symbol = trade.symbol;
+    const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (getTimeframeMinutes(analysisTimeframe) * 60 * 1000);
+    
+    log(`🔍 Vérification précision trailing stop: ${analysisTimeframe} → ${precisionTimeframe}`, 'DEBUG');
+    
+    const precisionData = await getPrecisionDataForTrailing(symbol, currentCandle.timestamp, endTime, analysisTimeframe);
+    
+    if (precisionData.length === 0) {
+        log(`⚠️ Pas de données précision, utilisation logique standard`, 'WARNING');
+        return null; // Pas de données, utiliser la logique standard
+    }
+    
+    log(`📊 Analyse ${precisionData.length} bougies ${precisionTimeframe} pour trailing stop`, 'DEBUG');
+    
+    for (const precisionCandle of precisionData) {
+        if (trade.direction === 'LONG') {
+            // Mettre à jour le prix le plus haut
+            if (precisionCandle.high > trade.highestPrice) {
+                trade.highestPrice = precisionCandle.high;
+                trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+                log(`🔍 LONG - Nouveau high précision: ${trade.highestPrice.toFixed(4)}, Stop: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+            }
+            
+            // Vérifier si le trailing stop est touché
+            if (precisionCandle.low <= trade.trailingStopPrice) {
+                log(`🎯 LONG - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.low.toFixed(4)} <= ${trade.trailingStopPrice.toFixed(4)}`, 'SUCCESS');
+                return {
+                    exitPrice: trade.trailingStopPrice,
+                    exitTime: precisionCandle.timestamp,
+                    reason: `Trailing Stop Loss (${precisionTimeframe} precision)`
+                };
+            }
+        } else { // SHORT
+            // Mettre à jour le prix le plus bas
+            if (precisionCandle.low < trade.lowestPrice) {
+                trade.lowestPrice = precisionCandle.low;
+                trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
+                log(`🔍 SHORT - Nouveau low précision: ${trade.lowestPrice.toFixed(4)}, Stop: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+            }
+            
+            // Vérifier si le trailing stop est touché
+            if (precisionCandle.high >= trade.trailingStopPrice) {
+                log(`🎯 SHORT - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.high.toFixed(4)} >= ${trade.trailingStopPrice.toFixed(4)}`, 'SUCCESS');
+                return {
+                    exitPrice: trade.trailingStopPrice,
+                    exitTime: precisionCandle.timestamp,
+                    reason: `Trailing Stop Loss (${precisionTimeframe} precision)`
+                };
+            }
+        }
+    }
+    
+    return null;
 }
 
 // Rendre les fonctions accessibles globalement
