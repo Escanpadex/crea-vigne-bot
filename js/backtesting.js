@@ -6,7 +6,20 @@
  * 3. ✅ RÉDUCTION DES APPELS API : Désactivation de la précision trailing stop
  * 4. ✅ AMÉLIORATION DES SIGNAUX BUY : Seuil de significativité pour éviter les faux signaux
  * 
- * Stratégie optimisée : BUY uniquement → LONG → Fermeture par trailing stop loss
+ * 🧮 NOUVELLE INTÉGRATION - MACD AVANCÉ :
+ * 
+ * 5. ✅ CALCUL MACD AVANCÉ : Intégration du système de trading en temps réel
+ *    - Analyse de tendance de l'histogramme sur 3 périodes (IMPROVING/DETERIORATING/NEUTRAL)
+ *    - Détection de croisements haussiers stricts avec momentum positif
+ *    - Histogramme calculé en temps réel avec analyse de force
+ *    - Diagnostic complet des performances MACD
+ * 
+ * 6. ✅ SIGNAUX BUY OPTIMISÉS :
+ *    - Signal BUY FORT : Croisement strict + Histogram>0 + Tendance IMPROVING
+ *    - Signal BUY Standard : MACD>Signal + Histogram>0 + Tendance IMPROVING
+ *    - Élimination des signaux faibles (momentum insuffisant)
+ * 
+ * Stratégie optimisée : MACD Avancé → BUY strict → LONG → Fermeture par trailing stop
  */
 
 // Backtesting System for Trading Strategies
@@ -350,57 +363,130 @@ async function runBacktestStrategy() {
     log(`✅ Backtesting terminé avec succès`, 'SUCCESS');
 }
 
-// Calculer MACD (fonction intégrée pour le backtesting)
+// 🧮 Calculer MACD avancé (fonction intégrée pour le backtesting)
+// Intégration du calcul MACD avancé avec analyse de tendance et crossover strict
 function calculateMACDForBacktest(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-    if (prices.length < slowPeriod + signalPeriod) {
+    const minRequired = slowPeriod + signalPeriod + 10;
+    if (prices.length < minRequired) {
+        console.warn(`⚠️ MACD Backtest: Données insuffisantes - Reçu: ${prices.length}, Requis: ${minRequired} (${fastPeriod},${slowPeriod},${signalPeriod})`);
         return {
             macdArray: new Array(prices.length).fill(null),
-            signalArray: new Array(prices.length).fill(null)
+            signalArray: new Array(prices.length).fill(null),
+            histogramArray: new Array(prices.length).fill(null),
+            crossoverArray: new Array(prices.length).fill(false),
+            trendArray: new Array(prices.length).fill('NEUTRAL')
         };
     }
     
-    // Calculer les EMA
-    const emaFast = calculateEMA(prices, fastPeriod);
-    const emaSlow = calculateEMA(prices, slowPeriod);
+    // Fonction EMA interne optimisée
+    function calculateEMA(data, period) {
+        const k = 2 / (period + 1);
+        const emaArray = new Array(data.length).fill(null);
+        
+        let sum = 0;
+        for (let i = 0; i < period; i++) {
+            sum += data[i];
+        }
+        emaArray[period - 1] = sum / period;
+        
+        for (let i = period; i < data.length; i++) {
+            emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
+        }
+        
+        return emaArray;
+    }
+    
+    // Calculer les EMA rapide et lente
+    const emaFastArray = calculateEMA(prices, fastPeriod);
+    const emaSlowArray = calculateEMA(prices, slowPeriod);
     
     // Calculer la ligne MACD
-    const macdArray = new Array(prices.length).fill(null);
-    for (let i = slowPeriod - 1; i < prices.length; i++) {
-        if (emaFast[i] !== null && emaSlow[i] !== null) {
-            macdArray[i] = emaFast[i] - emaSlow[i];
+    const macdArray = prices.map((price, idx) => {
+        const emaFast = emaFastArray[idx];
+        const emaSlow = emaSlowArray[idx];
+        if (emaFast === null || emaSlow === null) return null;
+        return emaFast - emaSlow;
+    });
+    
+    // Collecter les valeurs MACD valides pour calculer la ligne de signal
+    const validMacdValues = [];
+    let macdStartIndex = -1;
+    
+    for (let i = 0; i < macdArray.length; i++) {
+        if (macdArray[i] !== null) {
+            if (macdStartIndex === -1) macdStartIndex = i;
+            validMacdValues.push(macdArray[i]);
         }
     }
     
     // Calculer la ligne de signal (EMA du MACD)
-    const signalArray = new Array(prices.length).fill(null);
-    const macdValidValues = [];
+    let signalArray = new Array(prices.length).fill(null);
     
-    // Collecter les valeurs MACD valides
-    for (let i = slowPeriod - 1; i < prices.length; i++) {
-        if (macdArray[i] !== null) {
-            macdValidValues.push(macdArray[i]);
-        }
-    }
-    
-    // Calculer l'EMA de la ligne MACD
-    if (macdValidValues.length >= signalPeriod) {
-        const signalEMA = calculateEMA(macdValidValues, signalPeriod);
+    if (validMacdValues.length >= signalPeriod) {
+        const signalEMA = calculateEMA(validMacdValues, signalPeriod);
         
         // Mapper les valeurs de signal aux indices corrects
-        let signalIndex = 0;
-        for (let i = slowPeriod - 1; i < prices.length; i++) {
-            if (macdArray[i] !== null) {
-                if (signalIndex < signalEMA.length && signalEMA[signalIndex] !== null) {
-                    signalArray[i] = signalEMA[signalIndex];
-                }
-                signalIndex++;
+        for (let i = 0; i < signalEMA.length; i++) {
+            if (signalEMA[i] !== null && macdStartIndex + i < prices.length) {
+                signalArray[macdStartIndex + i] = signalEMA[i];
             }
         }
     }
     
+    // Calculer l'histogramme
+    const histogramArray = macdArray.map((macd, i) => {
+        const signal = signalArray[i];
+        return (macd !== null && signal !== null) ? macd - signal : null;
+    });
+    
+    // 🎯 ANALYSE AVANCÉE : Détecter les croisements stricts et tendances
+    const crossoverArray = new Array(prices.length).fill(false);
+    const trendArray = new Array(prices.length).fill('NEUTRAL');
+    
+    for (let i = 2; i < prices.length; i++) {
+        const currentMacd = macdArray[i];
+        const currentSignal = signalArray[i];
+        const prevMacd = macdArray[i - 1];
+        const prevSignal = signalArray[i - 1];
+        const currentHistogram = histogramArray[i];
+        const prevHistogram = histogramArray[i - 1];
+        const prevHistogram2 = histogramArray[i - 2];
+        
+        if (currentMacd !== null && currentSignal !== null && 
+            prevMacd !== null && prevSignal !== null) {
+            
+            // 🔥 Détection de croisement haussier strict
+            const wasBelow = prevMacd <= prevSignal;
+            const nowAbove = currentMacd > currentSignal;
+            const histogramImproving = prevHistogram !== null && currentHistogram > prevHistogram;
+            
+            crossoverArray[i] = wasBelow && nowAbove && histogramImproving;
+            
+            // 📈 Analyse de tendance de l'histogramme sur 3 périodes
+            if (currentHistogram !== null && prevHistogram !== null && prevHistogram2 !== null) {
+                const trend1 = currentHistogram > prevHistogram;
+                const trend2 = prevHistogram > prevHistogram2;
+                
+                if (trend1 && trend2) {
+                    trendArray[i] = 'IMPROVING';      // Force haussière
+                } else if (!trend1 && !trend2) {
+                    trendArray[i] = 'DETERIORATING';  // Force baissière
+                } else {
+                    trendArray[i] = 'NEUTRAL';        // Tendance mixte
+                }
+            }
+        }
+    }
+    
+    log(`🧮 MACD Avancé calculé: ${macdArray.filter(v => v !== null).length} valeurs MACD, ${signalArray.filter(v => v !== null).length} valeurs Signal`, 'DEBUG');
+    log(`🎯 Croisements détectés: ${crossoverArray.filter(v => v === true).length}`, 'DEBUG');
+    
     return {
         macdArray: macdArray,
-        signalArray: signalArray
+        signalArray: signalArray,
+        histogramArray: histogramArray,
+        crossoverArray: crossoverArray,
+        trendArray: trendArray
     };
 }
 
@@ -411,15 +497,55 @@ function calculateMACDIndicators() {
     
     log(`📊 MACD calculé: ${macdData.macdArray.filter(v => v !== null).length} valeurs valides`, 'DEBUG');
     
+    // 🧮 DIAGNOSTIC MACD AVANCÉ
+    diagnoseMACDAdvanced(macdData);
+    
     return {
         type: 'macd',
         macd: macdData.macdArray,
         signal: macdData.signalArray,
-        histogram: macdData.macdArray.map((macd, i) => {
-            const signal = macdData.signalArray[i];
-            return (macd !== null && signal !== null) ? macd - signal : null;
-        })
+        histogram: macdData.histogramArray,
+        crossover: macdData.crossoverArray,
+        trend: macdData.trendArray
     };
+}
+
+// 🔍 Fonction de diagnostic pour le MACD avancé
+function diagnoseMACDAdvanced(macdData) {
+    const totalPoints = macdData.macdArray.length;
+    const validPoints = macdData.macdArray.filter(v => v !== null).length;
+    const crossovers = macdData.crossoverArray.filter(v => v === true).length;
+    
+    // Analyser les tendances
+    const trendStats = {
+        IMPROVING: macdData.trendArray.filter(t => t === 'IMPROVING').length,
+        DETERIORATING: macdData.trendArray.filter(t => t === 'DETERIORATING').length,
+        NEUTRAL: macdData.trendArray.filter(t => t === 'NEUTRAL').length
+    };
+    
+    // Analyser les histogrammes
+    const histogramStats = {
+        positive: macdData.histogramArray.filter(h => h !== null && h > 0).length,
+        negative: macdData.histogramArray.filter(h => h !== null && h < 0).length,
+        neutral: macdData.histogramArray.filter(h => h !== null && h === 0).length
+    };
+    
+    log(`🧮 === DIAGNOSTIC MACD AVANCÉ ===`, 'INFO');
+    log(`📊 Points de données: ${validPoints}/${totalPoints} (${((validPoints/totalPoints)*100).toFixed(1)}%)`, 'INFO');
+    log(`🔥 Croisements haussiers stricts: ${crossovers}`, 'SUCCESS');
+    log(`📈 Tendances: Améliorante=${trendStats.IMPROVING}, Détériorante=${trendStats.DETERIORATING}, Neutre=${trendStats.NEUTRAL}`, 'INFO');
+    log(`📊 Histogramme: Positif=${histogramStats.positive}, Négatif=${histogramStats.negative}, Neutre=${histogramStats.neutral}`, 'INFO');
+    
+    // Calculer le pourcentage de signaux potentiels
+    const potentialBuySignals = macdData.macdArray.filter((macd, i) => {
+        const signal = macdData.signalArray[i];
+        const histogram = macdData.histogramArray[i];
+        const trend = macdData.trendArray[i];
+        return macd !== null && signal !== null && macd > signal && histogram > 0 && trend === 'IMPROVING';
+    }).length;
+    
+    log(`🎯 Signaux BUY potentiels (MACD>Signal + Histogram>0 + Tendance améliorante): ${potentialBuySignals}`, 'SUCCESS');
+    log(`🧮 === FIN DIAGNOSTIC MACD ===`, 'INFO');
 }
 
 // Calculer les indicateurs RSI
@@ -524,33 +650,46 @@ function getEntrySignal(indicators, index) {
     }
 }
 
-// Signal MACD
+// 🎯 Signal MACD Avancé avec analyse de tendance
 function getMACDSignal(indicators, index) {
     const macd = indicators.macd[index];
     const signal = indicators.signal[index];
+    const histogram = indicators.histogram[index];
+    const crossover = indicators.crossover[index];
+    const trend = indicators.trend[index];
+    
+    // Données précédentes pour analyse
     const prevMacd = indicators.macd[index - 1];
     const prevSignal = indicators.signal[index - 1];
+    const prevHistogram = indicators.histogram[index - 1];
     
     // Log de debug pour les premières bougies
     if (index < 55 && index % 10 === 0) {
-        log(`🔍 MACD Debug [${index}]: MACD=${macd?.toFixed(6)}, Signal=${signal?.toFixed(6)}, Prev MACD=${prevMacd?.toFixed(6)}, Prev Signal=${prevSignal?.toFixed(6)}`, 'DEBUG');
+        log(`🔍 MACD Avancé Debug [${index}]: MACD=${macd?.toFixed(6)}, Signal=${signal?.toFixed(6)}, Histogram=${histogram?.toFixed(6)}, Crossover=${crossover}, Trend=${trend}`, 'DEBUG');
     }
     
-    if (macd === null || signal === null || prevMacd === null || prevSignal === null) {
+    if (macd === null || signal === null || histogram === null) {
         return 'HOLD';
     }
     
-    // CORRECTION 4 : Améliorer la détection des signaux BUY avec seuils de significativité
-    const difference = macd - signal;
-    const prevDifference = prevMacd - prevSignal;
-    
-    // Seuil minimum pour considérer un signal significatif (éviter les micro-variations)
-    const minSignificantDifference = 0.00001;
-    
-    // Croisement haussier avec seuil de significativité
-    if (prevDifference <= 0 && difference > minSignificantDifference) {
-        log(`🟢 Signal BUY détecté [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)} (diff: ${difference.toFixed(6)})`, 'SUCCESS');
+    // 🔥 SIGNAL BUY : Croisement haussier strict avec momentum positif
+    if (crossover && histogram > 0 && trend === 'IMPROVING') {
+        log(`🟢 Signal BUY FORT détecté [${index}]: Croisement strict + Histogram=${histogram.toFixed(6)} + Tendance=${trend}`, 'SUCCESS');
         return 'BUY';
+    }
+    
+    // 📈 SIGNAL BUY : MACD au-dessus avec momentum améliorant
+    if (macd > signal && histogram > 0 && trend === 'IMPROVING') {
+        log(`🟢 Signal BUY détecté [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)}, Histogram=${histogram.toFixed(6)}, Tendance=${trend}`, 'SUCCESS');
+        return 'BUY';
+    }
+    
+    // 📊 Conditions haussières mais momentum faible - pas de signal d'achat
+    if (macd > signal && histogram > 0) {
+        if (index < 55 && index % 10 === 0) {
+            log(`📊 MACD haussier faible [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)}, mais Tendance=${trend}`, 'DEBUG');
+        }
+        return 'HOLD'; // Attendre un momentum plus fort
     }
     
     // CORRECTION 2 : Éliminer complètement les signaux SELL
