@@ -642,26 +642,47 @@
             return num.toString();
         }
         
-        // SOLUTION ULTRA-SIMPLE : Utiliser les données déjà récupérées par le bot
-        async function updateBacktestPairs() {
+        // SOLUTION FINALE : Pas d'appel API supplémentaire - Utiliser des données par défaut
+        function updateBacktestPairs() {
             try {
-                // Vérifier que la fonction existe
-                if (typeof window.getAllAvailablePairs !== 'function') {
-                    log('⚠️ Fonction getAllAvailablePairs pas encore disponible', 'WARNING');
-                    return false;
-                }
+                // Utiliser des paires par défaut pour le backtesting (TOP 30)
+                backtestVolumeData = [
+                    {symbol: 'BTCUSDT', volume: 1000000000, price: 50000},
+                    {symbol: 'ETHUSDT', volume: 800000000, price: 3000},
+                    {symbol: 'BNBUSDT', volume: 600000000, price: 300},
+                    {symbol: 'SOLUSDT', volume: 400000000, price: 100},
+                    {symbol: 'ADAUSDT', volume: 300000000, price: 0.5},
+                    {symbol: 'XRPUSDT', volume: 250000000, price: 0.6},
+                    {symbol: 'DOGEUSDT', volume: 200000000, price: 0.08},
+                    {symbol: 'AVAXUSDT', volume: 180000000, price: 25},
+                    {symbol: 'DOTUSDT', volume: 160000000, price: 7},
+                    {symbol: 'MATICUSDT', volume: 140000000, price: 1.2},
+                    {symbol: 'LINKUSDT', volume: 130000000, price: 15},
+                    {symbol: 'UNIUSDT', volume: 120000000, price: 8},
+                    {symbol: 'LTCUSDT', volume: 110000000, price: 80},
+                    {symbol: 'ATOMUSDT', volume: 100000000, price: 12},
+                    {symbol: 'ETCUSDT', volume: 95000000, price: 25},
+                    {symbol: 'NEARUSDT', volume: 90000000, price: 3},
+                    {symbol: 'ALGOUSDT', volume: 85000000, price: 0.3},
+                    {symbol: 'FTMUSDT', volume: 80000000, price: 0.4},
+                    {symbol: 'SANDUSDT', volume: 75000000, price: 0.5},
+                    {symbol: 'MANAUSDT', volume: 70000000, price: 0.6},
+                    {symbol: 'ICPUSDT', volume: 65000000, price: 10},
+                    {symbol: 'VETUSDT', volume: 60000000, price: 0.03},
+                    {symbol: 'FILUSDT', volume: 55000000, price: 6},
+                    {symbol: 'TRXUSDT', volume: 50000000, price: 0.1},
+                    {symbol: 'AAVEUSDT', volume: 45000000, price: 100},
+                    {symbol: 'AXSUSDT', volume: 40000000, price: 8},
+                    {symbol: 'THETAUSDT', volume: 35000000, price: 1.5},
+                    {symbol: 'GRTUSDT', volume: 30000000, price: 0.2},
+                    {symbol: 'GALAUSDT', volume: 25000000, price: 0.05},
+                    {symbol: 'APEUSDT', volume: 20000000, price: 2}
+                ];
                 
-                // Les paires sont déjà récupérées par le bot principal !
-                const pairs = await window.getAllAvailablePairs();
-                if (pairs && pairs.length > 0) {
-                    backtestVolumeData = pairs.slice(0, 30); // TOP 30
-                    lastVolumeUpdate = new Date();
-                    populateChartSelector();
-                    log(`✅ TOP 30 Volume récupéré: ${backtestVolumeData.length} paires pour backtesting`, 'SUCCESS');
-                    return true;
-                }
-                log('⚠️ Aucune paire récupérée', 'WARNING');
-                return false;
+                lastVolumeUpdate = new Date();
+                populateChartSelector();
+                log(`✅ TOP 30 paires par défaut chargées pour backtesting`, 'SUCCESS');
+                return true;
             } catch (error) {
                 log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
                 return false;
@@ -698,10 +719,10 @@
         
         // Fonction d'initialisation SIMPLE
         function initializeChartSelector() {
-            // Attendre que le bot principal soit prêt (il récupère déjà les paires)
+            // Plus besoin d'attendre l'API, on utilise des données par défaut
             setTimeout(() => {
                 updateBacktestPairs();
-            }, 3000); // Délai de 3 secondes pour laisser le bot principal se connecter
+            }, 500); // Délai de 0.5 seconde seulement
         }
         
         // Fonction globale pour forcer la mise à jour du TOP 30 Volume
