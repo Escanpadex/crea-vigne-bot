@@ -235,11 +235,14 @@
             
             <!-- Sélection de la Paire -->
             <div class="form-group" style="margin-bottom: 20px;">
-                <label id="chartSelectorLabel">Sélectionner une paire pour le backtesting:</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label id="chartSelectorLabel">Sélectionner une paire pour le backtesting:</label>
+                    <button onclick="window.updateChartSelector()" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;">🔄 Actualiser</button>
+                </div>
                 <select id="chartSymbol" onchange="updateSelectedPair()">
                     <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
                 </select>
-                <small>⚡ Paires classées par volume 24h - Capital fixe: 1000 USDT</small>
+                <small>⚡ TOP 30 Volume Bitget (temps réel) - Mise à jour: <span id="lastVolumeUpdate">En cours...</span> - Capital fixe: 1000 USDT</small>
             </div>
             
             <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -338,8 +341,12 @@
                     
                     <div class="form-group">
                         <label>Take Profit (%):</label>
-                        <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
-                        <small>Objectif de profit en % avant fermeture automatique</small>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit()">
+                            <label for="enableTakeProfit" style="margin: 0;">Activer</label>
+                            <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
+                        </div>
+                        <small>Objectif de profit en % avant fermeture automatique. Décochez pour utiliser uniquement le trailing stop loss.</small>
                     </div>
                 </div>
             </div>
@@ -621,26 +628,213 @@
             }, 1000);
         });
         
-        // Fonction d'initialisation du sélecteur
-        function initializeChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            
-            // Utiliser des valeurs par défaut (ancien système TOP 30 désactivé)
-            chartSelect.innerHTML = `
-                <option value="BINANCE:BTCUSDT">1. Bitcoin (BTC/USDT)</option>
-                <option value="BINANCE:ETHUSDT">2. Ethereum (ETH/USDT)</option>
-                <option value="BINANCE:BNBUSDT">3. Binance Coin (BNB/USDT)</option>
-                <option value="BINANCE:ADAUSDT">4. Cardano (ADA/USDT)</option>
-                <option value="BINANCE:SOLUSDT">5. Solana (SOL/USDT)</option>
-            `;
-            log('📊 Sélecteur initialisé avec paires par défaut (TOP 30 désactivé)', 'INFO');
+        // Variables pour le TOP 30 Volume Bitget
+        let top30VolumeData = [];
+        let volumeUpdateInterval = null;
+        let lastVolumeUpdate = null;
+        
+        // Fonction utilitaire pour formater les nombres (locale si utils.js pas disponible)
+        function formatNumber(num) {
+            if (typeof window.formatNumber === 'function') {
+                return window.formatNumber(num);
+            }
+            // Fallback local
+            if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toString();
         }
         
-        // Fonction globale DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
+        // Récupérer le TOP 30 Volume depuis Bitget
+        async function fetchTop30Volume() {
+            try {
+                log('🔄 Récupération du TOP 30 Volume Bitget...', 'INFO');
+                
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+                const data = await response.json();
+                
+                if (data.code === '00000' && data.data) {
+                    const validPairs = data.data
+                        .filter(pair => {
+                            const volume = parseFloat(pair.usdtVolume || 0);
+                            return volume > 1000000 && pair.symbol.endsWith('USDT'); // Volume minimum 1M
+                        })
+                        .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
+                        .slice(0, 30); // TOP 30
+                    
+                    top30VolumeData = validPairs.map((pair, index) => ({
+                        symbol: pair.symbol,
+                        volume: parseFloat(pair.usdtVolume),
+                        price: parseFloat(pair.lastPr),
+                        rank: index + 1
+                    }));
+                    
+                    lastVolumeUpdate = new Date();
+                    
+                    log(`✅ TOP 30 Volume récupéré: ${top30VolumeData.length} paires`, 'SUCCESS');
+                    log(`🥇 #1: ${top30VolumeData[0].symbol} - ${formatNumber(top30VolumeData[0].volume)} vol`, 'INFO');
+                    log(`🥈 #2: ${top30VolumeData[1].symbol} - ${formatNumber(top30VolumeData[1].volume)} vol`, 'INFO');
+                    log(`🥉 #3: ${top30VolumeData[2].symbol} - ${formatNumber(top30VolumeData[2].volume)} vol`, 'INFO');
+                    
+                    // Mettre à jour le sélecteur
+                    updateChartSelector();
+                    
+                    return true;
+                                 } else {
+                     log('❌ Erreur API Bitget pour récupération volumes', 'ERROR');
+                     // Utiliser des paires par défaut en cas d'erreur
+                     useDefaultPairs();
+                     return false;
+                 }
+             } catch (error) {
+                 log(`❌ Erreur récupération TOP 30 Volume: ${error.message}`, 'ERROR');
+                 // Utiliser des paires par défaut en cas d'erreur
+                 useDefaultPairs();
+                 return false;
+             }
+         }
+         
+         // Utiliser des paires par défaut en cas d'erreur API
+         function useDefaultPairs() {
+             if (top30VolumeData.length === 0) {
+                 log('🔄 Utilisation des paires par défaut...', 'INFO');
+                 
+                 const defaultPairs = [
+                     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
+                     'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
+                     'LINKUSDT', 'UNIUSDT', 'LTCUSDT', 'ATOMUSDT', 'ETCUSDT',
+                     'NEARUSDT', 'ALGOUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT',
+                     'ICPUSDT', 'VETUSDT', 'FILUSDT', 'TRXUSDT', 'AAVEUSDT',
+                     'AXSUSDT', 'THETAUSDT', 'GRTUSDT', 'GALAUSDT', 'APEUSDT'
+                 ];
+                 
+                 top30VolumeData = defaultPairs.map((symbol, index) => ({
+                     symbol: symbol,
+                     volume: 1000000000 - (index * 10000000), // Volume fictif décroissant
+                     price: 100,
+                     rank: index + 1
+                 }));
+                 
+                 lastVolumeUpdate = new Date();
+                 updateChartSelector();
+                 
+                 // Mettre à jour l'indicateur d'erreur
+                 const updateIndicator = document.getElementById('lastVolumeUpdate');
+                 if (updateIndicator) {
+                     updateIndicator.textContent = 'Erreur API - Paires par défaut';
+                     updateIndicator.style.color = '#dc3545'; // Rouge pour indiquer une erreur
+                 }
+             }
+        }
+        
+        // Mettre à jour le sélecteur avec les données de volume
+        function updateChartSelector() {
+            const chartSelect = document.getElementById('chartSymbol');
+            const currentSelection = chartSelect.value;
+            
+            if (top30VolumeData.length === 0) {
+                // Fallback si pas de données
+                chartSelect.innerHTML = `
+                    <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
+                `;
+                return;
+            }
+            
+            let html = '';
+            top30VolumeData.forEach((pair, index) => {
+                const volumeFormatted = formatNumber(pair.volume);
+                const priceFormatted = pair.price.toFixed(4);
+                html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
+            });
+            
+            chartSelect.innerHTML = html;
+            
+            // Restaurer la sélection précédente si elle existe encore
+            if (currentSelection && [...chartSelect.options].some(opt => opt.value === currentSelection)) {
+                chartSelect.value = currentSelection;
+            }
+            
+                         const updateTime = lastVolumeUpdate ? lastVolumeUpdate.toLocaleTimeString() : 'Jamais';
+             
+             // Mettre à jour l'indicateur visuel
+             const updateIndicator = document.getElementById('lastVolumeUpdate');
+             if (updateIndicator) {
+                 updateIndicator.textContent = updateTime;
+                 updateIndicator.style.color = '#28a745'; // Vert pour indiquer une mise à jour récente
+             }
+             
+             log(`📊 Sélecteur mis à jour avec TOP 30 Volume Bitget (${updateTime})`, 'SUCCESS');
+        }
+        
+        // Démarrer la mise à jour automatique du volume
+        function startVolumeUpdates() {
+            // Arrêter l'ancien intervalle s'il existe
+            if (volumeUpdateInterval) {
+                clearInterval(volumeUpdateInterval);
+            }
+            
+            // Récupérer immédiatement
+            fetchTop30Volume();
+            
+            // Programmer la mise à jour toutes les heures (3600000 ms)
+            volumeUpdateInterval = setInterval(() => {
+                fetchTop30Volume();
+            }, 60 * 60 * 1000); // 1 heure
+            
+                         log('⏰ Mise à jour automatique du TOP 30 Volume activée (toutes les heures)', 'SUCCESS');
+             
+             // Démarrer le compteur de temps restant
+             startCountdownTimer();
+         }
+         
+         // Afficher le temps restant jusqu'à la prochaine mise à jour
+         function startCountdownTimer() {
+             setInterval(() => {
+                 if (lastVolumeUpdate) {
+                     const now = new Date();
+                     const nextUpdate = new Date(lastVolumeUpdate.getTime() + 60 * 60 * 1000); // +1 heure
+                     const timeRemaining = nextUpdate - now;
+                     
+                     if (timeRemaining > 0) {
+                         const minutes = Math.floor(timeRemaining / (1000 * 60));
+                         const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+                         
+                         const updateIndicator = document.getElementById('lastVolumeUpdate');
+                         if (updateIndicator && updateIndicator.style.color !== '#dc3545') { // Pas en cas d'erreur
+                             updateIndicator.textContent = `${lastVolumeUpdate.toLocaleTimeString()} (prochaine dans ${minutes}:${seconds.toString().padStart(2, '0')})`;
+                         }
+                     }
+                 }
+             }, 1000); // Mise à jour chaque seconde
+         }
+        
+        // Fonction d'initialisation du sélecteur (ancienne version remplacée)
+        function initializeChartSelector() {
+            // Démarrer les mises à jour de volume automatiques
+            startVolumeUpdates();
+        }
+        
+        // Fonction globale pour forcer la mise à jour du TOP 30 Volume
         window.updateChartSelector = function() {
-            log('ℹ️ window.updateChartSelector() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
-            return;
+            log('🔄 Mise à jour forcée du TOP 30 Volume...', 'INFO');
+            fetchTop30Volume();
         };
+        
+        // Fonction pour activer/désactiver le Take Profit
+        function toggleTakeProfit() {
+            const enableCheckbox = document.getElementById('enableTakeProfit');
+            const takeProfitInput = document.getElementById('backtestTakeProfit');
+            
+            if (enableCheckbox.checked) {
+                takeProfitInput.disabled = false;
+                takeProfitInput.style.opacity = '1';
+                log('✅ Take Profit activé', 'INFO');
+            } else {
+                takeProfitInput.disabled = true;
+                takeProfitInput.style.opacity = '0.5';
+                log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
+            }
+        }
     </script>
 </body>
 </html> 
