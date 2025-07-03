@@ -546,12 +546,31 @@
         async function loadBacktestPairs() {
             try {
                 log('🔄 Récupération directe des paires depuis Bitget...', 'INFO');
+                log('🔍 DEBUG: Début de la fonction loadBacktestPairs', 'DEBUG');
+                
+                // Vérifier que API_BASE existe
+                log(`🔍 DEBUG: API_BASE = ${typeof API_BASE !== 'undefined' ? API_BASE : 'UNDEFINED'}`, 'DEBUG');
+                
+                if (typeof API_BASE === 'undefined') {
+                    log('❌ DEBUG: API_BASE non défini!', 'ERROR');
+                    return;
+                }
+                
+                const url = `${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`;
+                log(`🔍 DEBUG: URL = ${url}`, 'DEBUG');
                 
                 // Appel direct à l'API Bitget sans passer par getAllAvailablePairs
-                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+                log('🔍 DEBUG: Avant fetch...', 'DEBUG');
+                const response = await fetch(url);
+                log('🔍 DEBUG: Après fetch, avant response.json()...', 'DEBUG');
+                
                 const data = await response.json();
+                log('🔍 DEBUG: Après response.json(), data.code =', data.code, 'DEBUG');
                 
                 if (data.code === '00000' && data.data) {
+                    log(`🔍 DEBUG: ${data.data.length} paires brutes récupérées`, 'DEBUG');
+                    
+                    log('🔍 DEBUG: Début du filtrage...', 'DEBUG');
                     const allPairs = data.data
                         .filter(pair => {
                             const volume = parseFloat(pair.usdtVolume || 0);
@@ -564,35 +583,63 @@
                         }))
                         .sort((a, b) => b.volume - a.volume);
                     
+                    log(`🔍 DEBUG: ${allPairs.length} paires après filtrage`, 'DEBUG');
+                    
                     backtestPairs = allPairs.slice(0, 30); // TOP 30
+                    log(`🔍 DEBUG: TOP 30 sélectionné, avant fillChartSelector()`, 'DEBUG');
+                    
                     fillChartSelector();
+                    log(`🔍 DEBUG: Après fillChartSelector()`, 'DEBUG');
+                    
                     log(`✅ ${backtestPairs.length} paires chargées pour backtesting`, 'SUCCESS');
                 } else {
-                    log('❌ Erreur API Bitget pour backtesting', 'ERROR');
+                    log(`❌ Erreur API Bitget pour backtesting: code=${data.code}`, 'ERROR');
                 }
             } catch (error) {
                 log(`❌ Erreur récupération paires backtesting: ${error.message}`, 'ERROR');
+                log(`🔍 DEBUG: Stack trace: ${error.stack}`, 'DEBUG');
             }
         }
         
         // Remplir le sélecteur avec les paires
         function fillChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            if (!chartSelect || backtestPairs.length === 0) return;
-            
-            let html = '';
-            backtestPairs.forEach((pair, index) => {
-                const volumeFormatted = formatNumber(pair.volume);
-                html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
-            });
-            
-            chartSelect.innerHTML = html;
-            
-            // Mettre à jour l'indicateur
-            const updateIndicator = document.getElementById('lastVolumeUpdate');
-            if (updateIndicator) {
-                updateIndicator.textContent = new Date().toLocaleTimeString();
-                updateIndicator.style.color = '#28a745';
+            try {
+                log('🔍 DEBUG: Début de fillChartSelector()', 'DEBUG');
+                
+                const chartSelect = document.getElementById('chartSymbol');
+                log(`🔍 DEBUG: chartSelect trouvé: ${!!chartSelect}`, 'DEBUG');
+                log(`🔍 DEBUG: backtestPairs.length: ${backtestPairs.length}`, 'DEBUG');
+                
+                if (!chartSelect || backtestPairs.length === 0) {
+                    log('🔍 DEBUG: Sortie précoce de fillChartSelector', 'DEBUG');
+                    return;
+                }
+                
+                log('🔍 DEBUG: Début de la génération HTML...', 'DEBUG');
+                let html = '';
+                backtestPairs.forEach((pair, index) => {
+                    const volumeFormatted = formatNumber(pair.volume);
+                    html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
+                });
+                
+                log(`🔍 DEBUG: HTML généré, longueur: ${html.length}`, 'DEBUG');
+                log('🔍 DEBUG: Avant chartSelect.innerHTML...', 'DEBUG');
+                
+                chartSelect.innerHTML = html;
+                
+                log('🔍 DEBUG: Après chartSelect.innerHTML...', 'DEBUG');
+                
+                // Mettre à jour l'indicateur
+                const updateIndicator = document.getElementById('lastVolumeUpdate');
+                if (updateIndicator) {
+                    updateIndicator.textContent = new Date().toLocaleTimeString();
+                    updateIndicator.style.color = '#28a745';
+                }
+                
+                log('🔍 DEBUG: Fin de fillChartSelector()', 'DEBUG');
+            } catch (error) {
+                log(`❌ DEBUG: Erreur dans fillChartSelector: ${error.message}`, 'ERROR');
+                log(`🔍 DEBUG: Stack trace fillChartSelector: ${error.stack}`, 'DEBUG');
             }
         }
         
