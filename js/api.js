@@ -224,6 +224,9 @@ async function getAllAvailablePairs() {
                 }))
                 .sort((a, b) => b.volume - a.volume);
             
+            // Stocker les paires globalement pour le backtesting
+            window.allPairs = allPairs;
+            
             log(`✅ ${allPairs.length} paires récupérées pour l'analyse MACD`, 'SUCCESS');
             return allPairs;
         } else {
