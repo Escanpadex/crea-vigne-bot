@@ -576,7 +576,7 @@ async function simulateTrades(indicators) {
     }
     
     log(`📊 Résumé des signaux: BUY=${signalCount.BUY}, SELL=${signalCount.SELL}, HOLD=${signalCount.HOLD}`, 'INFO');
-    log(`💼 Trades ouverts: ${backtestResults.trades.length}`, 'INFO');
+    log(`💼 Trades fermés: ${backtestResults.trades.length}`, 'INFO');
 }
 
 // Obtenir le signal d'entrée selon la stratégie
@@ -726,11 +726,17 @@ function openTrade(candle, direction) {
     backtestResults.openTrades.push(trade);
     const takeProfitText = trade.takeProfit ? `, TP: ${backtestConfig.takeProfit}%` : ', TP: Désactivé';
     log(`📈 Ouverture trade ${direction}: ${trade.symbol} @ ${trade.entryPrice.toFixed(4)} (Trailing Stop: ${backtestConfig.trailingStop}%${takeProfitText})`, 'INFO');
+    log(`🔍 Trade ouvert - Stop initial: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
 }
 
 // Vérifier les trades ouverts avec trailing stop loss
 async function checkOpenTrades(candle, candleIndex) {
     const tradesToRemove = [];
+    
+    // Log debug pour les premiers trades
+    if (backtestResults.openTrades.length > 0 && candleIndex < 70) {
+        log(`🔍 Vérification ${backtestResults.openTrades.length} trades ouverts à l'index ${candleIndex}`, 'DEBUG');
+    }
     
     for (let i = 0; i < backtestResults.openTrades.length; i++) {
         const trade = backtestResults.openTrades[i];
@@ -745,6 +751,11 @@ async function checkOpenTrades(candle, candleIndex) {
                 trade.highestPrice = candle.high;
                 // Ajuster le trailing stop loss
                 trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+                
+                // Log debug pour le premier trade
+                if (candleIndex < 70) {
+                    log(`🔍 LONG - Nouveau high: ${trade.highestPrice.toFixed(4)}, Stop ajusté: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
             
             // Vérifier take profit en premier (si activé)
@@ -753,23 +764,15 @@ async function checkOpenTrades(candle, candleIndex) {
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
             }
-            // Vérifier trailing stop loss avec précision 1 minute pour timeframes > 1min
-            else if (backtestConfig.timeframe !== '1min') {
-                const nextCandle = backtestData[candleIndex + 1];
-                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
-                
-                if (precisionResult) {
-                    shouldClose = true;
-                    exitReason = precisionResult.reason;
-                    exitPrice = precisionResult.exitPrice;
-                    exitTime = precisionResult.exitTime;
-                }
-            }
-            // Pour les données 1 minute, vérification directe
+            // Vérifier trailing stop loss
             else if (candle.low <= trade.trailingStopPrice) {
                 shouldClose = true;
                 exitReason = 'Trailing Stop Loss';
                 exitPrice = trade.trailingStopPrice;
+                
+                if (candleIndex < 70) {
+                    log(`🔍 LONG - Stop déclenché: Low=${candle.low.toFixed(4)} <= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
             
         } else { // SHORT
@@ -778,6 +781,11 @@ async function checkOpenTrades(candle, candleIndex) {
                 trade.lowestPrice = candle.low;
                 // Ajuster le trailing stop loss
                 trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
+                
+                // Log debug pour le premier trade
+                if (candleIndex < 70) {
+                    log(`🔍 SHORT - Nouveau low: ${trade.lowestPrice.toFixed(4)}, Stop ajusté: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
             
             // Vérifier take profit en premier (si activé)
@@ -786,23 +794,15 @@ async function checkOpenTrades(candle, candleIndex) {
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
             }
-            // Vérifier trailing stop loss avec précision 1 minute pour timeframes > 1min
-            else if (backtestConfig.timeframe !== '1min') {
-                const nextCandle = backtestData[candleIndex + 1];
-                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
-                
-                if (precisionResult) {
-                    shouldClose = true;
-                    exitReason = precisionResult.reason;
-                    exitPrice = precisionResult.exitPrice;
-                    exitTime = precisionResult.exitTime;
-                }
-            }
-            // Pour les données 1 minute, vérification directe
+            // Vérifier trailing stop loss
             else if (candle.high >= trade.trailingStopPrice) {
                 shouldClose = true;
                 exitReason = 'Trailing Stop Loss';
                 exitPrice = trade.trailingStopPrice;
+                
+                if (candleIndex < 70) {
+                    log(`🔍 SHORT - Stop déclenché: High=${candle.high.toFixed(4)} >= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
         }
         
