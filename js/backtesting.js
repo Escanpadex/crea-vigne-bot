@@ -1,3 +1,14 @@
+/*
+ * CORRECTIONS APPORTÉES AU BACKTESTING (4 problèmes résolus) :
+ * 
+ * 1. ✅ AFFICHAGE DES RÉSULTATS : Ajout de displayBacktestResults() à la fin du backtesting
+ * 2. ✅ SUPPRESSION DES SIGNAUX SELL : Seuls les signaux BUY ouvrent des trades LONG
+ * 3. ✅ RÉDUCTION DES APPELS API : Désactivation de la précision trailing stop
+ * 4. ✅ AMÉLIORATION DES SIGNAUX BUY : Seuil de significativité pour éviter les faux signaux
+ * 
+ * Stratégie optimisée : BUY uniquement → LONG → Fermeture par trailing stop loss
+ */
+
 // Backtesting System for Trading Strategies
 console.log('📁 Loading backtesting.js...');
 
@@ -332,6 +343,11 @@ async function runBacktestStrategy() {
     calculateFinalStats();
     
     updateBacktestStatus('Backtesting terminé', 100);
+    
+    // CORRECTION 1 : Assurer l'affichage des résultats
+    displayBacktestResults();
+    
+    log(`✅ Backtesting terminé avec succès`, 'SUCCESS');
 }
 
 // Calculer MACD (fonction intégrée pour le backtesting)
@@ -469,10 +485,10 @@ async function simulateTrades(indicators) {
             log(`🎯 Signal ${signal} détecté à l'index ${i} - Prix: ${candle.close}`, 'INFO');
         }
         
+        // CORRECTION 2 : Uniquement les signaux BUY pour ouvrir des trades LONG
+        // Plus de signaux SELL - fermeture uniquement par trailing stop
         if (signal === 'BUY' && backtestResults.openTrades.length === 0) {
             openTrade(candle, 'LONG');
-        } else if (signal === 'SELL' && backtestResults.openTrades.length === 0) {
-            openTrade(candle, 'SHORT');
         }
         
         // Vérifier les trades ouverts
@@ -524,17 +540,21 @@ function getMACDSignal(indicators, index) {
         return 'HOLD';
     }
     
-    // Croisement haussier
-    if (prevMacd <= prevSignal && macd > signal) {
-        log(`🟢 Signal BUY détecté [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)}`, 'SUCCESS');
+    // CORRECTION 4 : Améliorer la détection des signaux BUY avec seuils de significativité
+    const difference = macd - signal;
+    const prevDifference = prevMacd - prevSignal;
+    
+    // Seuil minimum pour considérer un signal significatif (éviter les micro-variations)
+    const minSignificantDifference = 0.00001;
+    
+    // Croisement haussier avec seuil de significativité
+    if (prevDifference <= 0 && difference > minSignificantDifference) {
+        log(`🟢 Signal BUY détecté [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)} (diff: ${difference.toFixed(6)})`, 'SUCCESS');
         return 'BUY';
     }
     
-    // Croisement baissier
-    if (prevMacd >= prevSignal && macd < signal) {
-        log(`🔴 Signal SELL détecté [${index}]: MACD=${macd.toFixed(6)} < Signal=${signal.toFixed(6)}`, 'SUCCESS');
-        return 'SELL';
-    }
+    // CORRECTION 2 : Éliminer complètement les signaux SELL
+    // Les trades se ferment uniquement par trailing stop loss
     
     return 'HOLD';
 }
@@ -548,15 +568,13 @@ function getRSISignal(indicators, index) {
         return 'HOLD';
     }
     
-    // Sortie de survente
+    // Sortie de survente (signal d'achat)
     if (prevRsi <= backtestConfig.rsiParams.oversold && rsi > backtestConfig.rsiParams.oversold) {
         return 'BUY';
     }
     
-    // Sortie de surachat
-    if (prevRsi >= backtestConfig.rsiParams.overbought && rsi < backtestConfig.rsiParams.overbought) {
-        return 'SELL';
-    }
+    // CORRECTION 2 : Éliminer le signal de vente
+    // Pas de signal de vente - fermeture uniquement par trailing stop
     
     return 'HOLD';
 }
@@ -577,10 +595,8 @@ function getEMASignal(indicators, index) {
         return 'BUY';
     }
     
-    // Croisement baissier
-    if (prevEmaFast >= prevEmaSlow && emaFast < emaSlow) {
-        return 'SELL';
-    }
+    // CORRECTION 2 : Éliminer le signal de vente
+    // Pas de signal de vente - fermeture uniquement par trailing stop
     
     return 'HOLD';
 }
@@ -598,15 +614,13 @@ function getBollingerSignal(indicators, index) {
         return 'HOLD';
     }
     
-    // Rebond sur la bande inférieure
+    // Rebond sur la bande inférieure (signal d'achat)
     if (prevPrice <= prevLower && price > lower) {
         return 'BUY';
     }
     
-    // Rebond sur la bande supérieure
-    if (prevPrice >= prevUpper && price < upper) {
-        return 'SELL';
-    }
+    // CORRECTION 2 : Éliminer le signal de vente
+    // Pas de signal de vente - fermeture uniquement par trailing stop
     
     return 'HOLD';
 }
@@ -676,30 +690,19 @@ async function checkOpenTrades(candle, candleIndex) {
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
             }
-            // Vérifier trailing stop loss avec précision
-            else {
-                const nextCandle = backtestData[candleIndex + 1];
-                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
+            // CORRECTION 3 : Désactiver la précision pour réduire les appels API
+            // Utiliser uniquement la logique standard de trailing stop
+            else if (candle.low <= trade.trailingStopPrice) {
+                shouldClose = true;
+                exitReason = 'Trailing Stop Loss';
+                exitPrice = trade.trailingStopPrice;
                 
-                if (precisionResult) {
-                    shouldClose = true;
-                    exitReason = precisionResult.reason;
-                    exitPrice = precisionResult.exitPrice;
-                    exitTime = precisionResult.exitTime;
-                }
-                // Fallback : vérification standard si pas de données précision
-                else if (candle.low <= trade.trailingStopPrice) {
-                    shouldClose = true;
-                    exitReason = 'Trailing Stop Loss';
-                    exitPrice = trade.trailingStopPrice;
-                    
-                    if (candleIndex < 70) {
-                        log(`🔍 LONG - Stop déclenché standard: Low=${candle.low.toFixed(4)} <= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
-                    }
+                if (candleIndex < 70) {
+                    log(`🔍 LONG - Stop déclenché: Low=${candle.low.toFixed(4)} <= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
                 }
             }
             
-        } else { // SHORT
+        } else { // SHORT - Gardé pour compatibilité mais pas utilisé
             // Mettre à jour le prix le plus bas atteint
             if (candle.low < trade.lowestPrice) {
                 trade.lowestPrice = candle.low;
@@ -718,26 +721,15 @@ async function checkOpenTrades(candle, candleIndex) {
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
             }
-            // Vérifier trailing stop loss avec précision
-            else {
-                const nextCandle = backtestData[candleIndex + 1];
-                const precisionResult = await checkTrailingStopPrecision(trade, candle, nextCandle);
+            // CORRECTION 3 : Désactiver la précision pour réduire les appels API
+            // Utiliser uniquement la logique standard de trailing stop
+            else if (candle.high >= trade.trailingStopPrice) {
+                shouldClose = true;
+                exitReason = 'Trailing Stop Loss';
+                exitPrice = trade.trailingStopPrice;
                 
-                if (precisionResult) {
-                    shouldClose = true;
-                    exitReason = precisionResult.reason;
-                    exitPrice = precisionResult.exitPrice;
-                    exitTime = precisionResult.exitTime;
-                }
-                // Fallback : vérification standard si pas de données précision
-                else if (candle.high >= trade.trailingStopPrice) {
-                    shouldClose = true;
-                    exitReason = 'Trailing Stop Loss';
-                    exitPrice = trade.trailingStopPrice;
-                    
-                    if (candleIndex < 70) {
-                        log(`🔍 SHORT - Stop déclenché standard: High=${candle.high.toFixed(4)} >= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
-                    }
+                if (candleIndex < 70) {
+                    log(`🔍 SHORT - Stop déclenché: High=${candle.high.toFixed(4)} >= Stop=${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
                 }
             }
         }
@@ -1247,3 +1239,6 @@ window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
 
 console.log('✅ Backtesting system loaded successfully');
+
+// CORRECTION TEMPORAIRE - Désactiver la précision
+window.checkTrailingStopPrecision_DISABLED = true;
