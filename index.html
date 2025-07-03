@@ -626,10 +626,9 @@
             }, 1000);
         });
         
-        // Variables pour le backtesting
+        // Variables pour le backtesting - SIMPLIFIÉ
         let backtestVolumeData = [];
         let lastVolumeUpdate = null;
-        let isUpdatingBacktestPairs = false; // Protection contre les appels multiples
         
         // Fonction utilitaire pour formater les nombres (locale si utils.js pas disponible)
         function formatNumber(num) {
@@ -643,201 +642,63 @@
             return num.toString();
         }
         
-        // Utiliser la fonction existante scanTop30Volume() au lieu de créer une nouvelle
+        // SOLUTION SIMPLE : Utiliser directement la fonction existante du bot
         async function updateBacktestPairs() {
-            // Protection contre les appels multiples
-            if (isUpdatingBacktestPairs) {
-                log('⚠️ Mise à jour des paires déjà en cours, ignoré', 'WARNING');
-                return false;
-            }
-            
-            isUpdatingBacktestPairs = true;
-            
             try {
-                log('🔄 Mise à jour des paires pour backtesting...', 'INFO');
-                
-                // Utiliser la fonction existante getAllAvailablePairs() de api.js
-                if (typeof window.getAllAvailablePairs === 'function') {
-                    const pairs = await window.getAllAvailablePairs();
-                    if (pairs && pairs.length > 0) {
-                        backtestVolumeData = pairs.slice(0, 30); // TOP 30
-                        lastVolumeUpdate = new Date();
-                        updateChartSelectorSafe(); // Utiliser la version sécurisée
-                        return true;
-                    }
+                // Utiliser la fonction existante getAllAvailablePairs() qui fonctionne déjà
+                const pairs = await window.getAllAvailablePairs();
+                if (pairs && pairs.length > 0) {
+                    backtestVolumeData = pairs.slice(0, 30); // TOP 30
+                    lastVolumeUpdate = new Date();
+                    populateChartSelector(); // Fonction simple pour remplir le sélecteur
+                    return true;
                 }
-                
-                // Fallback : utiliser des paires par défaut
-                useDefaultPairsSafe(); // Utiliser la version sécurisée
-                return true;
-                
-            } catch (error) {
-                log(`❌ Erreur mise à jour paires backtesting: ${error.message}`, 'ERROR');
-                useDefaultPairsSafe(); // Utiliser la version sécurisée
                 return false;
-            } finally {
-                isUpdatingBacktestPairs = false; // Libérer le verrou
+            } catch (error) {
+                log(`❌ Erreur récupération paires: ${error.message}`, 'ERROR');
+                return false;
             }
         }
          
-         // Utiliser des paires par défaut en cas d'erreur API
-         function useDefaultPairs() {
-             log('🔄 Chargement des paires par défaut...', 'INFO');
-             
-             const defaultPairs = [
-                 'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
-                 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
-                 'LINKUSDT', 'UNIUSDT', 'LTCUSDT', 'ATOMUSDT', 'ETCUSDT',
-                 'NEARUSDT', 'ALGOUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT',
-                 'ICPUSDT', 'VETUSDT', 'FILUSDT', 'TRXUSDT', 'AAVEUSDT',
-                 'AXSUSDT', 'THETAUSDT', 'GRTUSDT', 'GALAUSDT', 'APEUSDT'
-             ];
-             
-             backtestVolumeData = defaultPairs.map((symbol, index) => ({
-                 symbol: symbol,
-                 volume: 1000000000 - (index * 10000000), // Volume fictif décroissant
-                 price: 100,
-                 rank: index + 1
-             }));
-             
-             lastVolumeUpdate = new Date();
-             updateChartSelectorSafe(); // Utiliser la version sécurisée
-             
-             // Mettre à jour l'indicateur pour indiquer que c'est par défaut
-             const updateIndicator = document.getElementById('lastVolumeUpdate');
-             if (updateIndicator) {
-                 updateIndicator.textContent = 'Paires par défaut - Chargement API...';
-                 updateIndicator.style.color = '#ffc107'; // Jaune pour indiquer que c'est temporaire
-             }
-             
-             log('✅ 30 paires par défaut chargées pour backtesting', 'SUCCESS');
-        }
-        
-        // Version sécurisée qui ne déclenche pas de nouvelles mises à jour
-        function useDefaultPairsSafe() {
-            const defaultPairs = [
-                'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
-                'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
-                'LINKUSDT', 'UNIUSDT', 'LTCUSDT', 'ATOMUSDT', 'ETCUSDT',
-                'NEARUSDT', 'ALGOUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT',
-                'ICPUSDT', 'VETUSDT', 'FILUSDT', 'TRXUSDT', 'AAVEUSDT',
-                'AXSUSDT', 'THETAUSDT', 'GRTUSDT', 'GALAUSDT', 'APEUSDT'
-            ];
+        // Fonction simple pour remplir le sélecteur - PAS DE COMPLICATIONS
+        function populateChartSelector() {
+            const chartSelect = document.getElementById('chartSymbol');
+            if (!chartSelect) return;
             
-            backtestVolumeData = defaultPairs.map((symbol, index) => ({
-                symbol: symbol,
-                volume: 1000000000 - (index * 10000000), // Volume fictif décroissant
-                price: 100,
-                rank: index + 1
-            }));
+            if (backtestVolumeData.length === 0) {
+                chartSelect.innerHTML = `<option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>`;
+                return;
+            }
             
-            lastVolumeUpdate = new Date();
-            updateChartSelectorSafe(); // Utiliser la version sécurisée
+            let html = '';
+            backtestVolumeData.forEach((pair, index) => {
+                const volumeFormatted = formatNumber(pair.volume);
+                html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
+            });
             
-            // Mettre à jour l'indicateur pour indiquer que c'est par défaut
+            chartSelect.innerHTML = html;
+            
+            // Mettre à jour l'indicateur
             const updateIndicator = document.getElementById('lastVolumeUpdate');
             if (updateIndicator) {
-                updateIndicator.textContent = 'Paires par défaut - Chargement API...';
-                updateIndicator.style.color = '#ffc107'; // Jaune pour indiquer que c'est temporaire
+                updateIndicator.textContent = lastVolumeUpdate ? lastVolumeUpdate.toLocaleTimeString() : 'Jamais';
+                updateIndicator.style.color = '#28a745';
             }
+            
+            log(`📊 TOP 30 Volume chargé dans le sélecteur`, 'SUCCESS');
         }
         
-        // Mettre à jour le sélecteur avec les données de volume
-        function updateChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            if (!chartSelect) return;
-            
-            const currentSelection = chartSelect.value;
-            
-            if (backtestVolumeData.length === 0) {
-                // Fallback si pas de données
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
-                `;
-                return;
-            }
-            
-            let html = '';
-            backtestVolumeData.forEach((pair, index) => {
-                const volumeFormatted = formatNumber(pair.volume);
-                html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
-            });
-            
-            chartSelect.innerHTML = html;
-            
-            // Restaurer la sélection précédente si elle existe encore
-            if (currentSelection && [...chartSelect.options].some(opt => opt.value === currentSelection)) {
-                chartSelect.value = currentSelection;
-            }
-            
-            const updateTime = lastVolumeUpdate ? lastVolumeUpdate.toLocaleTimeString() : 'Jamais';
-             
-             // Mettre à jour l'indicateur visuel
-             const updateIndicator = document.getElementById('lastVolumeUpdate');
-             if (updateIndicator) {
-                 updateIndicator.textContent = updateTime;
-                 updateIndicator.style.color = '#28a745'; // Vert pour indiquer une mise à jour récente
-             }
-             
-             log(`📊 Sélecteur backtesting mis à jour avec TOP 30 Volume (${updateTime})`, 'SUCCESS');
-        }
-        
-        // Version sécurisée qui ne déclenche pas de nouvelles mises à jour
-        function updateChartSelectorSafe() {
-            const chartSelect = document.getElementById('chartSymbol');
-            if (!chartSelect) return;
-            
-            const currentSelection = chartSelect.value;
-            
-            if (backtestVolumeData.length === 0) {
-                // Fallback si pas de données
-                chartSelect.innerHTML = `
-                    <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
-                `;
-                return;
-            }
-            
-            let html = '';
-            backtestVolumeData.forEach((pair, index) => {
-                const volumeFormatted = formatNumber(pair.volume);
-                html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
-            });
-            
-            chartSelect.innerHTML = html;
-            
-            // Restaurer la sélection précédente si elle existe encore
-            if (currentSelection && [...chartSelect.options].some(opt => opt.value === currentSelection)) {
-                chartSelect.value = currentSelection;
-            }
-            
-            const updateTime = lastVolumeUpdate ? lastVolumeUpdate.toLocaleTimeString() : 'Jamais';
-             
-             // Mettre à jour l'indicateur visuel
-             const updateIndicator = document.getElementById('lastVolumeUpdate');
-             if (updateIndicator) {
-                 updateIndicator.textContent = updateTime;
-                 updateIndicator.style.color = '#28a745'; // Vert pour indiquer une mise à jour récente
-             }
-        }
-        
-        // Fonction d'initialisation du sélecteur (version simplifiée)
+        // Fonction d'initialisation SIMPLE
         function initializeChartSelector() {
-            // Charger immédiatement les paires par défaut pour éviter l'attente
-            useDefaultPairs();
-            
-            // Puis essayer de récupérer les vraies données en arrière-plan
+            // Essayer de récupérer les vraies données directement
             setTimeout(() => {
                 updateBacktestPairs();
-            }, 2000); // Délai de 2 secondes pour éviter de bloquer l'interface
+            }, 1000); // Délai de 1 seconde
         }
         
         // Fonction globale pour forcer la mise à jour du TOP 30 Volume
         window.updateChartSelector = function() {
-            if (isUpdatingBacktestPairs) {
-                log('⚠️ Mise à jour déjà en cours, ignoré', 'WARNING');
-                return;
-            }
-            log('🔄 Mise à jour forcée du TOP 30 Volume pour backtesting...', 'INFO');
+            log('🔄 Mise à jour forcée du TOP 30 Volume...', 'INFO');
             updateBacktestPairs();
         };
         
