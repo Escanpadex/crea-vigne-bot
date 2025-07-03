@@ -236,6 +236,9 @@ async function getAllAvailablePairs() {
     }
 }
 
+// Exposer la fonction globalement pour le backtesting
+window.getAllAvailablePairs = getAllAvailablePairs;
+
 async function getKlineData(symbol, limit = 50, timeframe = '15m') {
     try {
         // 🔧 Limiter le nombre de bougies selon les limites de l'API Bitget
