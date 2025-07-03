@@ -16,6 +16,7 @@ let backtestConfig = {
     positionSize: 10, // pourcentage
     trailingStop: 1.5, // pourcentage
     takeProfit: 4, // pourcentage
+    enableTakeProfit: true, // activer/désactiver le take profit
     macdParams: {
         fast: 12,
         slow: 26,
@@ -32,15 +33,81 @@ let backtestConfig = {
     }
 };
 
-// Récupérer les données 1 minute pour le trailing stop loss précis
+// Fonction pour récupérer les données klines depuis l'API Binance
+async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
+    try {
+        // Conversion des timeframes pour Binance
+        const binanceIntervals = {
+            '1m': '1m',
+            '5m': '5m',
+            '15m': '15m',
+            '30m': '30m',
+            '1h': '1h',
+            '4h': '4h',
+            '6h': '6h',
+            '12h': '12h',
+            '1d': '1d',
+            '3d': '3d',
+            '1w': '1w'
+        };
+        
+        const binanceInterval = binanceIntervals[interval] || '15m';
+        
+        // Limiter à 1000 (limite Binance)
+        if (limit > 1000) {
+            limit = 1000;
+        }
+        
+        // URL de l'API Binance (pas besoin d'authentification pour les données de marché)
+        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${binanceInterval}&limit=${limit}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (Array.isArray(data)) {
+            const klines = data.map(candle => ({
+                timestamp: parseInt(candle[0]),
+                open: parseFloat(candle[1]),
+                high: parseFloat(candle[2]),
+                low: parseFloat(candle[3]),
+                close: parseFloat(candle[4]),
+                volume: parseFloat(candle[5])
+            }));
+            
+            log(`📊 Binance: ${symbol} - ${klines.length} bougies ${interval} récupérées`, 'DEBUG');
+            return klines;
+        } else {
+            log(`❌ Erreur API Binance: ${data.msg || 'Réponse invalide'}`, 'ERROR');
+            return [];
+        }
+    } catch (error) {
+        log(`❌ Erreur réseau Binance ${symbol}: ${error.message}`, 'ERROR');
+        return [];
+    }
+}
+
+// Récupérer les données 1 minute pour le trailing stop loss précis via API Binance
 async function get1MinuteDataForTrailing(symbol, startTime, endTime) {
     try {
         // Calculer le nombre de minutes entre les deux timestamps
         const minutes = Math.ceil((endTime - startTime) / (60 * 1000));
-        const limit = Math.min(1000, minutes); // Limite API Bitget
         
-        // Récupérer les données 1 minute
-        const klines = await getKlineData(symbol, limit, '1min');
+        // Limiter strictement à 1000 et éviter les requêtes trop importantes
+        let limit = Math.min(1000, minutes);
+        
+        // Pour éviter les requêtes trop fréquentes, limiter à maximum 240 minutes (4h)
+        if (limit > 240) {
+            limit = 240;
+            log(`⚠️ Limitation trailing stop: ${minutes}min demandées, réduit à ${limit}min`, 'WARNING');
+        }
+        
+        // Éviter les requêtes pour des périodes trop courtes
+        if (limit < 1) {
+            return [];
+        }
+        
+        // Utiliser l'API Binance pour récupérer les données 1 minute
+        const klines = await getBinanceKlineData(symbol, limit, '1m');
         
         // Filtrer les données dans la plage de temps
         return klines.filter(k => k.timestamp >= startTime && k.timestamp <= endTime);
@@ -57,10 +124,30 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
         return null;
     }
     
-    // Récupérer les données 1 minute entre les deux bougies
+    // Pour les timeframes élevés, simplifier en utilisant seulement les données de la bougie actuelle
+    // Cela évite les requêtes API excessives tout en gardant une précision raisonnable
+    const timeframeMinutes = getTimeframeMinutes(backtestConfig.timeframe);
+    
+    // Pour les timeframes > 1h, utiliser une approche simplifiée sans données 1min
+    if (timeframeMinutes >= 60) {
+        log(`📊 Trailing stop simplifié pour timeframe ${backtestConfig.timeframe} (évite requêtes API excessives)`, 'DEBUG');
+        return null; // Utiliser la logique standard de checkOpenTrades
+    }
+    
+    // Seulement pour les timeframes courts (15m, 30m), récupérer quelques données 1min
     const symbol = trade.symbol;
-    const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (getTimeframeMinutes(backtestConfig.timeframe) * 60 * 1000);
-    const minuteData = await get1MinuteDataForTrailing(symbol, currentCandle.timestamp, endTime);
+    const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (timeframeMinutes * 60 * 1000);
+    
+    // Limiter à maximum 30 minutes de données 1min pour éviter les erreurs API
+    const maxMinutes = Math.min(30, timeframeMinutes);
+    const limitedEndTime = currentCandle.timestamp + (maxMinutes * 60 * 1000);
+    const actualEndTime = Math.min(endTime, limitedEndTime);
+    
+    const minuteData = await get1MinuteDataForTrailing(symbol, currentCandle.timestamp, actualEndTime);
+    
+    if (minuteData.length === 0) {
+        return null; // Pas de données, utiliser la logique standard
+    }
     
     for (const minuteCandle of minuteData) {
         if (trade.direction === 'LONG') {
@@ -199,6 +286,7 @@ async function updateBacktestConfig() {
         positionSize: parseFloat(document.getElementById('backtestPositionSize').value),
         trailingStop: parseFloat(document.getElementById('backtestTrailingStop').value),
         takeProfit: parseFloat(document.getElementById('backtestTakeProfit').value),
+        enableTakeProfit: document.getElementById('enableTakeProfit').checked,
         macdParams: {
             fast: parseInt(document.getElementById('macdFast').value),
             slow: parseInt(document.getElementById('macdSlow').value),
@@ -228,7 +316,7 @@ function validateBacktestConfig() {
         return false;
     }
     
-    if (backtestConfig.takeProfit < 0.1 || backtestConfig.takeProfit > 20) {
+    if (backtestConfig.enableTakeProfit && (backtestConfig.takeProfit < 0.1 || backtestConfig.takeProfit > 20)) {
         alert('Le take profit doit être entre 0.1% et 20%');
         return false;
     }
@@ -236,37 +324,37 @@ function validateBacktestConfig() {
     return true;
 }
 
-// Récupérer les données historiques
+// Récupérer les données historiques via API Binance
 async function fetchBacktestData(symbol) {
     try {
-        updateBacktestStatus('Récupération des données historiques...', 10);
+        updateBacktestStatus('Récupération des données historiques via Binance...', 10);
         
         // Calculer le nombre de bougies nécessaires
         const timeframeMinutes = getTimeframeMinutes(backtestConfig.timeframe);
         const totalMinutes = backtestConfig.duration * 24 * 60;
         const candlesNeeded = Math.ceil(totalMinutes / timeframeMinutes) + 100; // +100 pour les indicateurs
         
-        // Limiter à 1000 bougies maximum (limite API)
+        // Limiter à 1000 bougies maximum (limite API Binance)
         const limit = Math.min(candlesNeeded, 1000);
         
-        log(`📊 Récupération de ${limit} bougies ${backtestConfig.timeframe} pour ${symbol}`, 'INFO');
+        log(`📊 Récupération de ${limit} bougies ${backtestConfig.timeframe} pour ${symbol} via Binance`, 'INFO');
         
-        // Utiliser la fonction existante getKlineData
-        backtestData = await getKlineData(symbol, limit, backtestConfig.timeframe);
+        // Utiliser l'API Binance pour récupérer les données
+        backtestData = await getBinanceKlineData(symbol, limit, backtestConfig.timeframe);
         
         if (backtestData.length === 0) {
-            throw new Error('Aucune donnée historique récupérée');
+            throw new Error('Aucune donnée historique récupérée depuis Binance');
         }
         
         // Log des premières et dernières données pour vérification
-        log(`✅ ${backtestData.length} bougies récupérées pour le backtesting`, 'SUCCESS');
+        log(`✅ ${backtestData.length} bougies récupérées depuis Binance pour le backtesting`, 'SUCCESS');
         log(`📊 Première bougie: ${new Date(backtestData[0].timestamp).toLocaleString()} - Prix: ${backtestData[0].close}`, 'DEBUG');
         log(`📊 Dernière bougie: ${new Date(backtestData[backtestData.length-1].timestamp).toLocaleString()} - Prix: ${backtestData[backtestData.length-1].close}`, 'DEBUG');
         
-        updateBacktestStatus('Données récupérées avec succès', 25);
+        updateBacktestStatus('Données Binance récupérées avec succès', 25);
         
     } catch (error) {
-        throw new Error(`Erreur récupération données: ${error.message}`);
+        throw new Error(`Erreur récupération données Binance: ${error.message}`);
     }
 }
 
@@ -630,13 +718,14 @@ function openTrade(candle, direction) {
             candle.close * (1 + backtestConfig.trailingStop / 100),
         highestPrice: direction === 'LONG' ? candle.close : candle.close,
         lowestPrice: direction === 'SHORT' ? candle.close : candle.close,
-        takeProfit: direction === 'LONG' ? 
+        takeProfit: backtestConfig.enableTakeProfit ? (direction === 'LONG' ? 
             candle.close * (1 + backtestConfig.takeProfit / 100) : 
-            candle.close * (1 - backtestConfig.takeProfit / 100)
+            candle.close * (1 - backtestConfig.takeProfit / 100)) : null
     };
     
     backtestResults.openTrades.push(trade);
-    log(`📈 Ouverture trade ${direction}: ${trade.symbol} @ ${trade.entryPrice.toFixed(4)} (Trailing Stop: ${backtestConfig.trailingStop}%)`, 'INFO');
+    const takeProfitText = trade.takeProfit ? `, TP: ${backtestConfig.takeProfit}%` : ', TP: Désactivé';
+    log(`📈 Ouverture trade ${direction}: ${trade.symbol} @ ${trade.entryPrice.toFixed(4)} (Trailing Stop: ${backtestConfig.trailingStop}%${takeProfitText})`, 'INFO');
 }
 
 // Vérifier les trades ouverts avec trailing stop loss
@@ -658,8 +747,8 @@ async function checkOpenTrades(candle, candleIndex) {
                 trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
             }
             
-            // Vérifier take profit en premier
-            if (candle.high >= trade.takeProfit) {
+            // Vérifier take profit en premier (si activé)
+            if (trade.takeProfit !== null && candle.high >= trade.takeProfit) {
                 shouldClose = true;
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
@@ -691,8 +780,8 @@ async function checkOpenTrades(candle, candleIndex) {
                 trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
             }
             
-            // Vérifier take profit en premier
-            if (candle.low <= trade.takeProfit) {
+            // Vérifier take profit en premier (si activé)
+            if (trade.takeProfit !== null && candle.low <= trade.takeProfit) {
                 shouldClose = true;
                 exitReason = 'Take Profit';
                 exitPrice = trade.takeProfit;
@@ -1085,11 +1174,28 @@ function updateSelectedPair() {
     }
 }
 
+// Fonction pour activer/désactiver le Take Profit
+function toggleTakeProfit() {
+    const enableCheckbox = document.getElementById('enableTakeProfit');
+    const takeProfitInput = document.getElementById('backtestTakeProfit');
+    
+    if (enableCheckbox.checked) {
+        takeProfitInput.disabled = false;
+        takeProfitInput.style.opacity = '1';
+        log('✅ Take Profit activé', 'INFO');
+    } else {
+        takeProfitInput.disabled = true;
+        takeProfitInput.style.opacity = '0.5';
+        log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
+    }
+}
+
 // Rendre les fonctions accessibles globalement
 window.startBacktest = startBacktest;
 window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateChartTimeframe = updateChartTimeframe;
 window.updateSelectedPair = updateSelectedPair;
+window.toggleTakeProfit = toggleTakeProfit;
 
 console.log('✅ Backtesting system loaded successfully');
