@@ -528,7 +528,7 @@
     </script>
     
     <script>
-        // Variables pour le backtesting - ULTRA SIMPLE
+        // Variables pour le backtesting - DÉFINITIF
         let backtestPairs = [];
         
         // Fonction utilitaire pour formater les nombres
@@ -542,55 +542,36 @@
             return num.toString();
         }
         
-        // SOLUTION SIMPLE : Utiliser les données déjà récupérées par le bot
-        function loadBacktestPairs() {
-            let attempts = 0;
-            const maxAttempts = 10; // 10 secondes maximum
-            
-            // Attendre que le bot principal ait récupéré ses paires
-            const checkForPairs = () => {
-                attempts++;
-                log(`🔍 Vérification des paires disponibles... (tentative ${attempts}/${maxAttempts})`, 'DEBUG');
-                log(`window.allPairs existe: ${!!window.allPairs}`, 'DEBUG');
-                log(`window.allPairs.length: ${window.allPairs ? window.allPairs.length : 'undefined'}`, 'DEBUG');
+        // SOLUTION DÉFINITIVE : Appel direct à l'API Bitget
+        async function loadBacktestPairs() {
+            try {
+                log('🔄 Récupération directe des paires depuis Bitget...', 'INFO');
                 
-                // Vérifier si les paires sont disponibles dans une variable globale
-                if (window.allPairs && window.allPairs.length > 0) {
-                    backtestPairs = window.allPairs.slice(0, 30); // TOP 30
+                // Appel direct à l'API Bitget sans passer par getAllAvailablePairs
+                const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+                const data = await response.json();
+                
+                if (data.code === '00000' && data.data) {
+                    const allPairs = data.data
+                        .filter(pair => {
+                            const volume = parseFloat(pair.usdtVolume || 0);
+                            return volume > 1000000 && pair.symbol.endsWith('USDT');
+                        })
+                        .map(pair => ({
+                            symbol: pair.symbol,
+                            volume: parseFloat(pair.usdtVolume),
+                            price: parseFloat(pair.lastPr)
+                        }))
+                        .sort((a, b) => b.volume - a.volume);
+                    
+                    backtestPairs = allPairs.slice(0, 30); // TOP 30
                     fillChartSelector();
                     log(`✅ ${backtestPairs.length} paires chargées pour backtesting`, 'SUCCESS');
-                    return;
-                }
-                
-                // Si on a dépassé le nombre de tentatives, utiliser l'API directement
-                if (attempts >= maxAttempts) {
-                    log('⚠️ Timeout - Utilisation directe de l\'API...', 'WARNING');
-                    loadBacktestPairsDirectly();
-                    return;
-                }
-                
-                // Si pas encore disponible, réessayer dans 1 seconde
-                log('⏳ Paires pas encore disponibles, nouvel essai dans 1s...', 'INFO');
-                setTimeout(checkForPairs, 1000);
-            };
-            
-            checkForPairs();
-        }
-        
-        // Solution de fallback : appel direct à l'API
-        async function loadBacktestPairsDirectly() {
-            try {
-                log('🔄 Récupération directe des paires pour backtesting...', 'INFO');
-                if (typeof window.getAllAvailablePairs === 'function') {
-                    const pairs = await window.getAllAvailablePairs();
-                    if (pairs && pairs.length > 0) {
-                        backtestPairs = pairs.slice(0, 30);
-                        fillChartSelector();
-                        log(`✅ ${backtestPairs.length} paires chargées directement pour backtesting`, 'SUCCESS');
-                    }
+                } else {
+                    log('❌ Erreur API Bitget pour backtesting', 'ERROR');
                 }
             } catch (error) {
-                log(`❌ Erreur chargement direct: ${error.message}`, 'ERROR');
+                log(`❌ Erreur récupération paires backtesting: ${error.message}`, 'ERROR');
             }
         }
         
@@ -615,18 +596,18 @@
             }
         }
         
+        // Fonction globale pour forcer la mise à jour
+        window.updateChartSelector = function() {
+            log('🔄 Mise à jour du sélecteur...', 'INFO');
+            loadBacktestPairs();
+        };
+        
         // Initialisation simple
         function initializeChartSelector() {
             setTimeout(() => {
                 loadBacktestPairs();
             }, 2000); // Laisser le temps au bot principal de se connecter
         }
-        
-        // Fonction globale pour forcer la mise à jour
-        window.updateChartSelector = function() {
-            log('🔄 Mise à jour du sélecteur...', 'INFO');
-            loadBacktestPairs();
-        };
         
         // Fonction pour basculer l'affichage des logs
         function toggleLogs() {
