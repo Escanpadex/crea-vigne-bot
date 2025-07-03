@@ -609,4 +609,156 @@ input:focus, select:focus {
     .stat-numbers .bearish {
         font-size: 11px;
     }
+}
+
+/* Styles pour le Backtesting */
+.strategy-params {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.stat-card h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #6c757d;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #28a745;
+    margin-bottom: 5px;
+}
+
+.stat-value.negative {
+    color: #dc3545;
+}
+
+.stat-value.neutral {
+    color: #6c757d;
+}
+
+.stat-card small {
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.loading-spinner {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #28a745;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.progress-bar {
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar div {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+    transition: width 0.3s ease;
+}
+
+/* Styles pour l'historique des trades */
+.trade-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.trade-item.profit {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #f8f9fa 100%);
+}
+
+.trade-item.loss {
+    border-left: 4px solid #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f8f9fa 100%);
+}
+
+.trade-info {
+    flex: 1;
+}
+
+.trade-symbol {
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.trade-details {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.trade-result {
+    text-align: right;
+    font-weight: 600;
+}
+
+.trade-result.profit {
+    color: #28a745;
+}
+
+.trade-result.loss {
+    color: #dc3545;
+}
+
+/* Responsive pour le backtesting */
+@media (max-width: 768px) {
+    .grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .stat-card {
+        padding: 15px;
+    }
+    
+    .stat-value {
+        font-size: 20px;
+    }
+    
+    .trade-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .trade-result {
+        text-align: left;
+    }
 } 
