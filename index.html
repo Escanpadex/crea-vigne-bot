@@ -528,179 +528,46 @@
     </script>
     
     <script>
-        // Fonctions TradingView supprimées - Remplacées par le système de backtesting
-
-        // 🆕 FONCTION: Gestion du nombre de paires à analyser (fonction updateMacdTimeframe supprimée - plus nécessaire avec le filtrage progressif)
-
-        function updateTopVolumeCount() {
-            const count = parseInt(document.getElementById('topVolumeCount').value);
-            config.topVolumeCount = count;
-            
-            const settingsElement = document.getElementById('currentSettings');
-            settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP ${count}`;
-            
-            log(`📊 Quantité modifiée: TOP ${count} Volume`, 'INFO');
-            
-            // Mettre à jour le titre de la section
-            const topSectionTitle = document.getElementById('topVolumeTitle');
-            if (topSectionTitle) {
-                topSectionTitle.textContent = `📈 TOP ${count} Volume (Surveillance)`;
-            }
-            
-            // Mettre à jour le sélecteur de graphique
-            const chartLabel = document.getElementById('chartSelectorLabel');
-            if (chartLabel) {
-                chartLabel.textContent = `Sélectionner une paire (TOP ${count} Volume):`;
-            }
-            
-            // DÉSACTIVÉ - Ancien système TOP 30 remplacé par la stratégie multi-timeframes
-            // if (config.apiKey && top30Pairs.length > 0) {
-            //     log(`🔄 Mise à jour automatique du TOP ${count}...`, 'INFO');
-            //     setTimeout(() => {
-            //         scanTop30Volume();
-            //     }, 1000);
-            // }
-            
-            // Si le bot tourne, informer de l'impact
-            if (botRunning) {
-                log(`✅ TOP ${count} appliqué - Prochaine analyse dans ${count} paires`, 'SUCCESS');
-            }
-        }
-
-        // 💰 AUTOMATISATION: Rafraîchissement automatique du solde
-        let autoBalanceInterval = null;
+        // Variables pour le backtesting - ULTRA SIMPLE
+        let backtestPairs = [];
         
-        function startAutoBalanceRefresh() {
-            if (autoBalanceInterval) {
-                clearInterval(autoBalanceInterval);
-            }
-            
-            // Rafraîchir immédiatement
-            refreshBalance();
-            
-            // Programmer le rafraîchissement toutes les minutes
-            autoBalanceInterval = setInterval(() => {
-                if (config.apiKey) {
-                    refreshBalance();
-                }
-            }, 60 * 1000); // 60 secondes
-        }
-
-        // 👁️ FONCTION: Basculer l'affichage des logs (compatibilité avec anciens boutons)
-        function toggleLogs() {
-            const logsToggle = document.getElementById('logsToggle');
-            const logsSection = document.getElementById('logsSection');
-            const toggleCard = document.getElementById('logsToggleCard');
-            
-            if (logsSection.style.display === 'none' || logsSection.style.display === '') {
-                // Afficher les logs et mettre à jour le toggle
-                logsSection.style.display = 'block';
-                toggleCard.style.display = 'none';
-                logsToggle.checked = true;
-                document.getElementById('logsStatus').textContent = 'ON';
-                document.getElementById('logsStatus').style.color = '#ffffff';
-            } else {
-                // Masquer les logs et mettre à jour le toggle
-                logsSection.style.display = 'none';
-                toggleCard.style.display = 'block';
-                logsToggle.checked = false;
-                document.getElementById('logsStatus').textContent = 'OFF';
-                document.getElementById('logsStatus').style.color = 'rgba(255,255,255,0.7)';
-            }
-        }
-
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // 🚀 CONNEXION MANUELLE UNIQUEMENT - Pas de connexion automatique
-            // L'utilisateur doit cliquer sur le bouton 🔗 API pour se connecter
-            
-            // Initialiser l'affichage des paramètres
-            const settingsElement = document.getElementById('currentSettings');
-            if (settingsElement) {
-                settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP ${config.topVolumeCount || 30}`;
-            }
-            
-            // Initialiser le sélecteur avec des valeurs par défaut (seulement pour backtesting)
-            setTimeout(() => {
-                initializeChartSelector();
-            }, 1000);
-        });
-        
-        // Variables pour le backtesting - SIMPLIFIÉ
-        let backtestVolumeData = [];
-        let lastVolumeUpdate = null;
-        
-        // Fonction utilitaire pour formater les nombres (locale si utils.js pas disponible)
+        // Fonction utilitaire pour formater les nombres
         function formatNumber(num) {
             if (typeof window.formatNumber === 'function') {
                 return window.formatNumber(num);
             }
-            // Fallback local
             if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
             if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
             if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
             return num.toString();
         }
         
-        // SOLUTION FINALE : Pas d'appel API supplémentaire - Utiliser des données par défaut
-        function updateBacktestPairs() {
-            try {
-                // Utiliser des paires par défaut pour le backtesting (TOP 30)
-                backtestVolumeData = [
-                    {symbol: 'BTCUSDT', volume: 1000000000, price: 50000},
-                    {symbol: 'ETHUSDT', volume: 800000000, price: 3000},
-                    {symbol: 'BNBUSDT', volume: 600000000, price: 300},
-                    {symbol: 'SOLUSDT', volume: 400000000, price: 100},
-                    {symbol: 'ADAUSDT', volume: 300000000, price: 0.5},
-                    {symbol: 'XRPUSDT', volume: 250000000, price: 0.6},
-                    {symbol: 'DOGEUSDT', volume: 200000000, price: 0.08},
-                    {symbol: 'AVAXUSDT', volume: 180000000, price: 25},
-                    {symbol: 'DOTUSDT', volume: 160000000, price: 7},
-                    {symbol: 'MATICUSDT', volume: 140000000, price: 1.2},
-                    {symbol: 'LINKUSDT', volume: 130000000, price: 15},
-                    {symbol: 'UNIUSDT', volume: 120000000, price: 8},
-                    {symbol: 'LTCUSDT', volume: 110000000, price: 80},
-                    {symbol: 'ATOMUSDT', volume: 100000000, price: 12},
-                    {symbol: 'ETCUSDT', volume: 95000000, price: 25},
-                    {symbol: 'NEARUSDT', volume: 90000000, price: 3},
-                    {symbol: 'ALGOUSDT', volume: 85000000, price: 0.3},
-                    {symbol: 'FTMUSDT', volume: 80000000, price: 0.4},
-                    {symbol: 'SANDUSDT', volume: 75000000, price: 0.5},
-                    {symbol: 'MANAUSDT', volume: 70000000, price: 0.6},
-                    {symbol: 'ICPUSDT', volume: 65000000, price: 10},
-                    {symbol: 'VETUSDT', volume: 60000000, price: 0.03},
-                    {symbol: 'FILUSDT', volume: 55000000, price: 6},
-                    {symbol: 'TRXUSDT', volume: 50000000, price: 0.1},
-                    {symbol: 'AAVEUSDT', volume: 45000000, price: 100},
-                    {symbol: 'AXSUSDT', volume: 40000000, price: 8},
-                    {symbol: 'THETAUSDT', volume: 35000000, price: 1.5},
-                    {symbol: 'GRTUSDT', volume: 30000000, price: 0.2},
-                    {symbol: 'GALAUSDT', volume: 25000000, price: 0.05},
-                    {symbol: 'APEUSDT', volume: 20000000, price: 2}
-                ];
+        // SOLUTION SIMPLE : Utiliser les données déjà récupérées par le bot
+        function loadBacktestPairs() {
+            // Attendre que le bot principal ait récupéré ses paires
+            const checkForPairs = () => {
+                // Vérifier si les paires sont disponibles dans une variable globale
+                if (window.allPairs && window.allPairs.length > 0) {
+                    backtestPairs = window.allPairs.slice(0, 30); // TOP 30
+                    fillChartSelector();
+                    log(`✅ ${backtestPairs.length} paires chargées pour backtesting`, 'SUCCESS');
+                    return;
+                }
                 
-                lastVolumeUpdate = new Date();
-                populateChartSelector();
-                log(`✅ TOP 30 paires par défaut chargées pour backtesting`, 'SUCCESS');
-                return true;
-            } catch (error) {
-                log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
-                return false;
-            }
-        }
-         
-        // Fonction simple pour remplir le sélecteur - PAS DE COMPLICATIONS
-        function populateChartSelector() {
-            const chartSelect = document.getElementById('chartSymbol');
-            if (!chartSelect) return;
+                // Si pas encore disponible, réessayer dans 1 seconde
+                setTimeout(checkForPairs, 1000);
+            };
             
-            if (backtestVolumeData.length === 0) {
-                chartSelect.innerHTML = `<option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>`;
-                return;
-            }
+            checkForPairs();
+        }
+        
+        // Remplir le sélecteur avec les paires
+        function fillChartSelector() {
+            const chartSelect = document.getElementById('chartSymbol');
+            if (!chartSelect || backtestPairs.length === 0) return;
             
             let html = '';
-            backtestVolumeData.forEach((pair, index) => {
+            backtestPairs.forEach((pair, index) => {
                 const volumeFormatted = formatNumber(pair.volume);
                 html += `<option value="BINANCE:${pair.symbol}">${index + 1}. ${pair.symbol.replace('USDT', '/USDT')} - ${volumeFormatted} vol</option>`;
             });
@@ -710,26 +577,37 @@
             // Mettre à jour l'indicateur
             const updateIndicator = document.getElementById('lastVolumeUpdate');
             if (updateIndicator) {
-                updateIndicator.textContent = lastVolumeUpdate ? lastVolumeUpdate.toLocaleTimeString() : 'Jamais';
+                updateIndicator.textContent = new Date().toLocaleTimeString();
                 updateIndicator.style.color = '#28a745';
             }
-            
-            log(`📊 TOP 30 Volume chargé dans le sélecteur`, 'SUCCESS');
         }
         
-        // Fonction d'initialisation SIMPLE
+        // Initialisation simple
         function initializeChartSelector() {
-            // Plus besoin d'attendre l'API, on utilise des données par défaut
             setTimeout(() => {
-                updateBacktestPairs();
-            }, 500); // Délai de 0.5 seconde seulement
+                loadBacktestPairs();
+            }, 2000); // Laisser le temps au bot principal de se connecter
         }
         
-        // Fonction globale pour forcer la mise à jour du TOP 30 Volume
+        // Fonction globale pour forcer la mise à jour
         window.updateChartSelector = function() {
-            log('🔄 Mise à jour forcée du TOP 30 Volume...', 'INFO');
-            updateBacktestPairs();
+            log('🔄 Mise à jour du sélecteur...', 'INFO');
+            loadBacktestPairs();
         };
+        
+        // Fonction pour basculer l'affichage des logs
+        function toggleLogs() {
+            const logsSection = document.getElementById('logsSection');
+            const toggleCard = document.getElementById('logsToggleCard');
+            
+            if (logsSection.style.display === 'none' || logsSection.style.display === '') {
+                logsSection.style.display = 'block';
+                toggleCard.style.display = 'none';
+            } else {
+                logsSection.style.display = 'none';
+                toggleCard.style.display = 'block';
+            }
+        }
         
         // Fonction pour activer/désactiver le Take Profit
         function toggleTakeProfit() {
@@ -746,6 +624,20 @@
                 log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
             }
         }
+        
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialiser l'affichage des paramètres
+            const settingsElement = document.getElementById('currentSettings');
+            if (settingsElement) {
+                settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP 30`;
+            }
+            
+            // Initialiser le sélecteur de backtesting
+            setTimeout(() => {
+                initializeChartSelector();
+            }, 1000);
+        });
     </script>
 </body>
 </html> 
