@@ -258,7 +258,11 @@ async function fetchBacktestData(symbol) {
             throw new Error('Aucune donnée historique récupérée');
         }
         
+        // Log des premières et dernières données pour vérification
         log(`✅ ${backtestData.length} bougies récupérées pour le backtesting`, 'SUCCESS');
+        log(`📊 Première bougie: ${new Date(backtestData[0].timestamp).toLocaleString()} - Prix: ${backtestData[0].close}`, 'DEBUG');
+        log(`📊 Dernière bougie: ${new Date(backtestData[backtestData.length-1].timestamp).toLocaleString()} - Prix: ${backtestData[backtestData.length-1].close}`, 'DEBUG');
+        
         updateBacktestStatus('Données récupérées avec succès', 25);
         
     } catch (error) {
@@ -330,10 +334,66 @@ async function runBacktestStrategy() {
     updateBacktestStatus('Backtesting terminé', 100);
 }
 
+// Calculer MACD (fonction intégrée pour le backtesting)
+function calculateMACDForBacktest(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+    if (prices.length < slowPeriod + signalPeriod) {
+        return {
+            macdArray: new Array(prices.length).fill(null),
+            signalArray: new Array(prices.length).fill(null)
+        };
+    }
+    
+    // Calculer les EMA
+    const emaFast = calculateEMA(prices, fastPeriod);
+    const emaSlow = calculateEMA(prices, slowPeriod);
+    
+    // Calculer la ligne MACD
+    const macdArray = new Array(prices.length).fill(null);
+    for (let i = slowPeriod - 1; i < prices.length; i++) {
+        if (emaFast[i] !== null && emaSlow[i] !== null) {
+            macdArray[i] = emaFast[i] - emaSlow[i];
+        }
+    }
+    
+    // Calculer la ligne de signal (EMA du MACD)
+    const signalArray = new Array(prices.length).fill(null);
+    const macdValidValues = [];
+    
+    // Collecter les valeurs MACD valides
+    for (let i = slowPeriod - 1; i < prices.length; i++) {
+        if (macdArray[i] !== null) {
+            macdValidValues.push(macdArray[i]);
+        }
+    }
+    
+    // Calculer l'EMA de la ligne MACD
+    if (macdValidValues.length >= signalPeriod) {
+        const signalEMA = calculateEMA(macdValidValues, signalPeriod);
+        
+        // Mapper les valeurs de signal aux indices corrects
+        let signalIndex = 0;
+        for (let i = slowPeriod - 1; i < prices.length; i++) {
+            if (macdArray[i] !== null) {
+                if (signalIndex < signalEMA.length && signalEMA[signalIndex] !== null) {
+                    signalArray[i] = signalEMA[signalIndex];
+                }
+                signalIndex++;
+            }
+        }
+    }
+    
+    return {
+        macdArray: macdArray,
+        signalArray: signalArray
+    };
+}
+
 // Calculer les indicateurs MACD
 function calculateMACDIndicators() {
     const closes = backtestData.map(candle => candle.close);
-    const macdData = calculateMACD(closes, backtestConfig.macdParams.fast, backtestConfig.macdParams.slow, backtestConfig.macdParams.signal);
+    const macdData = calculateMACDForBacktest(closes, backtestConfig.macdParams.fast, backtestConfig.macdParams.slow, backtestConfig.macdParams.signal);
+    
+    log(`📊 MACD calculé: ${macdData.macdArray.filter(v => v !== null).length} valeurs valides`, 'DEBUG');
     
     return {
         type: 'macd',
@@ -387,6 +447,9 @@ function calculateBollingerIndicators() {
 async function simulateTrades(indicators) {
     const totalCandles = backtestData.length;
     let progress = 30;
+    let signalCount = { BUY: 0, SELL: 0, HOLD: 0 };
+    
+    log(`🔄 Début simulation: ${totalCandles} bougies, début à l'index 50`, 'INFO');
     
     for (let i = 50; i < totalCandles; i++) { // Commencer à 50 pour avoir assez de données pour les indicateurs
         const candle = backtestData[i];
@@ -399,6 +462,12 @@ async function simulateTrades(indicators) {
         
         // Vérifier les signaux d'entrée
         const signal = getEntrySignal(indicators, i);
+        signalCount[signal]++;
+        
+        // Log des premiers signaux pour debug
+        if (i < 60 && signal !== 'HOLD') {
+            log(`🎯 Signal ${signal} détecté à l'index ${i} - Prix: ${candle.close}`, 'INFO');
+        }
         
         if (signal === 'BUY' && backtestResults.openTrades.length === 0) {
             openTrade(candle, 'LONG');
@@ -417,6 +486,9 @@ async function simulateTrades(indicators) {
             await new Promise(resolve => setTimeout(resolve, 1));
         }
     }
+    
+    log(`📊 Résumé des signaux: BUY=${signalCount.BUY}, SELL=${signalCount.SELL}, HOLD=${signalCount.HOLD}`, 'INFO');
+    log(`💼 Trades ouverts: ${backtestResults.trades.length}`, 'INFO');
 }
 
 // Obtenir le signal d'entrée selon la stratégie
@@ -443,17 +515,24 @@ function getMACDSignal(indicators, index) {
     const prevMacd = indicators.macd[index - 1];
     const prevSignal = indicators.signal[index - 1];
     
+    // Log de debug pour les premières bougies
+    if (index < 55 && index % 10 === 0) {
+        log(`🔍 MACD Debug [${index}]: MACD=${macd?.toFixed(6)}, Signal=${signal?.toFixed(6)}, Prev MACD=${prevMacd?.toFixed(6)}, Prev Signal=${prevSignal?.toFixed(6)}`, 'DEBUG');
+    }
+    
     if (macd === null || signal === null || prevMacd === null || prevSignal === null) {
         return 'HOLD';
     }
     
     // Croisement haussier
     if (prevMacd <= prevSignal && macd > signal) {
+        log(`🟢 Signal BUY détecté [${index}]: MACD=${macd.toFixed(6)} > Signal=${signal.toFixed(6)}`, 'SUCCESS');
         return 'BUY';
     }
     
     // Croisement baissier
     if (prevMacd >= prevSignal && macd < signal) {
+        log(`🔴 Signal SELL détecté [${index}]: MACD=${macd.toFixed(6)} < Signal=${signal.toFixed(6)}`, 'SUCCESS');
         return 'SELL';
     }
     
