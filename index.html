@@ -544,8 +544,16 @@
         
         // SOLUTION SIMPLE : Utiliser les données déjà récupérées par le bot
         function loadBacktestPairs() {
+            let attempts = 0;
+            const maxAttempts = 10; // 10 secondes maximum
+            
             // Attendre que le bot principal ait récupéré ses paires
             const checkForPairs = () => {
+                attempts++;
+                log(`🔍 Vérification des paires disponibles... (tentative ${attempts}/${maxAttempts})`, 'DEBUG');
+                log(`window.allPairs existe: ${!!window.allPairs}`, 'DEBUG');
+                log(`window.allPairs.length: ${window.allPairs ? window.allPairs.length : 'undefined'}`, 'DEBUG');
+                
                 // Vérifier si les paires sont disponibles dans une variable globale
                 if (window.allPairs && window.allPairs.length > 0) {
                     backtestPairs = window.allPairs.slice(0, 30); // TOP 30
@@ -554,11 +562,36 @@
                     return;
                 }
                 
+                // Si on a dépassé le nombre de tentatives, utiliser l'API directement
+                if (attempts >= maxAttempts) {
+                    log('⚠️ Timeout - Utilisation directe de l\'API...', 'WARNING');
+                    loadBacktestPairsDirectly();
+                    return;
+                }
+                
                 // Si pas encore disponible, réessayer dans 1 seconde
+                log('⏳ Paires pas encore disponibles, nouvel essai dans 1s...', 'INFO');
                 setTimeout(checkForPairs, 1000);
             };
             
             checkForPairs();
+        }
+        
+        // Solution de fallback : appel direct à l'API
+        async function loadBacktestPairsDirectly() {
+            try {
+                log('🔄 Récupération directe des paires pour backtesting...', 'INFO');
+                if (typeof window.getAllAvailablePairs === 'function') {
+                    const pairs = await window.getAllAvailablePairs();
+                    if (pairs && pairs.length > 0) {
+                        backtestPairs = pairs.slice(0, 30);
+                        fillChartSelector();
+                        log(`✅ ${backtestPairs.length} paires chargées directement pour backtesting`, 'SUCCESS');
+                    }
+                }
+            } catch (error) {
+                log(`❌ Erreur chargement direct: ${error.message}`, 'ERROR');
+            }
         }
         
         // Remplir le sélecteur avec les paires
