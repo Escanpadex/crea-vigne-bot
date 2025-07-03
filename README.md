@@ -39,7 +39,51 @@ Le bot utilise une approche révolutionnaire avec **filtrage progressif optimis�
 3. **Confirmation Multi-Timeframes** : H4 et H1 haussiers requis
 4. **Performance Optimisée** : Suppression du timeframe 5M pour réduire le bruit
 5. **Signaux Plus Fiables** : 15M comme timeframe final pour des signaux plus robustes
-6. **Moins de Faux Signaux** : Réduction significative des entrées prématurées
+6. **Moins de Faux Signaux** : Réduction significante des entrées prématurées
+
+## 🧪 Système de Backtesting Intégré
+
+### ✨ Nouvelles Fonctionnalités
+
+**🔧 Interface Modernisée :**
+- Section TradingView agrandie (700px de hauteur)
+- Sélecteur de timeframe pour le graphique (5m, 15m, 1h, 4h, 1d)
+- Suppression de la section "Historique Croisements MACD" (remplacée par le backtesting)
+
+**📊 Système de Backtesting Complet :**
+- **Stratégies Multiples** : MACD, RSI, EMA Crossover, Bandes de Bollinger
+- **Paramètres Configurables** : Personnalisation complète de chaque stratégie
+- **Timeframes Variés** : Tests sur 5m, 15m, 1h, 4h, 1d
+- **Durées Flexibles** : 24h, 48h, 7 jours, 30 jours, 90 jours
+- **Gestion des Risques** : Stop Loss et Take Profit configurables
+
+**📈 Métriques de Performance :**
+- Profit/Perte total (% et USDT)
+- Win Rate (taux de réussite)
+- Nombre de trades
+- Sharpe Ratio
+- Maximum Drawdown
+- Durée moyenne des trades
+
+**💾 Export et Analyse :**
+- Export des résultats en JSON
+- Historique détaillé des trades
+- Graphique de performance (en développement)
+
+### 🎮 Utilisation du Backtesting
+
+1. **Sélection de la Crypto** : Choisir la paire dans le sélecteur TradingView
+2. **Configuration de la Stratégie** :
+   - Type : MACD, RSI, EMA, Bollinger
+   - Paramètres spécifiques (Fast, Slow, Signal pour MACD)
+3. **Configuration du Test** :
+   - Timeframe d'analyse
+   - Durée du test
+   - Capital initial
+   - Taille de position (%)
+   - Stop Loss et Take Profit (%)
+4. **Lancement** : Cliquer sur "🚀 Lancer le Backtesting"
+5. **Analyse** : Consulter les résultats et exporter si nécessaire
 
 ### ⚙️ Configuration
 

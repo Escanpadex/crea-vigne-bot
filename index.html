@@ -228,49 +228,222 @@
             </div>
         </div>
         
-        <!-- NOUVELLE SECTION TRADINGVIEW & MACD -->
-        <div class="grid" id="tradingViewMacdGrid">
-            <div class="card" id="tradingViewCard">
-                <h3>📊 Graphique TradingView & MACD</h3>
-                <div class="form-group">
-                    <label id="chartSelectorLabel">Sélectionner une paire (TOP 30 Volume):</label>
+        <!-- SECTION TRADINGVIEW AGRANDIE -->
+        <div class="card" id="tradingViewCard" style="margin-bottom: 30px;">
+            <h3>📊 Graphique TradingView & MACD</h3>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center;">
+                <div class="form-group" style="flex: 1;">
+                    <label id="chartSelectorLabel">Sélectionner une paire:</label>
                     <select id="chartSymbol" onchange="updateChart()">
                         <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
                     </select>
-                    <small>⚡ Paires classées par volume 24h (mise à jour automatique)</small>
+                    <small>⚡ Paires classées par volume 24h</small>
                 </div>
                 
-                <!-- TradingView Widget -->
-                <div class="tradingview-widget-container" style="height: 500px; margin-top: 15px;">
-                    <div id="tradingview_chart" style="height: 100%; border-radius: 8px; overflow: hidden;"></div>
-                </div>
-                
-                <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button class="btn" onclick="refreshMACDData()" style="flex: 1;">🔄 Actualiser MACD</button>
-                    <button class="btn" onclick="scanMACDCrossover()" style="flex: 1;">🎯 Scanner Croisement</button>
+                <div class="form-group" style="flex: 1;">
+                    <label>Timeframe Graphique:</label>
+                    <select id="chartTimeframe" onchange="updateChartTimeframe()">
+                        <option value="5">5 minutes</option>
+                        <option value="15" selected>15 minutes</option>
+                        <option value="60">1 heure</option>
+                        <option value="240">4 heures</option>
+                        <option value="1D">1 jour</option>
+                    </select>
+                    <small>⏱️ Intervalle de temps du graphique</small>
                 </div>
             </div>
             
-            <div class="card" id="macdHistoryCard">
-                <h3 style="margin-bottom: 15px;">📈 Historique Croisements MACD (24h)</h3>
-                <div style="margin-bottom: 15px;">
-                    <strong>Paire analysée:</strong> <span id="currentMACDPair">BTC/USDT</span>
-                    <br>
-                    <strong>Dernière analyse:</strong> <span id="lastMACDScan">--</span>
-                </div>
-                
-                <div id="macdHistory" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #fafafa;">
-                    <div style="text-align: center; color: #555; padding: 20px;">
-                        <p style="color: #333; font-weight: 600;">🤖 Analyse MACD Automatique Activée</p>
-                        <p style="color: #666;">📊 Scan automatique des croisements haussiers toutes les 30 secondes</p>
-                        <p style="color: #666;">🎯 Affichage des signaux MACD des 24 dernières heures</p>
+            <!-- TradingView Widget Agrandi -->
+            <div class="tradingview-widget-container" style="height: 700px; margin-top: 15px;">
+                <div id="tradingview_chart" style="height: 100%; border-radius: 8px; overflow: hidden;"></div>
+            </div>
+        </div>
+
+        <!-- NOUVELLE SECTION BACKTESTING -->
+        <div class="card" id="backtestingCard">
+            <h3>🧪 Backtesting de Stratégies</h3>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Configuration de la Stratégie -->
+                <div>
+                    <h4>⚙️ Configuration de la Stratégie</h4>
+                    <div class="form-group">
+                        <label>Type de Stratégie:</label>
+                        <select id="backtestStrategy">
+                            <option value="macd">MACD Classique</option>
+                            <option value="macd_multi">MACD Multi-Timeframes</option>
+                            <option value="rsi">RSI</option>
+                            <option value="bollinger">Bandes de Bollinger</option>
+                            <option value="ema_cross">Croisement EMA</option>
+                        </select>
+                    </div>
+                    
+                    <div id="macdParams" class="strategy-params">
+                        <div class="form-group">
+                            <label>MACD Fast:</label>
+                            <input type="number" id="macdFast" value="12" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>MACD Slow:</label>
+                            <input type="number" id="macdSlow" value="26" min="1" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>MACD Signal:</label>
+                            <input type="number" id="macdSignal" value="9" min="1" max="50">
+                        </div>
+                    </div>
+                    
+                    <div id="rsiParams" class="strategy-params" style="display: none;">
+                        <div class="form-group">
+                            <label>RSI Période:</label>
+                            <input type="number" id="rsiPeriod" value="14" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>RSI Survente:</label>
+                            <input type="number" id="rsiOversold" value="30" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>RSI Surachat:</label>
+                            <input type="number" id="rsiOverbought" value="70" min="50" max="100">
+                        </div>
+                    </div>
+                    
+                    <div id="emaParams" class="strategy-params" style="display: none;">
+                        <div class="form-group">
+                            <label>EMA Rapide:</label>
+                            <input type="number" id="emaFast" value="9" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>EMA Lente:</label>
+                            <input type="number" id="emaSlow" value="21" min="1" max="100">
+                        </div>
                     </div>
                 </div>
                 
-                <div style="margin-top: 15px; padding: 10px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 8px; font-size: 12px;">
-                    <strong style="color: #2d5a2d;">ℹ️ Info:</strong> <span style="color: #333;">Les croisements MACD haussiers indiquent des signaux d'achat potentiels.</span><br>
-                    <strong style="color: #2d5a2d;">📊 Conditions:</strong> <span style="color: #333;">MACD > Signal Line (croisement vers le haut)</span><br>
-                    <strong style="color: #2d5a2d;">⚡ Automatique:</strong> <span style="color: #333;">Scan en temps réel après connexion API</span>
+                <!-- Configuration du Test -->
+                <div>
+                    <h4>📅 Configuration du Test</h4>
+                    <div class="form-group">
+                        <label>Timeframe d'Analyse:</label>
+                        <select id="backtestTimeframe">
+                            <option value="5m">5 minutes</option>
+                            <option value="15m" selected>15 minutes</option>
+                            <option value="1h">1 heure</option>
+                            <option value="4h">4 heures</option>
+                            <option value="1d">1 jour</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Durée du Test:</label>
+                        <select id="backtestDuration">
+                            <option value="1">24 heures</option>
+                            <option value="2">48 heures</option>
+                            <option value="7" selected>7 jours</option>
+                            <option value="30">30 jours</option>
+                            <option value="90">90 jours</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Capital Initial (USDT):</label>
+                        <input type="number" id="backtestCapital" value="1000" min="100" max="100000" step="100">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Taille Position (%):</label>
+                        <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Stop Loss (%):</label>
+                        <input type="number" id="backtestStopLoss" value="2" min="0.1" max="10" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Take Profit (%):</label>
+                        <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Boutons de Contrôle -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <button class="btn" onclick="startBacktest()" id="startBacktestBtn" style="flex: 1; background: #28a745;">
+                    🚀 Lancer le Backtesting
+                </button>
+                <button class="btn" onclick="stopBacktest()" id="stopBacktestBtn" style="flex: 1; background: #dc3545; display: none;">
+                    ⏹️ Arrêter le Test
+                </button>
+                <button class="btn" onclick="exportBacktestResults()" id="exportBacktestBtn" style="flex: 1; background: #007bff; display: none;">
+                    📊 Exporter Résultats
+                </button>
+            </div>
+            
+            <!-- Résultats du Backtesting -->
+            <div id="backtestResults" style="display: none;">
+                <h4>📊 Résultats du Backtesting</h4>
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <h5>💰 Performance</h5>
+                        <div class="stat-value" id="backtestProfit">+0.00%</div>
+                        <small>Profit/Perte Total</small>
+                    </div>
+                    <div class="stat-card">
+                        <h5>📈 Trades</h5>
+                        <div class="stat-value" id="backtestTrades">0</div>
+                        <small>Nombre de Trades</small>
+                    </div>
+                    <div class="stat-card">
+                        <h5>✅ Win Rate</h5>
+                        <div class="stat-value" id="backtestWinRate">0%</div>
+                        <small>Taux de Réussite</small>
+                    </div>
+                    <div class="stat-card">
+                        <h5>📊 Sharpe Ratio</h5>
+                        <div class="stat-value" id="backtestSharpe">0.00</div>
+                        <small>Ratio Risque/Rendement</small>
+                    </div>
+                    <div class="stat-card">
+                        <h5>📉 Max Drawdown</h5>
+                        <div class="stat-value" id="backtestDrawdown">0.00%</div>
+                        <small>Perte Maximum</small>
+                    </div>
+                    <div class="stat-card">
+                        <h5>⏱️ Durée Moyenne</h5>
+                        <div class="stat-value" id="backtestAvgDuration">0h</div>
+                        <small>Durée des Trades</small>
+                    </div>
+                </div>
+                
+                <!-- Graphique des Résultats -->
+                <div id="backtestChart" style="height: 400px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #666;">
+                        📊 Graphique des performances sera affiché ici
+                    </div>
+                </div>
+                
+                <!-- Historique des Trades -->
+                <div>
+                    <h5>📋 Historique des Trades</h5>
+                    <div id="backtestTradeHistory" style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                        <div style="text-align: center; color: #666; padding: 20px;">
+                            Aucun trade effectué pour le moment
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statut du Backtesting -->
+            <div id="backtestStatus" style="display: none; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="loading-spinner" style="width: 20px; height: 20px;"></div>
+                    <span id="backtestStatusText">Initialisation du backtesting...</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div class="progress-bar" style="width: 100%; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
+                        <div id="backtestProgress" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s ease;"></div>
+                    </div>
+                    <small id="backtestProgressText" style="color: #666; margin-top: 5px; display: block;">0% terminé</small>
                 </div>
             </div>
         </div>
@@ -282,6 +455,7 @@
     <script src="js/api.js"></script>
     <script src="js/trading.js"></script>
     <script src="js/main.js"></script>
+    <script src="js/backtesting.js"></script>
     
     <!-- 🆘 FONCTIONS DIAGNOSTIC STOP LOSS -->
     <script>
@@ -379,11 +553,12 @@
         // Initialize TradingView Chart
         function initTradingViewChart() {
             if (typeof TradingView !== 'undefined') {
-                const interval = '15'; // Toujours 15M pour le graphique (timeframe final du filtrage progressif)
+                const interval = document.getElementById('chartTimeframe') ? 
+                    document.getElementById('chartTimeframe').value : '15';
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
-                    "height": 500,
+                    "height": 700,
                     "symbol": currentSymbol,
                     "interval": interval,
                     "timezone": "Europe/Paris",
@@ -407,7 +582,7 @@
                     }
                 });
                 
-                log(`📊 Graphique TradingView initialisé avec MACD (15M - timeframe final)`, 'SUCCESS');
+                log(`📊 Graphique TradingView initialisé avec MACD (${interval})`, 'SUCCESS');
             } else {
                 setTimeout(initTradingViewChart, 1000);
             }
@@ -646,11 +821,12 @@
             
             // Recréer le widget avec le nouveau symbole
             setTimeout(() => {
-                const interval = '15'; // Toujours 15M pour le graphique (timeframe final du filtrage progressif)
+                const interval = document.getElementById('chartTimeframe') ? 
+                    document.getElementById('chartTimeframe').value : '15';
                 
                 tvWidget = new TradingView.widget({
                     "width": "100%",
-                    "height": 600,
+                    "height": 700,
                     "symbol": selectedSymbol,
                     "interval": interval,
                     "timezone": "Europe/Paris",
@@ -671,7 +847,7 @@
                     }
                 });
                 
-                log(`📊 Graphique recréé avec succès: ${symbolName} (15M - timeframe final)`, 'SUCCESS');
+                log(`📊 Graphique recréé avec succès: ${symbolName} (${interval})`, 'SUCCESS');
             }, 500);
             
             // DÉSACTIVÉ - Utilise maintenant le nouveau système MACD multi-tokens
@@ -679,15 +855,7 @@
             console.log('📊 Ancien système MACD désactivé - Utilise le nouveau système multi-tokens');
         }
 
-        // Fonctions publiques (appelées par les boutons)
-        async function scanMACDCrossover() {
-            // SYSTÈME ORIGINAL - Le MACD fonctionne avec le bot principal
-            console.log('📊 Bouton Scanner Croisement - Le MACD fonctionne automatiquement avec le bot');
-        }
-
-        async function refreshMACDData() {
-            await refreshCompleteHistory();
-        }
+        // Fonctions publiques supprimées - Remplacées par le système de backtesting
 
         // 🆕 FONCTION: Gestion du nombre de paires à analyser (fonction updateMacdTimeframe supprimée - plus nécessaire avec le filtrage progressif)
 
