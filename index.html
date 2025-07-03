@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot Trading Bitget Futures - Analyse MACD Volume Dynamique</title>
     <link rel="stylesheet" href="styles/main.css">
-    <!-- TradingView Widget Script -->
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
 </head>
 <body>
     <div class="container">
@@ -228,40 +227,21 @@
             </div>
         </div>
         
-        <!-- SECTION TRADINGVIEW AGRANDIE -->
-        <div class="card" id="tradingViewCard" style="margin-bottom: 30px;">
-            <h3>📊 Graphique TradingView & MACD</h3>
-            <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center;">
-                <div class="form-group" style="flex: 1;">
-                    <label id="chartSelectorLabel">Sélectionner une paire:</label>
-                    <select id="chartSymbol" onchange="updateChart()">
-                        <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
-                    </select>
-                    <small>⚡ Paires classées par volume 24h</small>
-                </div>
-                
-                <div class="form-group" style="flex: 1;">
-                    <label>Timeframe Graphique:</label>
-                    <select id="chartTimeframe" onchange="updateChartTimeframe()">
-                        <option value="5">5 minutes</option>
-                        <option value="15" selected>15 minutes</option>
-                        <option value="60">1 heure</option>
-                        <option value="240">4 heures</option>
-                        <option value="1D">1 jour</option>
-                    </select>
-                    <small>⏱️ Intervalle de temps du graphique</small>
-                </div>
-            </div>
-            
-            <!-- TradingView Widget Agrandi -->
-            <div class="tradingview-widget-container" style="height: 700px; margin-top: 15px;">
-                <div id="tradingview_chart" style="height: 100%; border-radius: 8px; overflow: hidden;"></div>
-            </div>
-        </div>
+
 
         <!-- NOUVELLE SECTION BACKTESTING -->
         <div class="card" id="backtestingCard">
             <h3>🧪 Backtesting de Stratégies</h3>
+            
+            <!-- Sélection de la Paire -->
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label id="chartSelectorLabel">Sélectionner une paire pour le backtesting:</label>
+                <select id="chartSymbol" onchange="updateSelectedPair()">
+                    <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
+                </select>
+                <small>⚡ Paires classées par volume 24h - Capital fixe: 1000 USDT</small>
+            </div>
+            
             <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <!-- Configuration de la Stratégie -->
                 <div>
@@ -345,23 +325,21 @@
                     </div>
                     
                     <div class="form-group">
-                        <label>Capital Initial (USDT):</label>
-                        <input type="number" id="backtestCapital" value="1000" min="100" max="100000" step="100">
-                    </div>
-                    
-                    <div class="form-group">
                         <label>Taille Position (%):</label>
                         <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1">
+                        <small>Pourcentage du capital (1000 USDT) à utiliser par trade</small>
                     </div>
                     
                     <div class="form-group">
-                        <label>Stop Loss (%):</label>
-                        <input type="number" id="backtestStopLoss" value="2" min="0.1" max="10" step="0.1">
+                        <label>Trailing Stop Loss (%):</label>
+                        <input type="number" id="backtestTrailingStop" value="1.5" min="0.1" max="5" step="0.1">
+                        <small>Distance de trailing en % (calculé sur données 1min pour précision)</small>
                     </div>
                     
                     <div class="form-group">
                         <label>Take Profit (%):</label>
                         <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
+                        <small>Objectif de profit en % avant fermeture automatique</small>
                     </div>
                 </div>
             </div>
@@ -542,320 +520,9 @@
         }
     </script>
     
-    <!-- TradingView & MACD Functions OPTIMISÉES -->
-    <script>
-        let tvWidget = null;
-        let currentSymbol = 'BINANCE:BTCUSDT';
-        let macdHistoryData = [];
-        let realTimeInterval = null;
-        let lastKnownMACD = null;
 
-        // Initialize TradingView Chart
-        function initTradingViewChart() {
-            if (typeof TradingView !== 'undefined') {
-                const interval = document.getElementById('chartTimeframe') ? 
-                    document.getElementById('chartTimeframe').value : '15';
-                
-                tvWidget = new TradingView.widget({
-                    "width": "100%",
-                    "height": 700,
-                    "symbol": currentSymbol,
-                    "interval": interval,
-                    "timezone": "Europe/Paris",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "fr",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "container_id": "tradingview_chart",
-                    "studies": [
-                        "MACD@tv-basicstudies"
-                    ],
-                    "overrides": {
-                        "paneProperties.backgroundType": "solid",
-                        "paneProperties.background": "#ffffff",
-                        "paneProperties.vertGridProperties.color": "#f0f0f0",
-                        "paneProperties.horzGridProperties.color": "#f0f0f0"
-                    }
-                });
-                
-                log(`📊 Graphique TradingView initialisé avec MACD (${interval})`, 'SUCCESS');
-            } else {
-                setTimeout(initTradingViewChart, 1000);
-            }
-        }
 
-        // ⚡ OPTIMISATION 1: Données temps réel avec intervalles plus courts
-        async function getMACDDataOptimized(symbol, limit = 100) {
-            try {
-                const binanceSymbol = symbol.split(':')[1];
-                
-                // Utiliser 1min au lieu de 5min pour plus de réactivité
-                const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=1m&limit=${limit * 5}`);
-                const klines = await response.json();
-                
-                if (!Array.isArray(klines)) {
-                    throw new Error('Données invalides reçues de Binance');
-                }
-
-                // Convertir en données 5min pour le calcul MACD
-                const ohlc5m = convertTo5MinData(klines);
-                const macdData = calculateMACDOptimized(ohlc5m);
-                
-                return macdData;
-            } catch (error) {
-                log(`❌ Erreur récupération données MACD optimisées: ${error.message}`, 'ERROR');
-                return null;
-            }
-        }
-
-        // ⚡ OPTIMISATION 2: Conversion 1min vers 5min en temps réel
-        function convertTo5MinData(klines1m) {
-            const ohlc5m = [];
-            
-            // Grouper par blocs de 5 minutes
-            for (let i = 0; i < klines1m.length; i += 5) {
-                const block = klines1m.slice(i, i + 5);
-                if (block.length === 5) {
-                    const open = parseFloat(block[0][1]);
-                    const high = Math.max(...block.map(k => parseFloat(k[2])));
-                    const low = Math.min(...block.map(k => parseFloat(k[3])));
-                    const close = parseFloat(block[4][4]);
-                    const volume = block.reduce((sum, k) => sum + parseFloat(k[5]), 0);
-                    
-                    ohlc5m.push({
-                        time: new Date(parseInt(block[0][0])),
-                        open, high, low, close, volume
-                    });
-                }
-            }
-            
-            return ohlc5m;
-        }
-
-        // ⚡ OPTIMISATION 3: Calcul MACD plus rapide avec cache
-        function calculateMACDOptimized(ohlcData, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-            if (ohlcData.length < slowPeriod + signalPeriod) {
-                return null;
-            }
-
-            const closes = ohlcData.map(d => d.close);
-            
-            // EMA optimisée avec cache
-            function calculateEMAFast(prices, period) {
-                const k = 2 / (period + 1);
-                const ema = [prices[0]];
-                
-                for (let i = 1; i < prices.length; i++) {
-                    ema[i] = prices[i] * k + ema[i - 1] * (1 - k);
-                }
-                
-                return ema;
-            }
-
-            const ema12 = calculateEMAFast(closes, fastPeriod);
-            const ema26 = calculateEMAFast(closes, slowPeriod);
-            
-            const macdLine = ema12.map((val, i) => val - ema26[i]);
-            const signalLine = calculateEMAFast(macdLine.slice(slowPeriod - 1), signalPeriod);
-            
-            const histogram = [];
-            for (let i = 0; i < signalLine.length; i++) {
-                const macdIndex = i + slowPeriod - 1;
-                histogram[i] = macdLine[macdIndex] - signalLine[i];
-            }
-
-            return {
-                dates: ohlcData.slice(slowPeriod + signalPeriod - 2).map(d => d.time),
-                macd: macdLine.slice(slowPeriod + signalPeriod - 2),
-                signal: signalLine,
-                histogram: histogram
-            };
-        }
-
-        // ⚡ OPTIMISATION 4: Scan temps réel continu
-        async function startRealTimeScanning() {
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            
-            if (realTimeInterval) {
-                clearInterval(realTimeInterval);
-            }
-            
-            log('🚀 Démarrage scan MACD temps réel (30s)', 'SUCCESS');
-            
-            // DÉSACTIVÉ - Remplacé par la nouvelle stratégie multi-timeframes
-            // realTimeInterval = setInterval(async () => {
-            //     await scanMACDCrossoverRealTime();
-            // }, 30000);
-            
-            // Premier scan immédiat - DÉSACTIVÉ
-            // await scanMACDCrossoverRealTime();
-            
-            log('ℹ️ Scan MACD temps réel désactivé - Utilise la nouvelle stratégie multi-timeframes', 'INFO');
-        }
-
-        // ⚡ OPTIMISATION 5: Détection temps réel des nouveaux croisements - DÉSACTIVÉE
-        async function scanMACDCrossoverRealTime() {
-            // FONCTION DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
-            log('ℹ️ scanMACDCrossoverRealTime() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
-            return;
-        }
-
-        // Code de l'ancienne fonction scanMACDCrossoverRealTime complètement supprimé
-
-        // ⚡ OPTIMISATION 6: Rafraîchissement intelligent
-        async function refreshCompleteHistory() {
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            
-            const macdData = await getMACDDataOptimized(selectedSymbol, 300);
-            
-            if (!macdData) return;
-
-            const crossovers = [];
-            
-            for (let i = 1; i < macdData.macd.length; i++) {
-                const prevMACD = macdData.macd[i - 1];
-                const prevSignal = macdData.signal[i - 1];
-                const currMACD = macdData.macd[i];
-                const currSignal = macdData.signal[i];
-                
-                if (prevMACD <= prevSignal && currMACD > currSignal) {
-                    crossovers.push({
-                        time: macdData.dates[i],
-                        macd: currMACD,
-                        signal: currSignal,
-                        histogram: macdData.histogram[i]
-                    });
-                }
-            }
-
-            const now = new Date();
-            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const recent24h = crossovers.filter(c => c.time >= yesterday);
-
-            displayMACDHistoryOptimized(recent24h, symbolName);
-        }
-
-        // ⚡ OPTIMISATION 7: Affichage avec délai calculé et couleurs corrigées
-        function displayMACDHistoryOptimized(crossovers, symbolName) {
-            const container = document.getElementById('macdHistory');
-            
-            if (crossovers.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: #666; padding: 20px; background: #fafafa;">
-                        <p style="color: #333; font-weight: 600;">📊 Aucun croisement haussier MACD détecté sur ${symbolName}</p>
-                        <p style="color: #666;">⚡ Mode temps réel activé (scan toutes les 30s)</p>
-                        <p style="color: #2d5a2d;">🤖 Analyse automatique en cours...</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = `<div style="margin-bottom: 10px; font-weight: bold; color: #2d5a2d; background: #f0f8ff; padding: 8px; border-radius: 6px; border: 1px solid #b8e6b8;">
-                🎯 ${crossovers.length} croisement(s) haussier(s) - ${symbolName} ⚡ TEMPS RÉEL
-            </div>`;
-
-            crossovers.reverse().forEach((crossover, index) => {
-                const timeStr = crossover.time.toLocaleString('fr-FR');
-                const now = new Date();
-                const delayMinutes = Math.round((now - crossover.time) / 60000);
-                
-                // Convertir en heures si > 60 minutes
-                let delayText;
-                let delayColor;
-                
-                if (delayMinutes >= 60) {
-                    const hours = Math.floor(delayMinutes / 60);
-                    const remainingMinutes = delayMinutes % 60;
-                    delayText = remainingMinutes > 0 ? `${hours}h${remainingMinutes}min` : `${hours}h`;
-                    delayColor = '#d73527'; // Rouge foncé pour visibilité
-                } else {
-                    delayText = `${delayMinutes}min`;
-                    delayColor = delayMinutes <= 2 ? '#2d5a2d' : delayMinutes <= 5 ? '#e68a00' : '#d73527';
-                }
-                
-                html += `
-                    <div style="border: 1px solid #b8e6b8; border-radius: 6px; padding: 12px; margin: 8px 0; background: #f8fff8;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                            <strong style="color: #2d5a2d;">🔔 Croisement #${crossovers.length - index}</strong>
-                            <span style="color: ${delayColor}; font-weight: bold;">⚡ ${delayText}</span>
-                        </div>
-                        <div style="font-size: 13px; color: #333;">
-                            <div>⏰ Heure: ${timeStr}</div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = html;
-            document.getElementById('lastMACDScan').textContent = new Date().toLocaleTimeString();
-        }
-
-        // FONCTION DÉSACTIVÉE: updateChartSelector() pour éviter les conflits
-        function updateChartSelector() {
-            // FONCTION DÉSACTIVÉE - Remplacée par la stratégie multi-timeframes
-            log('ℹ️ updateChartSelector() désactivée - Utilise la nouvelle stratégie', 'DEBUG');
-            return;
-        }
-
-        // Update chart when symbol changes + Auto-start scanning
-        function updateChart() {
-            const selectedSymbol = document.getElementById('chartSymbol').value;
-            currentSymbol = selectedSymbol;
-            
-            const symbolName = selectedSymbol.split(':')[1].replace('USDT', '/USDT');
-            document.getElementById('currentMACDPair').textContent = symbolName;
-            
-            // Détruire l'ancien widget et en créer un nouveau avec le nouveau symbole
-            if (tvWidget) {
-                try {
-                    tvWidget.remove();
-                } catch(e) {
-                    console.log('Widget déjà supprimé');
-                }
-            }
-            
-            // Recréer le widget avec le nouveau symbole
-            setTimeout(() => {
-                const interval = document.getElementById('chartTimeframe') ? 
-                    document.getElementById('chartTimeframe').value : '15';
-                
-                tvWidget = new TradingView.widget({
-                    "width": "100%",
-                    "height": 700,
-                    "symbol": selectedSymbol,
-                    "interval": interval,
-                    "timezone": "Europe/Paris",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "fr",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "container_id": "tradingview_chart",
-                    "studies": ["MACD@tv-basicstudies"],
-                    "overrides": {
-                        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-                        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-                        "paneProperties.background": "#ffffff"
-                    }
-                });
-                
-                log(`📊 Graphique recréé avec succès: ${symbolName} (${interval})`, 'SUCCESS');
-            }, 500);
-            
-            // DÉSACTIVÉ - Utilise maintenant le nouveau système MACD multi-tokens
-            // startRealTimeScanning();
-            console.log('📊 Ancien système MACD désactivé - Utilise le nouveau système multi-tokens');
-        }
-
-        // Fonctions publiques supprimées - Remplacées par le système de backtesting
+        // Fonctions TradingView supprimées - Remplacées par le système de backtesting
 
         // 🆕 FONCTION: Gestion du nombre de paires à analyser (fonction updateMacdTimeframe supprimée - plus nécessaire avec le filtrage progressif)
 
@@ -947,10 +614,7 @@
                 settingsElement.textContent = `📈 Filtrage 4H→1H→15M | TOP ${config.topVolumeCount}`;
             }
             
-            // Wait a bit for TradingView script to load
-            setTimeout(() => {
-                initTradingViewChart();
-            }, 2000);
+
             
             // Initialiser le sélecteur avec des valeurs par défaut
             setTimeout(() => {
