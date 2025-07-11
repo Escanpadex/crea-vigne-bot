@@ -62,7 +62,7 @@ let backtestConfig = {
 };
 
 // Fonction pour récupérer les données klines depuis l'API Binance
-async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
+async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
     try {
         // Conversion des timeframes pour Binance
         const binanceIntervals = {
@@ -88,7 +88,9 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m') {
         }
         
         // URL de l'API Binance (pas besoin d'authentification pour les données de marché)
-        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${binanceInterval}&limit=${limit}`;
+        let url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${binanceInterval}&limit=${limit}`;
+        if (startTime) url += `&startTime=${startTime}`;
+        if (endTime) url += `&endTime=${endTime}`;
         
         const response = await fetch(url);
         const data = await response.json();
@@ -266,24 +268,39 @@ async function fetchBacktestData(symbol, timeframe = backtestConfig.timeframe) {
     try {
         updateBacktestStatus('Récupération des données historiques via Binance...', 10);
         
-        // Calculer le nombre de bougies nécessaires
-        const timeframeMinutes = getTimeframeMinutes(timeframe);
-        const totalMinutes = backtestConfig.duration * 24 * 60;
-        const candlesNeeded = Math.ceil(totalMinutes / timeframeMinutes) + 100; // +100 pour les indicateurs
+        const timeframeMs = getTimeframeMinutes(timeframe) * 60 * 1000;
+        const totalMs = backtestConfig.duration * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        let endTime = now;
+        let startTime = now - totalMs;
+        let allData = [];
         
-        // Limiter à 1000 bougies maximum (limite API Binance)
-        const limit = Math.min(candlesNeeded, 1000);
+        while (endTime > startTime) {
+            const currentStart = Math.max(startTime, endTime - (1000 * timeframeMs));
+            log(`📊 Récupération de bougies de ${new Date(currentStart).toLocaleString()} à ${new Date(endTime).toLocaleString()}`, 'INFO');
+            const data = await getBinanceKlineData(symbol, 1000, timeframe, currentStart, endTime);
+            
+            if (data.length === 0) break;
+            
+            allData = data.concat(allData); // Prepend
+            endTime = data[0].timestamp - 1;
+            
+            await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit
+        }
         
-        log(`📊 Récupération de ${limit} bougies ${timeframe} pour ${symbol} via Binance`, 'INFO');
+        // Add extra 100 candles for indicators if possible
+        if (allData.length > 0) {
+            const extraStart = allData[0].timestamp - (100 * timeframeMs);
+            const extraData = await getBinanceKlineData(symbol, 100, timeframe, extraStart, allData[0].timestamp - 1);
+            allData = extraData.concat(allData);
+        }
         
-        // Utiliser l'API Binance pour récupérer les données
-        backtestData = await getBinanceKlineData(symbol, limit, timeframe);
+        backtestData = allData;
         
         if (backtestData.length === 0) {
             throw new Error('Aucune donnée historique récupérée depuis Binance');
         }
         
-        // Log des premières et dernières données pour vérification
         log(`✅ ${backtestData.length} bougies récupérées depuis Binance pour le backtesting`, 'SUCCESS');
         log(`📊 Première bougie: ${new Date(backtestData[0].timestamp).toLocaleString()} - Prix: ${backtestData[0].close}`, 'DEBUG');
         log(`📊 Dernière bougie: ${new Date(backtestData[backtestData.length-1].timestamp).toLocaleString()} - Prix: ${backtestData[backtestData.length-1].close}`, 'DEBUG');
@@ -621,7 +638,7 @@ async function simulateTrades(indicators) {
         
         // CORRECTION 2 : Uniquement les signaux BUY pour ouvrir des trades LONG
         // Plus de signaux SELL - fermeture uniquement par trailing stop
-        if (signal === 'BUY' && backtestResults.openTrades.length === 0) {
+        if (signal === 'BUY') {
             openTrade(candle, 'LONG');
         }
         
