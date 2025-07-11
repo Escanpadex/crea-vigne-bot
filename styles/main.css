@@ -762,3 +762,116 @@ input:focus, select:focus {
         text-align: left;
     }
 } 
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background: #121212;
+    color: #e0e0e0;
+}
+
+.dark-mode .card {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #333;
+}
+
+.dark-mode .nav-tabs .nav-link {
+    color: #e0e0e0;
+    background: #1e1e1e;
+}
+
+.dark-mode .nav-tabs .nav-link.active {
+    background: #2c2c2c;
+    border-bottom: 2px solid #0d6efd;
+}
+
+.dark-mode .btn {
+    background: linear-gradient(45deg, #0d6efd, #6610f2);
+    color: #fff;
+}
+
+.dark-mode .btn-api-highlight {
+    background: linear-gradient(45deg, #198754, #0f5132) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 15px rgba(25, 135, 84, 0.4) !important;
+}
+
+/* Optimize cards: Reduce padding and add flex for better spacing */
+.card {
+    padding: 10px; /* Reduced from 15px for more compactness */
+    margin-bottom: 10px;
+    border-radius: 10px; /* Slightly smaller for modern feel */
+}
+
+/* Fix API button visibility and positioning */
+.btn-api-highlight {
+    color: #fff !important; /* Ensure text is white */
+    margin: 0 auto; /* Center if needed */
+}
+
+/* Adjust header for less empty space */
+.header {
+    padding: 10px;
+    margin-bottom: 10px;
+} 
+
+/* Further optimizations for all cards */
+.card {
+    padding: 10px; /* Reduced from 15px for more compactness */
+    margin-bottom: 10px;
+    border-radius: 10px; /* Slightly smaller for modern feel */
+}
+
+/* Analysis tab: Compact timeframe stats */
+.macd-timeframe-stats {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px; /* Reduced gap */
+}
+
+.timeframe-stat {
+    padding: 8px; /* Compact padding */
+}
+
+/* Positions tab: Optimize stats grid */
+.positions-metrics {
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.positions-metric {
+    padding: 8px 12px;
+}
+
+/* Backtesting tab: Compact form groups and stats */
+.form-group {
+    margin-bottom: 10px; /* Reduced */
+}
+
+.stat-card {
+    padding: 15px; /* Slightly reduced */
+}
+
+/* Logs tab: Make logs more readable and compact */
+.logs {
+    max-height: 300px;
+    padding: 10px;
+    font-size: 11px;
+}
+
+/* Dark mode enhancements for all sections */
+.dark-mode .form-group label,
+.dark-mode .stat-value,
+.dark-mode .trade-symbol {
+    color: #e0e0e0 !important; /* High contrast */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card {
+        padding: 8px;
+    }
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+} 
