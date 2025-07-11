@@ -132,6 +132,26 @@
                             </div>
                         </div>
                         
+                        <!-- 🆕 Nouveau: Basculement entre logiques -->
+                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                <div>
+                                    <strong style="color: #2d3748;">🔧 Mode d'Analyse Multi-Timeframe</strong>
+                                    <div style="font-size: 12px; color: #666; margin-top: 2px;" id="logicDescription">
+                                        Données étendues 4H/1H pour meilleurs signaux
+                                    </div>
+                                </div>
+                                <button onclick="toggleMultiTimeframeLogic()" id="logicToggleBtn" style="background: #48bb78; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold;">
+                                    🚀 AMÉLIORÉ
+                                </button>
+                            </div>
+                            <div style="font-size: 11px; color: #666; line-height: 1.4;">
+                                <div id="logicExplanation">
+                                    <strong>Mode Amélioré:</strong> Analyse 4H et 1H sur 60 jours de données pour détecter le dernier état valide, puis 15M sur données récentes pour les signaux BUY.
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div style="display: flex; gap: 15px; justify-content: center;">
                             <button class="btn" onclick="startBot()" id="startBtn" style="padding: 12px 30px; font-size: 16px; background: linear-gradient(135deg, #48bb78, #38a169); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3); font-weight: bold; min-width: 150px;">▶️ Démarrer le Bot</button>
                             <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="padding: 12px 30px; font-size: 16px; background: linear-gradient(135deg, #f56565, #e53e3e); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(245, 101, 101, 0.3); font-weight: bold; min-width: 150px;">⏹️ Arrêter le Bot</button>
