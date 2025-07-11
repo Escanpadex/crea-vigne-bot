@@ -47,6 +47,10 @@ let config = {
         minProfitToTrail: 0.5,         // Profit minimum avant activation trailing (0.5%)
         aggressiveTrailing: false,     // Mode agressif (0.5% au lieu de 1%)
         breakEvenProtection: true      // Protection break-even après +2%
+    },
+    fees: {
+        maker: 0.0002, // 0.02%
+        taker: 0.0005  // 0.05%
     }
 };
 

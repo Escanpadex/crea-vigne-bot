@@ -254,22 +254,22 @@ function validateBacktestConfig() {
 }
 
 // Récupérer les données historiques via API Binance
-async function fetchBacktestData(symbol) {
+async function fetchBacktestData(symbol, timeframe = backtestConfig.timeframe) {
     try {
         updateBacktestStatus('Récupération des données historiques via Binance...', 10);
         
         // Calculer le nombre de bougies nécessaires
-        const timeframeMinutes = getTimeframeMinutes(backtestConfig.timeframe);
+        const timeframeMinutes = getTimeframeMinutes(timeframe);
         const totalMinutes = backtestConfig.duration * 24 * 60;
         const candlesNeeded = Math.ceil(totalMinutes / timeframeMinutes) + 100; // +100 pour les indicateurs
         
         // Limiter à 1000 bougies maximum (limite API Binance)
         const limit = Math.min(candlesNeeded, 1000);
         
-        log(`📊 Récupération de ${limit} bougies ${backtestConfig.timeframe} pour ${symbol} via Binance`, 'INFO');
+        log(`📊 Récupération de ${limit} bougies ${timeframe} pour ${symbol} via Binance`, 'INFO');
         
         // Utiliser l'API Binance pour récupérer les données
-        backtestData = await getBinanceKlineData(symbol, limit, backtestConfig.timeframe);
+        backtestData = await getBinanceKlineData(symbol, limit, timeframe);
         
         if (backtestData.length === 0) {
             throw new Error('Aucune donnée historique récupérée depuis Binance');
@@ -899,6 +899,8 @@ function closeTrade(trade, exitTime, exitReason) {
         pnl = (trade.entryPrice - trade.exitPrice) * trade.quantity;
     }
     
+    pnl *= (1 - 0.0005); // 0.05% fee
+    
     trade.pnl = pnl;
     trade.pnlPercent = (pnl / trade.positionValue) * 100;
     
@@ -987,6 +989,14 @@ function calculateFinalStats() {
     } else {
         stats.avgDuration = 0;
     }
+
+    // Sortino ratio (similar to Sharpe but only downside deviation)
+    const downsideDeviation = returns.filter(r => r < 0).reduce((sum, r) => sum + Math.pow(r, 2), 0) / returns.length;
+    const sortinoRatio = returns.length > 0 && downsideDeviation > 0 ? Math.sqrt(returns.length) * (avgReturn / Math.sqrt(downsideDeviation)) : 0;
+    stats.sortinoRatio = sortinoRatio;
+
+    // Win/Loss Ratio
+    stats.winLossRatio = stats.losingTrades > 0 ? (stats.winningTrades / stats.losingTrades) : 0;
 }
 
 // Afficher les résultats du backtesting
@@ -1014,6 +1024,31 @@ function displayBacktestResults() {
     
     // Afficher le bouton d'export
     document.getElementById('exportBacktestBtn').style.display = 'block';
+
+    // Plot equity curve
+    plotEquityCurve(backtestResults.equity, backtestResults.timestamps);
+}
+
+function plotEquityCurve(equity, timestamps) {
+    const ctx = document.getElementById('equityCurveChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timestamps.map(ts => new Date(ts).toLocaleString()),
+            datasets: [{
+                label: 'Equity Curve',
+                data: equity,
+                borderColor: 'blue',
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: 'time' }
+            }
+        }
+    });
 }
 
 // Afficher l'historique des trades
@@ -1216,6 +1251,17 @@ function calculateBollingerBands(prices, period = 20, multiplier = 2) {
     return { upper, middle, lower };
 }
 
+async function optimizeMACD() {
+    const grids = { fast: [8,12,16], slow: [20,26,32], signal: [6,9,12] };
+    let best = { sharpe: -Infinity, params: {} };
+    for (let f of grids.fast) for (let s of grids.slow) for (let sig of grids.signal) {
+        backtestConfig.macdParams = {fast: f, slow: s, signal: sig};
+        await runBacktestStrategy();
+        if (backtestResults.stats.sharpeRatio > best.sharpe) best = {sharpe: backtestResults.stats.sharpeRatio, params: {f,s,sig}};
+    }
+    log(`Best params: ${JSON.stringify(best)}`);
+}
+
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
     // Gérer le changement de stratégie
@@ -1376,6 +1422,7 @@ window.exportBacktestResults = exportBacktestResults;
 window.updateChartTimeframe = updateChartTimeframe;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
+window.optimizeMACD = optimizeMACD; // Add this line to make optimizeMACD accessible
 
 console.log('✅ Backtesting system loaded successfully');
 
