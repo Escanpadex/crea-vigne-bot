@@ -45,65 +45,90 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         console.log(`🔍 [DEBUG] Analyse multi-timeframe pour ${symbol} à l'index ${candleIndex}`);
         
         const currentTime = historicalData[candleIndex].timestamp;
-        
-        // LOGIQUE CORRIGÉE : 4H et 1H utilisent des données étendues (60 jours)
-        // pour trouver le dernier signal valide, pas forcément dans la période de backtesting
-        const timeframes = ['4h', '1h', '15m'];
         const results = {};
         
-        for (const tf of timeframes) {
-            let dataToAnalyze;
-            
-            if (tf === '4h') {
-                dataToAnalyze = extended4hData.filter(c => c.timestamp <= currentTime);
-                console.log(`📊 [DEBUG] ${tf}: Utilisation de ${dataToAnalyze.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
-            } else if (tf === '1h') {
-                dataToAnalyze = extended1hData.filter(c => c.timestamp <= currentTime);
-                console.log(`📊 [DEBUG] ${tf}: Utilisation de ${dataToAnalyze.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
+        // ÉTAPE 1 : Analyser le dernier signal 4H connu (peut être en dehors des 7 jours)
+        const data4h = extended4hData.filter(c => c.timestamp <= currentTime);
+        console.log(`📊 [DEBUG] 4H: Utilisation de ${data4h.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
+        
+        if (data4h.length < 50) {
+            console.log(`⚠️ [DEBUG] Données insuffisantes pour 4H: ${data4h.length} bougies`);
+            return { finalDecision: 'FILTERED', filterReason: 'Données 4H insuffisantes' };
+        }
+        
+        // Trouver le dernier signal 4H connu
+        const lastSignal4h = await findLastSignalInTimeframe(symbol, '4h', data4h);
+        results['4h'] = lastSignal4h;
+        console.log(`📊 [DEBUG] 4H: Dernier signal connu = ${lastSignal4h.signal}, Index = ${lastSignal4h.signalIndex}`);
+        
+        // Si le dernier signal 4H est baissier, vérifier si un nouveau signal haussier est apparu
+        if (lastSignal4h.signal === 'BEARISH' || lastSignal4h.signal === 'NEUTRAL') {
+            const newBullish4h = await checkForNewBullishSignal(symbol, '4h', data4h, lastSignal4h.signalIndex);
+            if (!newBullish4h) {
+                results.finalDecision = 'FILTERED';
+                results.filterReason = `Dernier signal 4H baissier/neutre, en attente d'un signal haussier`;
+                console.log(`❌ [DEBUG] Filtré: Dernier signal 4H ${lastSignal4h.signal}, pas de nouveau signal haussier`);
+                return results;
             } else {
-                // 🎯 Pour 15M, utiliser les données de backtesting (période limitée)
-                dataToAnalyze = historicalData.slice(0, candleIndex + 1);
-                console.log(`📊 [DEBUG] ${tf}: Utilisation de ${dataToAnalyze.length} bougies locales`);
-            }
-            
-            if (dataToAnalyze.length < 50) {
-                console.log(`⚠️ [DEBUG] Données insuffisantes pour ${tf}: ${dataToAnalyze.length} bougies`);
-                results[tf] = { signal: 'INSUFFICIENT_DATA' };
-                continue;
-            }
-            
-            const analysis = await analyzePairMACDForBacktest(symbol, tf, dataToAnalyze);
-            results[tf] = analysis;
-            
-            console.log(`📊 [DEBUG] ${tf}: Signal = ${analysis.signal}, Crossover = ${analysis.crossover}`);
-            
-            // Filtrage progressif: H4 et H1 doivent être haussiers (dernier état)
-            if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
-                results.filtered = tf;
-                results.filterReason = `Filtré au ${tf}: dernier signal ${analysis.signal}`;
-                console.log(`❌ [DEBUG] Filtré au ${tf}: ${analysis.signal}`);
-                break;
+                console.log(`✅ [DEBUG] Nouveau signal 4H haussier détecté à l'index ${newBullish4h.signalIndex}`);
+                results['4h'] = newBullish4h;
             }
         }
         
-        if (!results.filtered) {
-            // Si H4 et H1 sont haussiers, vérifier le signal 15M
-            const signal15m = results['15m'];
-            if (signal15m.signal === 'BUY' && signal15m.crossover) {
-                results.finalDecision = 'BUY';
-                results.finalReason = 'H4 et H1 haussiers + croisement 15M détecté';
-                console.log(`✅ [DEBUG] Signal BUY validé: ${results.finalReason}`);
-            } else if (signal15m.signal === 'BULLISH') {
-                results.finalDecision = 'WAIT';
-                results.finalReason = 'H4 et H1 haussiers, 15M haussier mais pas de croisement';
-                console.log(`⏳ [DEBUG] Signal WAIT: ${results.finalReason}`);
-            } else {
+        // ÉTAPE 2 : Si 4H est haussier, analyser le dernier signal 1H
+        const data1h = extended1hData.filter(c => c.timestamp <= currentTime);
+        console.log(`📊 [DEBUG] 1H: Utilisation de ${data1h.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
+        
+        if (data1h.length < 50) {
+            console.log(`⚠️ [DEBUG] Données insuffisantes pour 1H: ${data1h.length} bougies`);
+            return { finalDecision: 'FILTERED', filterReason: 'Données 1H insuffisantes' };
+        }
+        
+        // Trouver le dernier signal 1H connu
+        const lastSignal1h = await findLastSignalInTimeframe(symbol, '1h', data1h);
+        results['1h'] = lastSignal1h;
+        console.log(`📊 [DEBUG] 1H: Dernier signal connu = ${lastSignal1h.signal}, Index = ${lastSignal1h.signalIndex}`);
+        
+        // Si le dernier signal 1H est baissier, vérifier si un nouveau signal haussier est apparu
+        if (lastSignal1h.signal === 'BEARISH' || lastSignal1h.signal === 'NEUTRAL') {
+            const newBullish1h = await checkForNewBullishSignal(symbol, '1h', data1h, lastSignal1h.signalIndex);
+            if (!newBullish1h) {
                 results.finalDecision = 'FILTERED';
-                results.filterReason = 'Filtré au 15M: signal non haussier';
-                console.log(`❌ [DEBUG] Filtré au 15M: ${signal15m.signal}`);
+                results.filterReason = `Dernier signal 1H baissier/neutre, en attente d'un signal haussier`;
+                console.log(`❌ [DEBUG] Filtré: Dernier signal 1H ${lastSignal1h.signal}, pas de nouveau signal haussier`);
+                return results;
+            } else {
+                console.log(`✅ [DEBUG] Nouveau signal 1H haussier détecté à l'index ${newBullish1h.signalIndex}`);
+                results['1h'] = newBullish1h;
             }
+        }
+        
+        // ÉTAPE 3 : Si 4H et 1H sont haussiers, analyser le 15M pour les signaux BUY
+        const data15m = historicalData.slice(0, candleIndex + 1);
+        console.log(`📊 [DEBUG] 15M: Utilisation de ${data15m.length} bougies locales`);
+        
+        if (data15m.length < 50) {
+            console.log(`⚠️ [DEBUG] Données insuffisantes pour 15M: ${data15m.length} bougies`);
+            return { finalDecision: 'FILTERED', filterReason: 'Données 15M insuffisantes' };
+        }
+        
+        const analysis15m = await analyzePairMACDForBacktest(symbol, '15m', data15m);
+        results['15m'] = analysis15m;
+        console.log(`📊 [DEBUG] 15M: Signal = ${analysis15m.signal}, Crossover = ${analysis15m.crossover}`);
+        
+        // Décision finale : BUY seulement si 15M a un signal BUY avec croisement
+        if (analysis15m.signal === 'BUY' && analysis15m.crossover) {
+            results.finalDecision = 'BUY';
+            results.finalReason = `4H et 1H haussiers + signal BUY 15M avec croisement détecté`;
+            console.log(`✅ [DEBUG] Signal BUY validé: ${results.finalReason}`);
+        } else if (analysis15m.signal === 'BULLISH') {
+            results.finalDecision = 'WAIT';
+            results.finalReason = `4H et 1H haussiers, 15M haussier mais pas de croisement`;
+            console.log(`⏳ [DEBUG] Signal WAIT: ${results.finalReason}`);
         } else {
             results.finalDecision = 'FILTERED';
+            results.filterReason = `15M non haussier: ${analysis15m.signal}`;
+            console.log(`❌ [DEBUG] Filtré au 15M: ${analysis15m.signal}`);
         }
         
         return results;
@@ -111,12 +136,68 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
     } catch (error) {
         console.error(`❌ [DEBUG] Erreur analyse multi-timeframe ${symbol}:`, error);
         log(`❌ Erreur analyse multi-timeframe backtesting ${symbol}: ${error.message}`, 'ERROR');
-        return { symbol, error: error.message };
+        return { finalDecision: 'FILTERED', filterReason: `Erreur: ${error.message}` };
     }
 }
 
-// 🆕 NOUVELLE FONCTION: Récupérer des données historiques étendues pour 4H et 1H
-async function getExtendedHistoricalData(symbol, timeframe, days = 60, endTimeMs = Date.now()) {
+// NOUVELLE FONCTION : Trouver le dernier signal dans un timeframe
+async function findLastSignalInTimeframe(symbol, timeframe, data) {
+    try {
+        let lastSignal = null;
+        let lastSignalIndex = -1;
+        
+        // Parcourir les données de la fin vers le début pour trouver le dernier signal
+        for (let i = data.length - 1; i >= 50; i--) {
+            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, data.slice(0, i + 1));
+            
+            // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
+            if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH') {
+                lastSignal = analysis;
+                lastSignalIndex = i;
+                break;
+            }
+        }
+        
+        // Si aucun signal trouvé, considérer comme neutre
+        if (!lastSignal) {
+            lastSignal = { signal: 'NEUTRAL', reason: 'Aucun signal clair trouvé' };
+            lastSignalIndex = data.length - 1;
+        }
+        
+        lastSignal.signalIndex = lastSignalIndex;
+        return lastSignal;
+        
+    } catch (error) {
+        console.error(`❌ [DEBUG] Erreur findLastSignalInTimeframe ${timeframe}:`, error);
+        return { signal: 'NEUTRAL', reason: `Erreur: ${error.message}`, signalIndex: -1 };
+    }
+}
+
+// NOUVELLE FONCTION : Vérifier si un nouveau signal haussier est apparu après un signal baissier
+async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex) {
+    try {
+        // Chercher un nouveau signal haussier après le dernier signal baissier
+        for (let i = lastSignalIndex + 1; i < data.length; i++) {
+            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, data.slice(0, i + 1));
+            
+            // Si on trouve un signal haussier (BUY ou BULLISH), c'est un nouveau signal
+            if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH') {
+                analysis.signalIndex = i;
+                console.log(`✅ [DEBUG] Nouveau signal haussier ${timeframe} trouvé à l'index ${i}: ${analysis.signal}`);
+                return analysis;
+            }
+        }
+        
+        return null; // Aucun nouveau signal haussier trouvé
+        
+    } catch (error) {
+        console.error(`❌ [DEBUG] Erreur checkForNewBullishSignal ${timeframe}:`, error);
+        return null;
+    }
+}
+
+// 🆕 NOUVELLE FONCTION: Récupérer des données historiques étendues pour 4H et 1H (OPTIMISÉE)
+async function getExtendedHistoricalData(symbol, timeframe, days = 30, endTimeMs = Date.now()) {
     try {
         console.log(`🔍 [DEBUG] Récupération de données étendues: ${symbol} ${timeframe} sur ${days} jours jusqu'à ${new Date(endTimeMs).toISOString()}`);
         
@@ -124,26 +205,18 @@ async function getExtendedHistoricalData(symbol, timeframe, days = 60, endTimeMs
         const totalMs = days * 24 * 60 * 60 * 1000;
         const startTime = endTimeMs - totalMs;
         
-        // Récupérer les données étendues via Binance avec gestion des chunks si >1000
-        let allData = [];
-        let currentEnd = endTimeMs;
-        let currentStart = startTime;
+        // Calculer le nombre de bougies approximatif
+        const expectedCandles = Math.floor(totalMs / timeframeMs);
+        const maxCandles = Math.min(1000, expectedCandles); // Limiter à 1000 bougies max
         
-        while (currentStart < currentEnd) {
-            const chunkEnd = Math.min(currentEnd, currentStart + (1000 * timeframeMs));
-            const chunkData = await getBinanceKlineData(symbol, 1000, timeframe, currentStart, chunkEnd);
-            
-            if (chunkData.length === 0) break;
-            
-            allData = chunkData.concat(allData); // Prepend since we're going backwards
-            currentEnd = chunkData[0].timestamp - 1;
-            
-            await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit
-        }
+        console.log(`📊 [DEBUG] Récupération de ${maxCandles} bougies ${timeframe} pour ${days} jours`);
         
-        console.log(`✅ [DEBUG] ${allData.length} bougies ${timeframe} récupérées sur ${days} jours`);
+        // Récupérer les données directement sans chunks pour optimiser
+        const data = await getBinanceKlineData(symbol, maxCandles, timeframe, startTime, endTimeMs);
         
-        return allData;
+        console.log(`✅ [DEBUG] ${data.length} bougies ${timeframe} récupérées`);
+        
+        return data;
         
     } catch (error) {
         console.error(`❌ [DEBUG] Erreur récupération données étendues ${symbol} ${timeframe}:`, error);
@@ -207,7 +280,7 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
             reason,
             price: tfData[tfData.length - 1].close,
             macd: latest.macd,
-            signal: latest.signal,
+            signalLine: latest.signal,  // Renommer pour éviter la collision
             histogram: latest.histogram
         };
         
@@ -217,11 +290,51 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
     }
 }
 
-// NOUVELLE FONCTION : Extraire les données pour un timeframe spécifique
-function getTimeframeData(historicalData, timeframe) {
-    // Pour simplifier, on utilise les données 15m comme base
-    // Dans un backtesting réel, il faudrait agréger les données correctement
-    return historicalData;
+// FONCTION CORRIGÉE : Extraire et agréger les données pour un timeframe spécifique
+function getTimeframeData(historicalData, targetTimeframe) {
+    if (!historicalData || historicalData.length === 0) {
+        console.log(`❌ [DEBUG] Données historiques vides pour ${targetTimeframe}`);
+        return [];
+    }
+    
+    const baseTimeframe = '15m'; // Timeframe de base des données
+    const baseMinutes = getTimeframeMinutes(baseTimeframe);
+    const targetMinutes = getTimeframeMinutes(targetTimeframe);
+    
+    // Si le timeframe cible est le même que la base, retourner directement
+    if (targetMinutes === baseMinutes) {
+        console.log(`✅ [DEBUG] Même timeframe (${targetTimeframe}), ${historicalData.length} bougies`);
+        return historicalData;
+    }
+    
+    // Si le timeframe cible est plus petit que la base, on ne peut pas agréger
+    if (targetMinutes < baseMinutes) {
+        console.log(`⚠️ [DEBUG] Timeframe ${targetTimeframe} plus petit que la base ${baseTimeframe}, utilisation des données de base`);
+        return historicalData;
+    }
+    
+    // Agréger les données pour le timeframe cible
+    const ratio = targetMinutes / baseMinutes;
+    const aggregatedData = [];
+    
+    for (let i = 0; i < historicalData.length; i += ratio) {
+        const chunk = historicalData.slice(i, i + ratio);
+        if (chunk.length === 0) continue;
+        
+        const aggregated = {
+            timestamp: chunk[0].timestamp,
+            open: chunk[0].open,
+            high: Math.max(...chunk.map(c => c.high)),
+            low: Math.min(...chunk.map(c => c.low)),
+            close: chunk[chunk.length - 1].close,
+            volume: chunk.reduce((sum, c) => sum + c.volume, 0)
+        };
+        
+        aggregatedData.push(aggregated);
+    }
+    
+    console.log(`✅ [DEBUG] Agrégation ${baseTimeframe} → ${targetTimeframe}: ${historicalData.length} → ${aggregatedData.length} bougies`);
+    return aggregatedData;
 }
 
 // NOUVELLE FONCTION : Paramètres MACD adaptés par timeframe (IDENTIQUES AU TRADING)
@@ -351,24 +464,36 @@ async function startBacktest() {
         
         console.log(`✅ [DEBUG] ${backtestData.length} bougies récupérées`);
         
-        // Pré-récupérer les données étendues pour 4H et 1H
+        // Pré-récupérer les données étendues pour 4H et 1H (OPTIMISÉ)
         console.log('🔍 [DEBUG] Pré-récupération des données étendues pour optimisation...');
-        const extendedDays = 60 + backtestConfig.duration;
-        const newestTime = backtestData[backtestData.length - 1].timestamp;
-        extended4hData = await getExtendedHistoricalData(symbol, '4h', extendedDays, newestTime);
-        extended1hData = await getExtendedHistoricalData(symbol, '1h', extendedDays, newestTime);
-        console.log(`✅ [DEBUG] Données étendues pré-chargées: 4H=${extended4hData.length}, 1H=${extended1hData.length}`);
+        updateBacktestStatus('Récupération des données étendues pour analyse multi-timeframe...', 35);
         
+        const extendedDays = 30 + backtestConfig.duration; // Réduit de 60 à 30 jours
+        const newestTime = backtestData[backtestData.length - 1].timestamp;
+        
+        // Récupérer 4H
+        updateBacktestStatus('Récupération des données 4H...', 40);
+        extended4hData = await getExtendedHistoricalData(symbol, '4h', extendedDays, newestTime);
+        console.log(`✅ [DEBUG] Données 4H pré-chargées: ${extended4hData.length} bougies`);
+        
+        // Récupérer 1H
+        updateBacktestStatus('Récupération des données 1H...', 45);
+        extended1hData = await getExtendedHistoricalData(symbol, '1h', extendedDays, newestTime);
+        console.log(`✅ [DEBUG] Données 1H pré-chargées: ${extended1hData.length} bougies`);
+        
+        updateBacktestStatus('Données étendues prêtes', 50);
+        console.log(`✅ [DEBUG] Toutes les données étendues pré-chargées: 4H=${extended4hData.length}, 1H=${extended1hData.length}`);
+
         // Exécuter le backtesting avec la logique identique au trading
         console.log('🔍 [DEBUG] Exécution du backtesting...');
         await runBacktestWithTradingLogic();
-        
+
         // Afficher les résultats
         console.log('🔍 [DEBUG] Affichage des résultats...');
         displayBacktestResults();
-        
+
         log('✅ Backtesting terminé avec succès', 'SUCCESS');
-        
+
     } catch (error) {
         console.error('❌ [DEBUG] Erreur dans startBacktest:', error);
         log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
@@ -474,7 +599,7 @@ function validateBacktestConfig() {
     return true;
 }
 
-// Récupérer les données historiques via API Binance
+// Récupérer les données historiques via API Binance (OPTIMISÉE)
 async function fetchHistoricalData(symbol) {
     try {
         updateBacktestStatus('Récupération des données historiques via Binance...', 10);
@@ -482,42 +607,22 @@ async function fetchHistoricalData(symbol) {
         const timeframeMs = getTimeframeMinutes(backtestConfig.timeframe) * 60 * 1000;
         const totalMs = backtestConfig.duration * 24 * 60 * 60 * 1000;
         const now = Date.now();
-        let endTime = now;
-        let startTime = now - totalMs;
-        let allData = [];
         
-        // Récupérer les données par chunks pour éviter les limites API
-        while (startTime < endTime - timeframeMs) {
-            const chunkEnd = Math.min(endTime, startTime + (1000 * timeframeMs));
-            
-            log(`📊 Récupération de bougies de ${new Date(startTime).toLocaleString()} à ${new Date(chunkEnd).toLocaleString()}`, 'INFO');
-            
-            const data = await getBinanceKlineData(symbol, 1000, backtestConfig.timeframe, startTime, chunkEnd);
-            
-            if (data.length === 0) {
-                log(`⚠️ Aucune donnée récupérée pour cette période. Arrêt de la récupération.`, 'WARNING');
-                break;
-            }
-            
-            allData = data.concat(allData); // Prepend
-            endTime = data[0].timestamp - 1;
-            
-            await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit
-        }
+        // Calculer le nombre de bougies nécessaires + marge pour les indicateurs
+        const expectedCandles = Math.floor(totalMs / timeframeMs);
+        const totalCandles = expectedCandles + 100; // Ajouter 100 bougies pour les indicateurs
         
-        // Ajouter 100 bougies supplémentaires pour les indicateurs si possible
-        if (allData.length > 0) {
-            const extraStart = allData[0].timestamp - (100 * timeframeMs);
-            const extraData = await getBinanceKlineData(symbol, 100, backtestConfig.timeframe, extraStart, allData[0].timestamp - 1);
-            allData = extraData.concat(allData);
-        }
+        console.log(`📊 [DEBUG] Récupération de ${totalCandles} bougies ${backtestConfig.timeframe} pour ${backtestConfig.duration} jours`);
         
-        backtestData = allData;
+        const data = await getBinanceKlineData(symbol, totalCandles, backtestConfig.timeframe);
         
-        if (backtestData.length === 0) {
+        if (data.length === 0) {
             throw new Error('Aucune donnée historique récupérée depuis Binance');
         }
         
+        backtestData = data;
+        
+        updateBacktestStatus('Données historiques récupérées avec succès', 30);
         log(`✅ ${backtestData.length} bougies récupérées pour le backtesting`, 'SUCCESS');
         
     } catch (error) {
@@ -546,18 +651,21 @@ function getTimeframeMinutes(timeframe) {
     return timeframeMap[timeframe] || 15;
 }
 
-// NOUVELLE FONCTION : Exécuter le backtesting avec la logique identique au trading
+// NOUVELLE FONCTION : Exécuter le backtesting avec la logique identique au trading (AMÉLIORÉE)
 async function runBacktestWithTradingLogic() {
     try {
         console.log('🔍 [DEBUG] Début runBacktestWithTradingLogic...');
         
-        updateBacktestStatus('Exécution du backtesting avec stratégie identique au trading...', 30);
+        updateBacktestStatus('Exécution du backtesting avec stratégie identique au trading...', 55);
         
         // Initialiser les variables de simulation
         let equity = backtestConfig.capital;
         let openTrades = [];
         let closedTrades = [];
         let equityHistory = [];
+        let totalSignals = 0;
+        let buySignals = 0;
+        let filteredSignals = 0;
         
         console.log(`✅ [DEBUG] Variables initialisées - Capital: ${equity}, Config:`, backtestConfig);
         
@@ -578,9 +686,11 @@ async function runBacktestWithTradingLogic() {
                 continue;
             }
             
-            // Mettre à jour le progrès
+            // Mettre à jour le progrès de façon plus fluide
             const progress = Math.round((i / backtestData.length) * 100);
-            updateBacktestStatus(`Analyse des données... ${progress}%`, 30 + (progress * 0.5));
+            if (i % 10 === 0) { // Mettre à jour tous les 10 index pour éviter trop de mises à jour
+                updateBacktestStatus(`Analyse des données... Bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
+            }
             
             // Analyser le signal multi-timeframe (identique au trading)
             const analysis = await analyzeMultiTimeframeForBacktest(
@@ -589,9 +699,22 @@ async function runBacktestWithTradingLogic() {
                 i // Passer l'index de la bougie actuelle
             );
             
+            totalSignals++;
+            
             if (!analysis) {
                 console.error(`❌ [DEBUG] Analyse manquante à l'index ${i}`);
                 continue;
+            }
+            
+            // Debug des signaux
+            if (analysis.finalDecision === 'BUY') {
+                buySignals++;
+                console.log(`✅ [DEBUG] Signal BUY détecté à l'index ${i} - Raison: ${analysis.finalReason}`);
+            } else if (analysis.finalDecision === 'FILTERED') {
+                filteredSignals++;
+                if (i % 50 === 0) { // Log moins fréquent pour éviter le spam
+                    console.log(`❌ [DEBUG] Signal filtré à l'index ${i} - Raison: ${analysis.filterReason}`);
+                }
             }
             
             // Ouvrir une position si signal BUY et pas de position ouverte
@@ -616,7 +739,7 @@ async function runBacktestWithTradingLogic() {
                 };
                 
                 openTrades.push(trade);
-                console.log(`🚀 [DEBUG] Position ouverte à l'index ${i}:`, trade);
+                console.log(`🚀 [DEBUG] Position ouverte à l'index ${i}: Prix=${trade.entryPrice.toFixed(4)}, Quantité=${trade.quantity.toFixed(6)}`);
                 log(`🚀 Position ouverte: ${trade.symbol} LONG @ ${trade.entryPrice.toFixed(4)} - Raison: ${trade.reason}`, 'SUCCESS');
             }
             
@@ -660,7 +783,7 @@ async function runBacktestWithTradingLogic() {
                     closedTrades.push(trade);
                     openTrades.splice(j, 1);
                     
-                    console.log(`📊 [DEBUG] Position fermée à l'index ${i}:`, trade);
+                    console.log(`📊 [DEBUG] Position fermée à l'index ${i}: ${closeReason}, PnL=${pnl.toFixed(2)}$`);
                     log(`📊 Position fermée: ${trade.symbol} - ${closeReason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
                         pnl > 0 ? 'SUCCESS' : 'WARNING');
                 }
@@ -691,6 +814,13 @@ async function runBacktestWithTradingLogic() {
             closedTrades.push(trade);
         });
         
+        // Statistiques de debug
+        console.log(`📊 [DEBUG] Statistiques d'analyse:`);
+        console.log(`  - Total signaux analysés: ${totalSignals}`);
+        console.log(`  - Signaux BUY: ${buySignals}`);
+        console.log(`  - Signaux filtrés: ${filteredSignals}`);
+        console.log(`  - Positions ouvertes: ${closedTrades.length}`);
+        
         // Calculer les résultats finaux
         console.log(`🔍 [DEBUG] Calcul des résultats finaux - ${closedTrades.length} trades fermés`);
         backtestResults = {
@@ -705,7 +835,11 @@ async function runBacktestWithTradingLogic() {
             winRate: closedTrades.length > 0 ? (closedTrades.filter(t => t.pnl > 0).length / closedTrades.length) * 100 : 0,
             maxDrawdown: Math.max(...equityHistory.map(h => h.drawdown), 0),
             avgTradeDuration: closedTrades.length > 0 ? 
-                closedTrades.reduce((sum, t) => sum + (t.exitTime - t.entryTime), 0) / closedTrades.length / (1000 * 60 * 60) : 0
+                closedTrades.reduce((sum, t) => sum + (t.exitTime - t.entryTime), 0) / closedTrades.length / (1000 * 60 * 60) : 0,
+            // Stats supplémentaires pour le debug
+            totalSignals: totalSignals,
+            buySignals: buySignals,
+            filteredSignals: filteredSignals
         };
         
         console.log('✅ [DEBUG] Résultats finaux calculés:', backtestResults);

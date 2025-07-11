@@ -45,6 +45,183 @@ async function analyzeMultiTimeframe(symbol) {
     }
 }
 
+// �� NOUVELLE FONCTION: Analyse multi-timeframe améliorée avec données étendues
+async function analyzeMultiTimeframeImproved(symbol) {
+    try {
+        console.log(`🔍 [TRADING] Analyse multi-timeframe améliorée pour ${symbol}`);
+        
+        // LOGIQUE AMÉLIORÉE : 4H et 1H utilisent des données étendues, 15M utilise des données standard
+        const timeframes = ['4h', '1h', '15m'];
+        const results = {};
+        
+        for (const tf of timeframes) {
+            let analysis;
+            
+            if (tf === '4h' || tf === '1h') {
+                // 🎯 AMÉLIORATION: Pour 4H et 1H, utiliser des données étendues (60 jours)
+                // pour trouver le dernier signal valide, pas forcément récent
+                console.log(`📊 [TRADING] ${tf}: Récupération de données étendues...`);
+                
+                // Utiliser des données étendues pour avoir le dernier état valide
+                const extendedData = await getExtendedHistoricalDataForTrading(symbol, tf, 60);
+                
+                if (extendedData.length === 0) {
+                    console.error(`❌ [TRADING] Aucune donnée étendue pour ${symbol} ${tf}`);
+                    results[tf] = { symbol, timeframe: tf, signal: 'INSUFFICIENT_DATA' };
+                    continue;
+                }
+                
+                // Analyser avec les données étendues pour avoir le dernier état
+                analysis = await analyzePairMACDWithData(symbol, tf, extendedData);
+                console.log(`📊 [TRADING] ${tf}: Signal = ${analysis.signal} (données étendues)`);
+                
+            } else {
+                // 🎯 Pour 15M, utiliser l'analyse standard (données récentes)
+                console.log(`📊 [TRADING] ${tf}: Analyse standard...`);
+                analysis = await analyzePairMACD(symbol, tf);
+                console.log(`📊 [TRADING] ${tf}: Signal = ${analysis.signal} (données standard)`);
+            }
+            
+            results[tf] = analysis;
+            
+            // Filtrage progressif: H4 et H1 doivent être haussiers (dernier état)
+            if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
+                results.filtered = tf;
+                results.filterReason = `Filtré au ${tf}: dernier signal ${analysis.signal}`;
+                console.log(`❌ [TRADING] Filtré au ${tf}: ${analysis.signal}`);
+                break;
+            }
+        }
+        
+        if (!results.filtered) {
+            // Si H4 et H1 sont haussiers, vérifier le signal 15M
+            const signal15m = results['15m'];
+            if (signal15m.signal === 'BUY' && signal15m.crossover) {
+                results.finalDecision = 'BUY';
+                results.finalReason = 'H4 et H1 haussiers (données étendues) + croisement 15M détecté';
+                console.log(`✅ [TRADING] Signal BUY validé: ${results.finalReason}`);
+            } else if (signal15m.signal === 'BULLISH') {
+                results.finalDecision = 'WAIT';
+                results.finalReason = 'H4 et H1 haussiers (données étendues), 15M haussier mais pas de croisement';
+                console.log(`⏳ [TRADING] Signal WAIT: ${results.finalReason}`);
+            } else {
+                results.finalDecision = 'FILTERED';
+                results.filterReason = 'Filtré au 15M: signal non haussier';
+                console.log(`❌ [TRADING] Filtré au 15M: ${signal15m.signal}`);
+            }
+        } else {
+            results.finalDecision = 'FILTERED';
+        }
+        
+        return results;
+        
+    } catch (error) {
+        console.error(`❌ [TRADING] Erreur analyse multi-timeframe améliorée ${symbol}:`, error);
+        log(`❌ Erreur analyse multi-timeframe améliorée ${symbol}: ${error.message}`, 'ERROR');
+        return { symbol, error: error.message };
+    }
+}
+
+// 🆕 FONCTION UTILITAIRE: Analyser MACD avec des données fournies
+async function analyzePairMACDWithData(symbol, timeframe, klineData) {
+    try {
+        // 🎯 Récupérer les paramètres MACD spécifiques au timeframe
+        const macdParams = getMACDParameters(timeframe);
+        
+        // Vérifier si on a assez de données pour l'analyse MACD
+        const minRequired = macdParams.slow + macdParams.signal + 10;
+        if (klineData.length < minRequired) {
+            return { 
+                symbol, 
+                signal: 'INSUFFICIENT_DATA', 
+                strength: 0, 
+                reason: `Données insuffisantes: ${klineData.length}/${minRequired} bougies (MACD ${macdParams.fast},${macdParams.slow},${macdParams.signal})`, 
+                timeframe 
+            };
+        }
+        
+        const closePrices = klineData.map(k => k.close);
+        const currentPrice = closePrices[closePrices.length - 1];
+        const volume24h = klineData.slice(-Math.min(288, klineData.length)).reduce((sum, k) => sum + k.volume, 0);
+        
+        // 🎯 Calculer MACD avec les paramètres spécifiques au timeframe
+        const macdData = calculateMACD(closePrices, macdParams.fast, macdParams.slow, macdParams.signal);
+        
+        let macdSignal = 'HOLD';
+        let signalStrength = 0;
+        let reason = '';
+        
+        if (macdData.macd !== null && macdData.signal !== null) {
+            const crossover = macdData.previousMacd <= macdData.previousSignal && macdData.macd > macdData.signal;
+            const histogramImproving = macdData.histogram > macdData.previousHistogram && macdData.previousHistogram > macdData.previousHistogram2;
+            
+            if (crossover && macdData.histogram > 0 && histogramImproving) {
+                macdSignal = 'BUY';
+                signalStrength = 90;
+                reason = `Croisement MACD + Histogram>0 + Tendance IMPROVING (${timeframe})`;
+            } else if (macdData.macd > macdData.signal && macdData.histogram > 0 && histogramImproving) {
+                macdSignal = 'BULLISH';
+                signalStrength = 75;
+                reason = `MACD>Signal + Histogram>0 + Tendance IMPROVING (${timeframe})`;
+            } else if (macdData.macd > macdData.signal && macdData.histogram > 0) {
+                macdSignal = 'BULLISH';
+                signalStrength = 60;
+                reason = `MACD>Signal + Histogram>0 (${timeframe})`;
+            } else if (macdData.macd < macdData.signal) {
+                macdSignal = 'BEARISH';
+                signalStrength = 30;
+                reason = `MACD<Signal (${timeframe})`;
+            } else {
+                macdSignal = 'NEUTRAL';
+                signalStrength = 50;
+                reason = `MACD neutre (${timeframe})`;
+            }
+        }
+        
+        return {
+            symbol,
+            timeframe,
+            signal: macdSignal,
+            strength: signalStrength,
+            price: currentPrice,
+            volume24h: volume24h,
+            macd: macdData.macd,
+            macdSignal: macdData.signal,
+            histogram: macdData.histogram,
+            crossover: macdData.crossover,
+            reason: reason
+        };
+        
+    } catch (error) {
+        console.error(`❌ [TRADING] Erreur analyse MACD avec données ${symbol} ${timeframe}:`, error);
+        log(`❌ ERREUR ANALYSE MACD ${symbol} (${timeframe}): ${error.message}`, 'ERROR');
+        return { symbol, timeframe, signal: 'HOLD', strength: 0, reason: `Erreur: ${error.message}` };
+    }
+}
+
+// 🆕 NOUVELLE FONCTION: Récupérer des données historiques étendues pour 4H et 1H
+async function getExtendedHistoricalDataForTrading(symbol, timeframe, days = 60) {
+    try {
+        console.log(`🔍 [TRADING] Récupération de données étendues: ${symbol} ${timeframe} sur ${days} jours`);
+        
+        // Utiliser la fonction existante getKlineData avec une limite élevée
+        // Pour 4H sur 60 jours = 60*24/4 = 360 bougies max
+        // Pour 1H sur 60 jours = 60*24 = 1440 bougies max (limité à 1000 par l'API)
+        const maxCandles = timeframe === '4h' ? 360 : 1000;
+        
+        const extendedData = await getKlineData(symbol, maxCandles, timeframe);
+        
+        console.log(`✅ [TRADING] ${extendedData.length} bougies ${timeframe} récupérées sur ${days} jours`);
+        
+        return extendedData;
+        
+    } catch (error) {
+        console.error(`❌ [TRADING] Erreur récupération données étendues ${symbol} ${timeframe}:`, error);
+        log(`❌ Erreur récupération données étendues trading: ${error.message}`, 'ERROR');
+        return [];
+    }
+}
+
 function calculatePositionSize() {
     const maxPositionValue = (balance.totalEquity * config.capitalPercent / 100) * config.leverage;
     return Math.max(maxPositionValue, 10);
