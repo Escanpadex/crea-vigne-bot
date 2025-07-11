@@ -232,17 +232,36 @@ async function startBacktest() {
     }
     
     try {
+        // 🔍 DEBUG: Vérifier l'élément chartSymbol
+        console.log('🔍 [DEBUG] Vérification de l\'élément chartSymbol...');
+        const chartSymbolElement = document.getElementById('chartSymbol');
+        if (!chartSymbolElement) {
+            console.error('❌ [DEBUG] Élément chartSymbol manquant');
+            throw new Error('Élément chartSymbol manquant');
+        }
+        
+        const selectedSymbol = chartSymbolElement.value;
+        console.log(`✅ [DEBUG] chartSymbol trouvé, valeur: ${selectedSymbol}`);
+        
+        if (!selectedSymbol) {
+            console.error('❌ [DEBUG] Aucun symbole sélectionné');
+            throw new Error('Aucun symbole sélectionné');
+        }
+        
         // Récupérer la configuration
+        console.log('🔍 [DEBUG] Mise à jour de la configuration...');
         await updateBacktestConfig();
         
         // Valider la configuration
+        console.log('🔍 [DEBUG] Validation de la configuration...');
         if (!validateBacktestConfig()) {
+            console.error('❌ [DEBUG] Configuration invalide');
             return;
         }
         
         // Récupérer la crypto sélectionnée
-        const selectedSymbol = document.getElementById('chartSymbol').value;
-        const symbol = selectedSymbol.split(':')[1]; // Enlever le préfixe BINANCE:
+        const symbol = selectedSymbol.includes(':') ? selectedSymbol.split(':')[1] : selectedSymbol;
+        console.log(`🔍 [DEBUG] Symbole extrait: ${symbol}`);
         
         backtestRunning = true;
         updateBacktestUI(true);
@@ -250,21 +269,28 @@ async function startBacktest() {
         log(`🚀 Démarrage du backtesting: ${symbol} - STRATÉGIE IDENTIQUE AU TRADING PRINCIPAL - ${backtestConfig.duration} jours`, 'INFO');
         
         // Récupérer les données historiques
+        console.log('🔍 [DEBUG] Récupération des données historiques...');
         await fetchHistoricalData(symbol);
         
         if (!backtestData || backtestData.length === 0) {
+            console.error('❌ [DEBUG] Aucune donnée historique récupérée');
             throw new Error('Impossible de récupérer les données historiques');
         }
         
+        console.log(`✅ [DEBUG] ${backtestData.length} bougies récupérées`);
+        
         // Exécuter le backtesting avec la logique identique au trading
+        console.log('🔍 [DEBUG] Exécution du backtesting...');
         await runBacktestWithTradingLogic();
         
         // Afficher les résultats
+        console.log('🔍 [DEBUG] Affichage des résultats...');
         displayBacktestResults();
         
         log('✅ Backtesting terminé avec succès', 'SUCCESS');
         
     } catch (error) {
+        console.error('❌ [DEBUG] Erreur dans startBacktest:', error);
         log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
         console.error('Erreur backtesting:', error);
     } finally {
@@ -289,15 +315,60 @@ function stopBacktest() {
 
 // Mettre à jour la configuration du backtesting
 async function updateBacktestConfig() {
-    backtestConfig = {
-        timeframe: '15m', // Fixe pour la simulation
-        duration: parseInt(document.getElementById('backtestDuration').value),
-        capital: 1000, // Capital fixe
-        positionSize: parseFloat(document.getElementById('backtestPositionSize').value),
-        trailingStop: parseFloat(document.getElementById('backtestTrailingStop').value),
-        takeProfit: parseFloat(document.getElementById('backtestTakeProfit').value),
-        enableTakeProfit: document.getElementById('enableTakeProfit').checked,
-    };
+    try {
+        // 🔍 DEBUG: Vérifier la présence de tous les éléments HTML
+        console.log('🔍 [DEBUG] Vérification des éléments HTML pour backtesting...');
+        
+        const elements = {
+            backtestDuration: document.getElementById('backtestDuration'),
+            backtestPositionSize: document.getElementById('backtestPositionSize'),
+            backtestTrailingStop: document.getElementById('backtestTrailingStop'),
+            backtestTakeProfit: document.getElementById('backtestTakeProfit'),
+            enableTakeProfit: document.getElementById('enableTakeProfit')
+        };
+        
+        // Vérifier chaque élément
+        for (const [name, element] of Object.entries(elements)) {
+            if (!element) {
+                console.error(`❌ [DEBUG] Élément HTML manquant: ${name}`);
+                throw new Error(`Élément HTML manquant: ${name}`);
+            } else {
+                console.log(`✅ [DEBUG] Élément ${name} trouvé, value: ${element.value || element.checked}`);
+            }
+        }
+        
+        // 🔍 DEBUG: Récupérer les valeurs avec vérification
+        const duration = elements.backtestDuration.value;
+        const positionSize = elements.backtestPositionSize.value;
+        const trailingStop = elements.backtestTrailingStop.value;
+        const takeProfit = elements.backtestTakeProfit.value;
+        const enableTakeProfit = elements.enableTakeProfit.checked;
+        
+        console.log('🔍 [DEBUG] Valeurs récupérées:');
+        console.log(`  - Duration: ${duration} (type: ${typeof duration})`);
+        console.log(`  - Position Size: ${positionSize} (type: ${typeof positionSize})`);
+        console.log(`  - Trailing Stop: ${trailingStop} (type: ${typeof trailingStop})`);
+        console.log(`  - Take Profit: ${takeProfit} (type: ${typeof takeProfit})`);
+        console.log(`  - Enable Take Profit: ${enableTakeProfit} (type: ${typeof enableTakeProfit})`);
+        
+        // Construire la configuration
+        backtestConfig = {
+            timeframe: '15m', // Fixe pour la simulation
+            duration: parseInt(duration),
+            capital: 1000, // Capital fixe
+            positionSize: parseFloat(positionSize),
+            trailingStop: parseFloat(trailingStop),
+            takeProfit: parseFloat(takeProfit),
+            enableTakeProfit: enableTakeProfit,
+        };
+        
+        console.log('✅ [DEBUG] Configuration mise à jour:', backtestConfig);
+        
+    } catch (error) {
+        console.error('❌ [DEBUG] Erreur dans updateBacktestConfig:', error);
+        log(`❌ Erreur configuration backtesting: ${error.message}`, 'ERROR');
+        throw error;
+    }
 }
 
 // Valider la configuration du backtesting
@@ -690,42 +761,81 @@ function calculateBollingerIndicators() {
 
 // Afficher les résultats du backtesting
 function displayBacktestResults() {
-    if (!backtestResults) {
-        log('❌ Aucun résultat de backtesting à afficher', 'ERROR');
-        return;
-    }
-    
-    // Afficher la section des résultats
-    document.getElementById('backtestResults').style.display = 'block';
-    
-    // Mettre à jour les statistiques avec la nouvelle structure
-    document.getElementById('backtestProfit').textContent = `${backtestResults.totalPnLPercent >= 0 ? '+' : ''}${backtestResults.totalPnLPercent.toFixed(2)}%`;
-    document.getElementById('backtestProfit').className = `stat-value ${backtestResults.totalPnLPercent >= 0 ? '' : 'negative'}`;
-    
-    document.getElementById('backtestTrades').textContent = backtestResults.totalTrades;
-    document.getElementById('backtestWinRate').textContent = `${backtestResults.winRate.toFixed(1)}%`;
-    
-    // Calculer le Sharpe ratio (simplifié)
-    const sharpeRatio = backtestResults.totalPnLPercent > 0 ? 
-        (backtestResults.totalPnLPercent / Math.max(backtestResults.maxDrawdown, 1)) : 0;
-    document.getElementById('backtestSharpe').textContent = sharpeRatio.toFixed(2);
-    
-    document.getElementById('backtestDrawdown').textContent = `${backtestResults.maxDrawdown.toFixed(2)}%`;
-    
-    // Durée moyenne en heures
-    document.getElementById('backtestAvgDuration').textContent = `${backtestResults.avgTradeDuration.toFixed(1)}h`;
-    
-    // Afficher l'historique des trades
-    displayTradeHistory();
-    
-    // Afficher le bouton d'export
-    document.getElementById('exportBacktestBtn').style.display = 'block';
+    try {
+        console.log('🔍 [DEBUG] Début displayBacktestResults...');
+        
+        if (!backtestResults) {
+            console.error('❌ [DEBUG] backtestResults est null');
+            log('❌ Aucun résultat de backtesting à afficher', 'ERROR');
+            return;
+        }
+        
+        console.log('✅ [DEBUG] backtestResults trouvé:', backtestResults);
+        
+        // 🔍 DEBUG: Vérifier la présence de tous les éléments HTML
+        const elementsToCheck = [
+            'backtestResults',
+            'backtestProfit',
+            'backtestTrades',
+            'backtestWinRate',
+            'backtestSharpe',
+            'backtestDrawdown',
+            'backtestAvgDuration',
+            'exportBacktestBtn'
+        ];
+        
+        for (const elementId of elementsToCheck) {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.error(`❌ [DEBUG] Élément HTML manquant: ${elementId}`);
+                throw new Error(`Élément HTML manquant: ${elementId}`);
+            } else {
+                console.log(`✅ [DEBUG] Élément ${elementId} trouvé`);
+            }
+        }
+        
+        // Afficher la section des résultats
+        document.getElementById('backtestResults').style.display = 'block';
+        
+        // Mettre à jour les statistiques avec la nouvelle structure
+        document.getElementById('backtestProfit').textContent = `${backtestResults.totalPnLPercent >= 0 ? '+' : ''}${backtestResults.totalPnLPercent.toFixed(2)}%`;
+        document.getElementById('backtestProfit').className = `stat-value ${backtestResults.totalPnLPercent >= 0 ? '' : 'negative'}`;
+        
+        document.getElementById('backtestTrades').textContent = backtestResults.totalTrades;
+        document.getElementById('backtestWinRate').textContent = `${backtestResults.winRate.toFixed(1)}%`;
+        
+        // Calculer le Sharpe ratio (simplifié)
+        const sharpeRatio = backtestResults.totalPnLPercent > 0 ? 
+            (backtestResults.totalPnLPercent / Math.max(backtestResults.maxDrawdown, 1)) : 0;
+        document.getElementById('backtestSharpe').textContent = sharpeRatio.toFixed(2);
+        
+        document.getElementById('backtestDrawdown').textContent = `${backtestResults.maxDrawdown.toFixed(2)}%`;
+        
+        // Durée moyenne en heures
+        document.getElementById('backtestAvgDuration').textContent = `${backtestResults.avgTradeDuration.toFixed(1)}h`;
+        
+        // Afficher l'historique des trades
+        console.log('🔍 [DEBUG] Affichage de l\'historique des trades...');
+        displayTradeHistory();
+        
+        // Afficher le bouton d'export
+        document.getElementById('exportBacktestBtn').style.display = 'block';
 
-    // Plot equity curve
-    if (backtestResults.equityHistory && backtestResults.equityHistory.length > 0) {
-        const timestamps = backtestResults.equityHistory.map(h => h.timestamp);
-        const equity = backtestResults.equityHistory.map(h => h.equity);
-        plotEquityCurve(equity, timestamps);
+        // Plot equity curve
+        console.log('🔍 [DEBUG] Affichage de la courbe d\'équité...');
+        if (backtestResults.equityHistory && backtestResults.equityHistory.length > 0) {
+            const timestamps = backtestResults.equityHistory.map(h => h.timestamp);
+            const equity = backtestResults.equityHistory.map(h => h.equity);
+            plotEquityCurve(equity, timestamps);
+        } else {
+            console.log('⚠️ [DEBUG] Pas de données d\'équité pour le graphique');
+        }
+        
+        console.log('✅ [DEBUG] displayBacktestResults terminé avec succès');
+        
+    } catch (error) {
+        console.error('❌ [DEBUG] Erreur dans displayBacktestResults:', error);
+        log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
     }
 }
 
@@ -763,39 +873,59 @@ function plotEquityCurve(equity, timestamps) {
 
 // Afficher l'historique des trades
 function displayTradeHistory() {
-    const historyDiv = document.getElementById('backtestTradeHistory');
-    
-    if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
-        historyDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Aucun trade effectué</div>';
-        return;
-    }
-    
-    let html = '';
-    backtestResults.trades.forEach(trade => {
-        const isProfit = trade.pnl > 0;
-        const duration = (trade.exitTime - trade.entryTime) / (1000 * 60 * 60); // en heures
+    try {
+        console.log('🔍 [DEBUG] Début displayTradeHistory...');
         
-        html += `
-            <div class="trade-item ${isProfit ? 'profit' : 'loss'}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; ${isProfit ? 'background: #f0f8f0;' : 'background: #fff0f0;'}">
-                <div class="trade-info">
-                    <div class="trade-symbol" style="font-weight: bold;">${trade.symbol} ${trade.side}</div>
-                    <div class="trade-details" style="font-size: 12px; color: #666;">
-                        Entrée: ${trade.entryPrice.toFixed(4)} → Sortie: ${trade.exitPrice.toFixed(4)} 
-                        (${trade.exitReason}) - ${duration.toFixed(1)}h
+        const historyDiv = document.getElementById('backtestTradeHistory');
+        if (!historyDiv) {
+            console.error('❌ [DEBUG] Élément backtestTradeHistory manquant');
+            throw new Error('Élément backtestTradeHistory manquant');
+        }
+        
+        console.log('✅ [DEBUG] Élément backtestTradeHistory trouvé');
+        
+        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('⚠️ [DEBUG] Aucun trade à afficher');
+            historyDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Aucun trade effectué</div>';
+            return;
+        }
+        
+        console.log(`✅ [DEBUG] Affichage de ${backtestResults.trades.length} trades`);
+        
+        let html = '';
+        backtestResults.trades.forEach((trade, index) => {
+            console.log(`🔍 [DEBUG] Processing trade ${index + 1}:`, trade);
+            
+            const isProfit = trade.pnl > 0;
+            const duration = (trade.exitTime - trade.entryTime) / (1000 * 60 * 60); // en heures
+            
+            html += `
+                <div class="trade-item ${isProfit ? 'profit' : 'loss'}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; ${isProfit ? 'background: #f0f8f0;' : 'background: #fff0f0;'}">
+                    <div class="trade-info">
+                        <div class="trade-symbol" style="font-weight: bold;">${trade.symbol} ${trade.side}</div>
+                        <div class="trade-details" style="font-size: 12px; color: #666;">
+                            Entrée: ${trade.entryPrice.toFixed(4)} → Sortie: ${trade.exitPrice.toFixed(4)} 
+                            (${trade.exitReason}) - ${duration.toFixed(1)}h
+                        </div>
+                        <div style="font-size: 11px; color: #999; margin-top: 2px;">
+                            ${trade.reason}
+                        </div>
                     </div>
-                    <div style="font-size: 11px; color: #999; margin-top: 2px;">
-                        ${trade.reason}
+                    <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
+                        ${isProfit ? '+' : ''}${trade.pnl.toFixed(2)} USDT
+                        <br><small>(${trade.pnlPercent >= 0 ? '+' : ''}${trade.pnlPercent.toFixed(2)}%)</small>
                     </div>
                 </div>
-                <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
-                    ${isProfit ? '+' : ''}${trade.pnl.toFixed(2)} USDT
-                    <br><small>(${trade.pnlPercent >= 0 ? '+' : ''}${trade.pnlPercent.toFixed(2)}%)</small>
-                </div>
-            </div>
-        `;
-    });
-    
-    historyDiv.innerHTML = html;
+            `;
+        });
+        
+        historyDiv.innerHTML = html;
+        console.log('✅ [DEBUG] displayTradeHistory terminé avec succès');
+        
+    } catch (error) {
+        console.error('❌ [DEBUG] Erreur dans displayTradeHistory:', error);
+        log(`❌ Erreur affichage historique: ${error.message}`, 'ERROR');
+    }
 }
 
 // Exporter les résultats
