@@ -971,8 +971,9 @@ function calculateFinalStats() {
         returns.push(dailyReturn);
     }
     
+    let avgReturn = 0;
     if (returns.length > 0) {
-        const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+        avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
         const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
         const stdDev = Math.sqrt(variance);
         stats.sharpeRatio = stdDev > 0 ? avgReturn / stdDev : 0;
