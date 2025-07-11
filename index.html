@@ -30,86 +30,111 @@
         <div class="tab-content">
             <div class="tab-pane fade show active" id="settings" role="tabpanel">
                 <div class="card">
-                    <div class="header">
+                    <!-- En-tête avec titre et statut API -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">
+                        <h3 style="margin: 0; color: #2d3748; font-size: 24px;">⚙️ Configuration du Bot</h3>
+                        <!-- Section Connexion API compacte -->
+                        <div style="display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #48bb78, #38a169); padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);">
+                            <div class="status">
+                                <div class="status-dot" id="connectionStatus"></div>
+                                <span id="connectionText" style="font-size: 13px; color: #ffffff; font-weight: 700;">Déconnecté</span>
+                            </div>
+                            <div style="font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 600;">API Bitget Futures</div>
+                            <button class="btn" onclick="testConnection()" style="font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; font-weight: bold;">🔗 Tester</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenu principal organisé en sections -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                        <!-- Section Stratégie -->
+                        <div>
+                            <h4 style="margin: 0 0 15px 0; color: #4a5568; font-size: 16px; border-left: 4px solid #48bb78; padding-left: 12px;">📊 Stratégie de Trading</h4>
+                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                                <div style="text-align: center; margin-bottom: 10px;">
+                                    <strong style="color: #2d5a2d; font-size: 14px;">Multi-Timeframes OPTIMISÉE</strong><br>
+                                    <span style="color: #666; font-size: 12px;">4H → 1H → 15M (Filtrage progressif)</span>
+                                </div>
+                                <div style="font-size: 11px; color: #666; text-align: center;">
+                                    Stratégie fixe avec paramètres MACD adaptatifs
+                                </div>
+                            </div>
+                            
+                            <!-- Balance -->
+                            <div style="background: #f0f8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 15px;">
+                                <h5 style="margin: 0 0 10px 0; color: #2b6cb0; font-size: 14px;">💳 Balance du Compte</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div>
+                                        <div style="font-size: 11px; color: #666;">USDT Disponible</div>
+                                        <div style="font-weight: bold; color: #2d3748; font-size: 14px;" id="usdtBalance">--</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 11px; color: #666;">Équité Totale</div>
+                                        <div style="font-weight: bold; color: #2d3748; font-size: 14px;" id="totalEquity">--</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Section Paramètres -->
+                        <div>
+                            <h4 style="margin: 0 0 15px 0; color: #4a5568; font-size: 16px; border-left: 4px solid #4299e1; padding-left: 12px;">⚙️ Paramètres de Trading</h4>
+                            
+                            <!-- Champs API cachés mais fonctionnels -->
+                            <div style="display: none;">
+                                <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
+                                <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
+                                <input type="password" id="passphrase" value="Charmant16320Charmant16320">
+                            </div>
+                            
+                            <!-- Paramètres de risque -->
+                            <div style="background: #fff8f0; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                                <h5 style="margin: 0 0 12px 0; color: #c05621; font-size: 14px;">⚡ Gestion des Risques</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                    <div class="form-group">
+                                        <label style="font-size: 12px; color: #744210; font-weight: 600;">Capital par trade (%):</label>
+                                        <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid #fed7aa; border-radius: 4px;">
+                                        <small style="font-size: 10px; color: #a0a0a0;">% du capital total utilisé</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label style="font-size: 12px; color: #744210; font-weight: 600;">Trailing Stop (%):</label>
+                                        <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; padding: 8px; font-size: 13px; border: 1px solid #fed7aa; border-radius: 4px;">
+                                        <small style="font-size: 10px; color: #a0a0a0;">Protection automatique</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Paramètres de position -->
+                            <div style="background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                                <h5 style="margin: 0 0 12px 0; color: #2d3748; font-size: 14px;">📈 Configuration Position</h5>
+                                <div class="form-group">
+                                    <label style="font-size: 12px; color: #4a5568; font-weight: 600;">Levier:</label>
+                                    <select id="leverage" style="width: 100%; padding: 10px; font-size: 13px; border: 1px solid #cbd5e0; border-radius: 4px; background: white;">
+                                        <option value="2" selected>2x (Recommandé - Sécurisé)</option>
+                                        <option value="3">3x (Modéré)</option>
+                                        <option value="5">5x (Risqué)</option>
+                                        <option value="10">10x (Très risqué)</option>
+                                    </select>
+                                    <small style="font-size: 10px; color: #a0a0a0;">Multiplicateur de position</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Contrôles en bas -->
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #e2e8f0;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                            <div style="display: flex; align-items: center; gap: 15px;">
-                                <!-- Section Connexion API -->
-                                <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                                    <div class="status">
-                                        <div class="status-dot" id="connectionStatus"></div>
-                                        <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
-                                    </div>
-                                    <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
-                                    <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
-                                </div>
-                                
-
+                            <div style="font-size: 14px; color: #4a5568;">
+                                <strong id="currentSettings">📊 Stratégie Active: MACD Multi-Timeframes (4H→1H→15M)</strong>
                             </div>
-                            <div>
-                                <h3 style="margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">📊 Paramètres Stratégie MACD</h3>
-                                
-                                <!-- Champs API cachés mais fonctionnels -->
-                                <div style="display: none;">
-                                    <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
-                                    <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
-                                    <input type="password" id="passphrase" value="Charmant16320Charmant16320">
-                                </div>
-                                
-                                <!-- Paramètres en colonnes compactes -->
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 13px;">Capital (%):</label>
-                                        <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; padding: 8px; font-size: 13px;">
-                                        <small style="font-size: 10px; display: block; margin-top: 2px;">% du capital total</small>
-                                    </div>
-                                    
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 13px;">Levier:</label>
-                                        <select id="leverage" style="width: 100%; padding: 8px; font-size: 13px;">
-                                            <option value="2" selected>2x (Recommandé)</option>
-                                            <option value="3">3x</option>
-                                            <option value="5">5x</option>
-                                            <option value="10">10x</option>
-                                        </select>
-                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Multiplicateur position</small>
-                                    </div>
-                                    
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 13px;">Trailing Stop (%):</label>
-                                        <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; padding: 8px; font-size: 13px;">
-                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Protection en %</small>
-                                    </div>
-                                    
-                                    <!-- Sélecteur de timeframe supprimé - Remplacé par le filtrage progressif 4H → 1H → 15M -->
-                                    
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 13px;">📊 Stratégie:</label>
-                                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px; text-align: center;">
-                                            <strong>Multi-Timeframes OPTIMISÉE</strong><br>
-                                            <span style="color: #666;">4H → 1H → 15M</span>
-                                        </div>
-                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Filtrage progressif</small>
-                                    </div>
-                                    
-                                    <div class="form-group" style="margin-bottom: 8px;">
-                                        <label style="font-size: 13px;">💳 Balance:</label>
-                                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px;">
-                                            <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
-                                            <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
-                                        </div>
-                                        <small style="font-size: 10px; display: block; margin-top: 2px;">MAJ automatique</small>
-                                    </div>
-                                </div>
-                                
-                                <div style="font-size: 12px; color: #666; margin: 8px 0; text-align: center;">
-                                    <strong id="currentSettings">📊 MACD Multi-Timeframes</strong>
-                                </div>
-                                
-                                <div style="display: flex; gap: 8px;">
-                                    <button class="btn" onclick="startBot()" id="startBtn" style="flex: 1; padding: 10px; font-size: 14px;">▶️ Démarrer</button>
-                                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="flex: 1; padding: 10px; font-size: 14px;">⏹️ Arrêter</button>
-                                </div>
+                            <div style="font-size: 12px; color: #a0a0a0;">
+                                Bot de trading automatisé
                             </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 15px; justify-content: center;">
+                            <button class="btn" onclick="startBot()" id="startBtn" style="padding: 12px 30px; font-size: 16px; background: linear-gradient(135deg, #48bb78, #38a169); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3); font-weight: bold; min-width: 150px;">▶️ Démarrer le Bot</button>
+                            <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="padding: 12px 30px; font-size: 16px; background: linear-gradient(135deg, #f56565, #e53e3e); color: white; border: none; border-radius: 8px; box-shadow: 0 4px 15px rgba(245, 101, 101, 0.3); font-weight: bold; min-width: 150px;">⏹️ Arrêter le Bot</button>
                         </div>
                     </div>
                 </div>
