@@ -695,144 +695,167 @@ async function runBacktestWithTradingLogic() {
         
         // Vérifier les données historiques
         if (!backtestData || backtestData.length === 0) {
+            console.error('❌ [BACKTEST_DEBUG] backtestData manquant ou vide');
             throw new Error('Données historiques manquantes');
         }
         
+        // Vérifier les données étendues
+        if (!extended4hData || extended4hData.length === 0) {
+            console.error('❌ [BACKTEST_DEBUG] extended4hData manquant ou vide');
+            throw new Error('Données étendues 4H manquantes');
+        }
+        
+        if (!extended1hData || extended1hData.length === 0) {
+            console.error('❌ [BACKTEST_DEBUG] extended1hData manquant ou vide');
+            throw new Error('Données étendues 1H manquantes');
+        }
+        
         console.log(`📊 [BACKTEST_DEBUG] ${backtestData.length} bougies disponibles pour le backtesting`);
-        console.log(`📊 [BACKTEST_DEBUG] Données étendues: 4H=${extended4hData?.length || 0}, 1H=${extended1hData?.length || 0}`);
+        console.log(`📊 [BACKTEST_DEBUG] Données étendues: 4H=${extended4hData.length}, 1H=${extended1hData.length}`);
+        
+        // Récupérer le vrai symbole depuis les données
+        const symbol = backtestData[0]?.symbol || 'SUIUSDT'; // Utiliser le vrai symbole
+        console.log(`📊 [BACKTEST_DEBUG] Symbole utilisé: ${symbol}`);
         
         // Parcourir les données historiques (échantillonnage pour optimiser)
-        const sampleRate = Math.max(1, Math.floor(backtestData.length / 100)); // Analyser max 100 points
+        const sampleRate = Math.max(1, Math.floor(backtestData.length / 50)); // Réduire à 50 points pour debug
         console.log(`📊 [BACKTEST_DEBUG] Échantillonnage: 1 analyse tous les ${sampleRate} bougies`);
+        console.log(`📊 [BACKTEST_DEBUG] Début analyse de l'index 50 à ${backtestData.length} avec pas de ${sampleRate}`);
         
         for (let i = 50; i < backtestData.length; i += sampleRate) {
-            const currentCandle = backtestData[i];
-            
-            if (!currentCandle) {
-                console.error(`❌ [BACKTEST_DEBUG] Bougie manquante à l'index ${i}`);
-                continue;
-            }
-            
-            // Mettre à jour le progrès
-            const progress = Math.round((i / backtestData.length) * 100);
-            if (i % (sampleRate * 10) === 0) {
-                updateBacktestStatus(`Analyse bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
-                console.log(`📊 [BACKTEST_DEBUG] Progression: ${i}/${backtestData.length} (${progress}%)`);
-            }
-            
-            // Analyser le signal multi-timeframe
-            console.log(`\n🔍 [BACKTEST_DEBUG] === ANALYSE BOUGIE ${i} ===`);
-            console.log(`📅 [BACKTEST_DEBUG] Timestamp: ${new Date(currentCandle.timestamp).toISOString()}`);
-            console.log(`💰 [BACKTEST_DEBUG] Prix: ${currentCandle.close}`);
-            
-            const analysis = await analyzeMultiTimeframeForBacktest(
-                'BTCUSDT', // Symbole fixe pour debug
-                backtestData.slice(0, i + 1),
-                i
-            );
-            
-            totalSignals++;
-            
-            if (!analysis) {
-                console.error(`❌ [BACKTEST_DEBUG] Analyse manquante à l'index ${i}`);
-                continue;
-            }
-            
-            // Debug détaillé des signaux
-            console.log(`📊 [BACKTEST_DEBUG] Résultat analyse: ${analysis.finalDecision}`);
-            if (analysis.finalReason) console.log(`📝 [BACKTEST_DEBUG] Raison: ${analysis.finalReason}`);
-            if (analysis.filterReason) console.log(`❌ [BACKTEST_DEBUG] Filtrage: ${analysis.filterReason}`);
-            
-            // Compter les signaux
-            if (analysis.finalDecision === 'BUY') {
-                buySignals++;
-                console.log(`✅ [BACKTEST_DEBUG] 🚀 SIGNAL BUY DÉTECTÉ ! Total: ${buySignals}`);
-            } else if (analysis.finalDecision === 'FILTERED') {
-                filteredSignals++;
-            } else if (analysis.finalDecision === 'WAIT') {
-                waitSignals++;
-            }
-            
-            // Ouvrir une position si signal BUY et pas de position ouverte
-            if (analysis.finalDecision === 'BUY' && openTrades.length === 0) {
-                const positionSize = (equity * backtestConfig.positionSize / 100);
-                const quantity = positionSize / currentCandle.close;
+            try {
+                const currentCandle = backtestData[i];
                 
-                const trade = {
-                    id: Date.now(),
-                    symbol: 'BTCUSDT',
-                    side: 'LONG',
-                    entryPrice: currentCandle.close,
-                    quantity: quantity,
-                    positionSize: positionSize,
-                    entryTime: currentCandle.timestamp,
-                    entryIndex: i,
-                    reason: analysis.finalReason,
-                    highestPrice: currentCandle.close,
-                    stopLossPrice: currentCandle.close * (1 - backtestConfig.trailingStop / 100),
-                    takeProfitPrice: backtestConfig.enableTakeProfit ? 
-                        currentCandle.close * (1 + backtestConfig.takeProfit / 100) : null
-                };
-                
-                openTrades.push(trade);
-                console.log(`🚀 [BACKTEST_DEBUG] 💰 POSITION OUVERTE !`);
-                console.log(`📊 [BACKTEST_DEBUG] Prix: ${trade.entryPrice.toFixed(4)}, Quantité: ${trade.quantity.toFixed(6)}`);
-                console.log(`📊 [BACKTEST_DEBUG] Stop Loss: ${trade.stopLossPrice.toFixed(4)}, Take Profit: ${trade.takeProfitPrice?.toFixed(4) || 'N/A'}`);
-                log(`🚀 Position ouverte: ${trade.symbol} LONG @ ${trade.entryPrice.toFixed(4)}`, 'SUCCESS');
-            }
-            
-            // Gérer les positions ouvertes (logique existante)
-            for (let j = openTrades.length - 1; j >= 0; j--) {
-                const trade = openTrades[j];
-                
-                // Mettre à jour le trailing stop
-                if (currentCandle.high > trade.highestPrice) {
-                    trade.highestPrice = currentCandle.high;
-                    trade.stopLossPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+                if (!currentCandle) {
+                    console.error(`❌ [BACKTEST_DEBUG] Bougie manquante à l'index ${i}`);
+                    continue;
                 }
                 
-                let closeReason = null;
-                let closePrice = null;
-                
-                // Vérifier stop loss
-                if (currentCandle.low <= trade.stopLossPrice) {
-                    closeReason = 'Stop Loss';
-                    closePrice = trade.stopLossPrice;
+                // Mettre à jour le progrès
+                const progress = Math.round((i / backtestData.length) * 100);
+                if (i % (sampleRate * 5) === 0) { // Plus fréquent pour debug
+                    updateBacktestStatus(`Analyse bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
+                    console.log(`📊 [BACKTEST_DEBUG] Progression: ${i}/${backtestData.length} (${progress}%)`);
                 }
                 
-                // Vérifier take profit
-                if (trade.takeProfitPrice && currentCandle.high >= trade.takeProfitPrice) {
-                    closeReason = 'Take Profit';
-                    closePrice = trade.takeProfitPrice;
+                // Analyser le signal multi-timeframe
+                console.log(`\n🔍 [BACKTEST_DEBUG] === ANALYSE BOUGIE ${i} ===`);
+                console.log(`📅 [BACKTEST_DEBUG] Timestamp: ${new Date(currentCandle.timestamp).toISOString()}`);
+                console.log(`💰 [BACKTEST_DEBUG] Prix: ${currentCandle.close}`);
+                
+                const analysis = await analyzeMultiTimeframeForBacktest(
+                    symbol, // Utiliser le vrai symbole
+                    backtestData.slice(0, i + 1),
+                    i
+                );
+                
+                totalSignals++;
+                
+                if (!analysis) {
+                    console.error(`❌ [BACKTEST_DEBUG] Analyse manquante à l'index ${i}`);
+                    continue;
                 }
                 
-                // Fermer la position si nécessaire
-                if (closeReason) {
-                    const pnl = (closePrice - trade.entryPrice) * trade.quantity;
-                    const pnlPercent = (pnl / trade.positionSize) * 100;
+                // Debug détaillé des signaux
+                console.log(`📊 [BACKTEST_DEBUG] Résultat analyse: ${analysis.finalDecision}`);
+                if (analysis.finalReason) console.log(`📝 [BACKTEST_DEBUG] Raison: ${analysis.finalReason}`);
+                if (analysis.filterReason) console.log(`❌ [BACKTEST_DEBUG] Filtrage: ${analysis.filterReason}`);
+                
+                // Compter les signaux
+                if (analysis.finalDecision === 'BUY') {
+                    buySignals++;
+                    console.log(`✅ [BACKTEST_DEBUG] 🚀 SIGNAL BUY DÉTECTÉ ! Total: ${buySignals}`);
+                } else if (analysis.finalDecision === 'FILTERED') {
+                    filteredSignals++;
+                } else if (analysis.finalDecision === 'WAIT') {
+                    waitSignals++;
+                }
+                
+                // Ouvrir une position si signal BUY et pas de position ouverte
+                if (analysis.finalDecision === 'BUY' && openTrades.length === 0) {
+                    const positionSize = (equity * backtestConfig.positionSize / 100);
+                    const quantity = positionSize / currentCandle.close;
                     
-                    trade.exitPrice = closePrice;
-                    trade.exitTime = currentCandle.timestamp;
-                    trade.exitReason = closeReason;
-                    trade.pnl = pnl;
-                    trade.pnlPercent = pnlPercent;
+                    const trade = {
+                        id: Date.now(),
+                        symbol: symbol, // Utiliser le vrai symbole
+                        side: 'LONG',
+                        entryPrice: currentCandle.close,
+                        quantity: quantity,
+                        positionSize: positionSize,
+                        entryTime: currentCandle.timestamp,
+                        entryIndex: i,
+                        reason: analysis.finalReason,
+                        highestPrice: currentCandle.close,
+                        stopLossPrice: currentCandle.close * (1 - backtestConfig.trailingStop / 100),
+                        takeProfitPrice: backtestConfig.enableTakeProfit ? 
+                            currentCandle.close * (1 + backtestConfig.takeProfit / 100) : null
+                    };
                     
-                    equity += pnl;
-                    closedTrades.push(trade);
-                    openTrades.splice(j, 1);
-                    
-                    console.log(`📊 [BACKTEST_DEBUG] 💸 POSITION FERMÉE: ${closeReason}, PnL=${pnl.toFixed(2)}$`);
-                    log(`📊 Position fermée: ${closeReason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
-                        pnl > 0 ? 'SUCCESS' : 'WARNING');
+                    openTrades.push(trade);
+                    console.log(`🚀 [BACKTEST_DEBUG] 💰 POSITION OUVERTE !`);
+                    console.log(`📊 [BACKTEST_DEBUG] Prix: ${trade.entryPrice.toFixed(4)}, Quantité: ${trade.quantity.toFixed(6)}`);
+                    console.log(`📊 [BACKTEST_DEBUG] Stop Loss: ${trade.stopLossPrice.toFixed(4)}, Take Profit: ${trade.takeProfitPrice?.toFixed(4) || 'N/A'}`);
+                    log(`🚀 Position ouverte: ${trade.symbol} LONG @ ${trade.entryPrice.toFixed(4)}`, 'SUCCESS');
                 }
+                
+                // Gérer les positions ouvertes
+                for (let j = openTrades.length - 1; j >= 0; j--) {
+                    const trade = openTrades[j];
+                    
+                    // Mettre à jour le trailing stop
+                    if (currentCandle.high > trade.highestPrice) {
+                        trade.highestPrice = currentCandle.high;
+                        trade.stopLossPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+                    }
+                    
+                    let closeReason = null;
+                    let closePrice = null;
+                    
+                    // Vérifier stop loss
+                    if (currentCandle.low <= trade.stopLossPrice) {
+                        closeReason = 'Stop Loss';
+                        closePrice = trade.stopLossPrice;
+                    }
+                    
+                    // Vérifier take profit
+                    if (trade.takeProfitPrice && currentCandle.high >= trade.takeProfitPrice) {
+                        closeReason = 'Take Profit';
+                        closePrice = trade.takeProfitPrice;
+                    }
+                    
+                    // Fermer la position si nécessaire
+                    if (closeReason) {
+                        const pnl = (closePrice - trade.entryPrice) * trade.quantity;
+                        const pnlPercent = (pnl / trade.positionSize) * 100;
+                        
+                        trade.exitPrice = closePrice;
+                        trade.exitTime = currentCandle.timestamp;
+                        trade.exitReason = closeReason;
+                        trade.pnl = pnl;
+                        trade.pnlPercent = pnlPercent;
+                        
+                        equity += pnl;
+                        closedTrades.push(trade);
+                        openTrades.splice(j, 1);
+                        
+                        console.log(`📊 [BACKTEST_DEBUG] 💸 POSITION FERMÉE: ${closeReason}, PnL=${pnl.toFixed(2)}$`);
+                        log(`📊 Position fermée: ${closeReason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
+                            pnl > 0 ? 'SUCCESS' : 'WARNING');
+                    }
+                }
+                
+                // Enregistrer l'équité
+                equityHistory.push({
+                    timestamp: currentCandle.timestamp,
+                    equity: equity,
+                    drawdown: Math.max(0, (backtestConfig.capital - equity) / backtestConfig.capital * 100)
+                });
+                
+            } catch (candleError) {
+                console.error(`❌ [BACKTEST_DEBUG] Erreur à l'index ${i}:`, candleError);
+                // Continuer avec la bougie suivante
             }
-            
-            // Enregistrer l'équité
-            equityHistory.push({
-                timestamp: currentCandle.timestamp,
-                equity: equity,
-                drawdown: Math.max(0, (backtestConfig.capital - equity) / backtestConfig.capital * 100)
-            });
         }
         
         // Fermer les positions ouvertes à la fin
@@ -855,9 +878,9 @@ async function runBacktestWithTradingLogic() {
         // Statistiques finales de debug
         console.log(`\n📊 [BACKTEST_DEBUG] === STATISTIQUES FINALES ===`);
         console.log(`📊 [BACKTEST_DEBUG] Total signaux analysés: ${totalSignals}`);
-        console.log(`📊 [BACKTEST_DEBUG] Signaux BUY: ${buySignals} (${((buySignals/totalSignals)*100).toFixed(2)}%)`);
-        console.log(`📊 [BACKTEST_DEBUG] Signaux WAIT: ${waitSignals} (${((waitSignals/totalSignals)*100).toFixed(2)}%)`);
-        console.log(`📊 [BACKTEST_DEBUG] Signaux FILTERED: ${filteredSignals} (${((filteredSignals/totalSignals)*100).toFixed(2)}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux BUY: ${buySignals} (${totalSignals > 0 ? ((buySignals/totalSignals)*100).toFixed(2) : 0}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux WAIT: ${waitSignals} (${totalSignals > 0 ? ((waitSignals/totalSignals)*100).toFixed(2) : 0}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux FILTERED: ${filteredSignals} (${totalSignals > 0 ? ((filteredSignals/totalSignals)*100).toFixed(2) : 0}%)`);
         console.log(`📊 [BACKTEST_DEBUG] Positions ouvertes: ${closedTrades.length}`);
         console.log(`📊 [BACKTEST_DEBUG] Capital final: ${equity.toFixed(2)}$ (${((equity-backtestConfig.capital)/backtestConfig.capital*100).toFixed(2)}%)`);
         
@@ -886,8 +909,30 @@ async function runBacktestWithTradingLogic() {
         updateBacktestStatus('Backtesting terminé avec succès !', 100);
         
     } catch (error) {
-        console.error('❌ [BACKTEST_DEBUG] Erreur dans runBacktestWithTradingLogic:', error);
+        console.error('❌ [BACKTEST_DEBUG] Erreur CRITIQUE dans runBacktestWithTradingLogic:', error);
+        console.error('❌ [BACKTEST_DEBUG] Stack trace:', error.stack);
         log(`❌ Erreur lors du backtesting: ${error.message}`, 'ERROR');
+        
+        // Créer des résultats vides en cas d'erreur
+        backtestResults = {
+            equity: backtestConfig.capital,
+            equityHistory: [],
+            trades: [],
+            totalTrades: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+            totalPnL: 0,
+            totalPnLPercent: 0,
+            winRate: 0,
+            maxDrawdown: 0,
+            avgTradeDuration: 0,
+            totalSignals: 0,
+            buySignals: 0,
+            waitSignals: 0,
+            filteredSignals: 0,
+            error: error.message
+        };
+        
         throw error;
     }
 }
@@ -1582,3 +1627,141 @@ console.log('✅ Backtesting system loaded successfully');
 
 // CORRECTION TEMPORAIRE - Désactiver la précision
 window.checkTrailingStopPrecision_DISABLED = true;
+
+// FONCTION TEMPORAIRE DE DIAGNOSTIC : Version simplifiée pour identifier le problème
+async function runBacktestWithTradingLogic() {
+    console.log('🚀 [DIAGNOSTIC] === DÉBUT DU DIAGNOSTIC ===');
+    
+    try {
+        updateBacktestStatus('Diagnostic du backtesting...', 55);
+        
+        // Vérifications de base
+        console.log('🔍 [DIAGNOSTIC] Vérification des données...');
+        console.log(`📊 [DIAGNOSTIC] backtestData: ${backtestData ? backtestData.length : 'NULL'} bougies`);
+        console.log(`📊 [DIAGNOSTIC] extended4hData: ${extended4hData ? extended4hData.length : 'NULL'} bougies`);
+        console.log(`📊 [DIAGNOSTIC] extended1hData: ${extended1hData ? extended1hData.length : 'NULL'} bougies`);
+        console.log(`📊 [DIAGNOSTIC] Configuration:`, backtestConfig);
+        
+        if (!backtestData || backtestData.length === 0) {
+            throw new Error('backtestData manquant');
+        }
+        
+        // Initialiser les variables
+        let equity = backtestConfig.capital;
+        let closedTrades = [];
+        let equityHistory = [];
+        let totalAnalyses = 0;
+        let errorsCount = 0;
+        
+        console.log('✅ [DIAGNOSTIC] Variables initialisées');
+        
+        // Test simple : analyser seulement 5 bougies pour commencer
+        const testIndices = [50, 100, 200, 400, 600].filter(i => i < backtestData.length);
+        console.log(`🔍 [DIAGNOSTIC] Test sur ${testIndices.length} bougies: ${testIndices}`);
+        
+        for (const i of testIndices) {
+            try {
+                console.log(`\n🔍 [DIAGNOSTIC] === TEST BOUGIE ${i} ===`);
+                const currentCandle = backtestData[i];
+                
+                if (!currentCandle) {
+                    console.error(`❌ [DIAGNOSTIC] Bougie ${i} manquante`);
+                    continue;
+                }
+                
+                console.log(`📅 [DIAGNOSTIC] Timestamp: ${new Date(currentCandle.timestamp).toISOString()}`);
+                console.log(`💰 [DIAGNOSTIC] Prix: ${currentCandle.close}`);
+                
+                // Test simple d'analyse MACD 15M seulement (sans multi-timeframe)
+                console.log(`🔍 [DIAGNOSTIC] Test analyse MACD 15M simple...`);
+                const data15m = backtestData.slice(0, i + 1);
+                const analysis15m = await analyzePairMACDForBacktest('SUIUSDT', '15m', data15m);
+                
+                console.log(`📊 [DIAGNOSTIC] Résultat 15M:`, analysis15m);
+                totalAnalyses++;
+                
+                // Simuler une position simple si signal BUY
+                if (analysis15m.signal === 'BUY') {
+                    console.log(`✅ [DIAGNOSTIC] Signal BUY détecté en 15M !`);
+                    
+                    // Créer une position de test
+                    const trade = {
+                        id: Date.now(),
+                        symbol: 'SUIUSDT',
+                        side: 'LONG',
+                        entryPrice: currentCandle.close,
+                        entryTime: currentCandle.timestamp,
+                        entryIndex: i,
+                        exitPrice: currentCandle.close * 1.02, // +2% simulé
+                        exitTime: currentCandle.timestamp + 60000, // +1 minute
+                        exitReason: 'Test simulé',
+                        pnl: 20, // PnL simulé
+                        pnlPercent: 2
+                    };
+                    
+                    closedTrades.push(trade);
+                    console.log(`🚀 [DIAGNOSTIC] Position de test créée !`);
+                }
+                
+                updateBacktestStatus(`Test bougie ${i}...`, 60 + (testIndices.indexOf(i) / testIndices.length) * 30);
+                
+            } catch (candleError) {
+                errorsCount++;
+                console.error(`❌ [DIAGNOSTIC] Erreur bougie ${i}:`, candleError);
+                console.error(`❌ [DIAGNOSTIC] Stack:`, candleError.stack);
+            }
+        }
+        
+        // Résultats du diagnostic
+        console.log(`\n📊 [DIAGNOSTIC] === RÉSULTATS DU DIAGNOSTIC ===`);
+        console.log(`📊 [DIAGNOSTIC] Analyses réussies: ${totalAnalyses}`);
+        console.log(`📊 [DIAGNOSTIC] Erreurs: ${errorsCount}`);
+        console.log(`📊 [DIAGNOSTIC] Positions de test: ${closedTrades.length}`);
+        
+        // Créer des résultats de test
+        backtestResults = {
+            equity: equity,
+            equityHistory: [],
+            trades: closedTrades,
+            totalTrades: closedTrades.length,
+            winningTrades: closedTrades.filter(t => t.pnl > 0).length,
+            losingTrades: closedTrades.filter(t => t.pnl < 0).length,
+            totalPnL: closedTrades.reduce((sum, t) => sum + t.pnl, 0),
+            totalPnLPercent: 0,
+            winRate: closedTrades.length > 0 ? (closedTrades.filter(t => t.pnl > 0).length / closedTrades.length) * 100 : 0,
+            maxDrawdown: 0,
+            avgTradeDuration: 0,
+            // Stats de diagnostic
+            totalAnalyses: totalAnalyses,
+            errorsCount: errorsCount,
+            diagnostic: true
+        };
+        
+        console.log('✅ [DIAGNOSTIC] === DIAGNOSTIC TERMINÉ ===');
+        updateBacktestStatus('Diagnostic terminé !', 100);
+        
+    } catch (error) {
+        console.error('❌ [DIAGNOSTIC] ERREUR CRITIQUE:', error);
+        console.error('❌ [DIAGNOSTIC] Stack trace:', error.stack);
+        
+        // Résultats d'erreur
+        backtestResults = {
+            equity: backtestConfig.capital,
+            equityHistory: [],
+            trades: [],
+            totalTrades: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+            totalPnL: 0,
+            totalPnLPercent: 0,
+            winRate: 0,
+            maxDrawdown: 0,
+            avgTradeDuration: 0,
+            error: error.message,
+            diagnostic: true
+        };
+        
+        log(`❌ Erreur diagnostic: ${error.message}`, 'ERROR');
+        throw error;
+    }
+}
