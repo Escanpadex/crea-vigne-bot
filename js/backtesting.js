@@ -45,6 +45,19 @@ let backtestConfig = {
         fast: 12,
         slow: 26,
         signal: 9
+    },
+    rsiParams: {
+        period: 14,
+        oversold: 30,
+        overbought: 70
+    },
+    emaParams: {
+        fast: 12,
+        slow: 26
+    },
+    bollingerParams: {
+        period: 20,
+        multiplier: 2
     }
 };
 
@@ -211,6 +224,19 @@ async function updateBacktestConfig() {
             fast: parseInt(document.getElementById('macdFast').value),
             slow: parseInt(document.getElementById('macdSlow').value),
             signal: parseInt(document.getElementById('macdSignal').value)
+        },
+        rsiParams: {
+            period: parseInt(document.getElementById('rsiPeriod').value),
+            oversold: parseFloat(document.getElementById('rsiOversold').value),
+            overbought: parseFloat(document.getElementById('rsiOverbought').value)
+        },
+        emaParams: {
+            fast: parseInt(document.getElementById('emaFast').value),
+            slow: parseInt(document.getElementById('emaSlow').value)
+        },
+        bollingerParams: {
+            period: parseInt(document.getElementById('bollingerPeriod').value),
+            multiplier: parseFloat(document.getElementById('bollingerMultiplier').value)
         }
     };
 }
@@ -557,7 +583,7 @@ function calculateEMAIndicators() {
 // Calculer les indicateurs Bollinger
 function calculateBollingerIndicators() {
     const closes = backtestData.map(candle => candle.close);
-    const bollinger = calculateBollingerBands(closes, 20, 2);
+    const bollinger = calculateBollingerBands(closes, backtestConfig.bollingerParams.period, backtestConfig.bollingerParams.multiplier);
     
     return {
         type: 'bollinger',
@@ -1126,7 +1152,12 @@ function updateBacktestStatus(message, progress = 0) {
 
 // Fonction pour changer le timeframe du graphique
 function updateChartTimeframe() {
-    const timeframe = document.getElementById('chartTimeframe').value;
+    const timeframeElement = document.getElementById('chartTimeframe');
+    if (!timeframeElement) {
+        log('⚠️ Chart timeframe element not found', 'WARNING');
+        return;
+    }
+    const timeframe = timeframeElement.value;
     
     if (tvWidget) {
         try {
