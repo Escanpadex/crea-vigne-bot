@@ -30,6 +30,7 @@ let backtestRunning = false;
 let backtestData = null;
 let backtestResults = null;
 let backtestInterval = null;
+let equityChart = null;
 
 // Configuration du backtesting
 let backtestConfig = {
@@ -1057,21 +1058,31 @@ function displayBacktestResults() {
 
 function plotEquityCurve(equity, timestamps) {
     const ctx = document.getElementById('equityCurveChart').getContext('2d');
-    new Chart(ctx, {
+    
+    // Destroy existing chart if it exists
+    if (equityChart) {
+        equityChart.destroy();
+        equityChart = null;
+    }
+    
+    // Create new chart
+    equityChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: timestamps.map(ts => new Date(ts).toLocaleString()),
+            labels: timestamps.map(ts => new Date(ts).toLocaleDateString()),
             datasets: [{
-                label: 'Equity Curve',
+                label: 'Courbe d\'équité',
                 data: equity,
-                borderColor: 'blue',
+                borderColor: '#28a745',
                 fill: false
             }]
         },
         options: {
             responsive: true,
             scales: {
-                x: { type: 'time' }
+                y: {
+                    beginAtZero: false
+                }
             }
         }
     });
