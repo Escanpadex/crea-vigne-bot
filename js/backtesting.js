@@ -143,17 +143,25 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
 // NOUVELLE FONCTION : Trouver le dernier signal dans un timeframe
 async function findLastSignalInTimeframe(symbol, timeframe, data) {
     try {
+        console.log(`🔍 [SIGNAL_DEBUG] Recherche du dernier signal ${timeframe} dans ${data.length} bougies`);
+        
+        // Optimisation : analyser seulement les 100 dernières bougies pour éviter les boucles infinies
+        const startIndex = Math.max(50, data.length - 100);
         let lastSignal = null;
         let lastSignalIndex = -1;
         
-        // Parcourir les données de la fin vers le début pour trouver le dernier signal
-        for (let i = data.length - 1; i >= 50; i--) {
-            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, data.slice(0, i + 1));
+        // Parcourir les données de la fin vers le début (optimisé)
+        for (let i = data.length - 1; i >= startIndex; i -= 5) { // Pas de 5 pour optimiser
+            const subData = data.slice(0, i + 1);
+            if (subData.length < 50) continue;
+            
+            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
             
             // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
             if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH') {
                 lastSignal = analysis;
                 lastSignalIndex = i;
+                console.log(`✅ [SIGNAL_DEBUG] Dernier signal ${timeframe} trouvé: ${analysis.signal} à l'index ${i}`);
                 break;
             }
         }
@@ -162,13 +170,14 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         if (!lastSignal) {
             lastSignal = { signal: 'NEUTRAL', reason: 'Aucun signal clair trouvé' };
             lastSignalIndex = data.length - 1;
+            console.log(`⚠️ [SIGNAL_DEBUG] Aucun signal ${timeframe} trouvé, considéré comme NEUTRAL`);
         }
         
         lastSignal.signalIndex = lastSignalIndex;
         return lastSignal;
         
     } catch (error) {
-        console.error(`❌ [DEBUG] Erreur findLastSignalInTimeframe ${timeframe}:`, error);
+        console.error(`❌ [SIGNAL_DEBUG] Erreur findLastSignalInTimeframe ${timeframe}:`, error);
         return { signal: 'NEUTRAL', reason: `Erreur: ${error.message}`, signalIndex: -1 };
     }
 }
@@ -176,22 +185,34 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
 // NOUVELLE FONCTION : Vérifier si un nouveau signal haussier est apparu après un signal baissier
 async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex) {
     try {
-        // Chercher un nouveau signal haussier après le dernier signal baissier
-        for (let i = lastSignalIndex + 1; i < data.length; i++) {
-            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, data.slice(0, i + 1));
+        console.log(`🔍 [SIGNAL_DEBUG] Recherche nouveau signal haussier ${timeframe} après index ${lastSignalIndex}`);
+        
+        // Optimisation : limiter la recherche aux 50 dernières bougies après le dernier signal
+        const startSearch = Math.max(lastSignalIndex + 1, data.length - 50);
+        const endSearch = data.length;
+        
+        console.log(`🔍 [SIGNAL_DEBUG] Recherche ${timeframe} de l'index ${startSearch} à ${endSearch}`);
+        
+        // Chercher un nouveau signal haussier (optimisé avec pas de 3)
+        for (let i = startSearch; i < endSearch; i += 3) {
+            const subData = data.slice(0, i + 1);
+            if (subData.length < 50) continue;
+            
+            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
             
             // Si on trouve un signal haussier (BUY ou BULLISH), c'est un nouveau signal
             if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH') {
                 analysis.signalIndex = i;
-                console.log(`✅ [DEBUG] Nouveau signal haussier ${timeframe} trouvé à l'index ${i}: ${analysis.signal}`);
+                console.log(`✅ [SIGNAL_DEBUG] Nouveau signal haussier ${timeframe} trouvé à l'index ${i}: ${analysis.signal}`);
                 return analysis;
             }
         }
         
+        console.log(`❌ [SIGNAL_DEBUG] Aucun nouveau signal haussier ${timeframe} trouvé`);
         return null; // Aucun nouveau signal haussier trouvé
         
     } catch (error) {
-        console.error(`❌ [DEBUG] Erreur checkForNewBullishSignal ${timeframe}:`, error);
+        console.error(`❌ [SIGNAL_DEBUG] Erreur checkForNewBullishSignal ${timeframe}:`, error);
         return null;
     }
 }
@@ -337,7 +358,7 @@ function getTimeframeData(historicalData, targetTimeframe) {
     return aggregatedData;
 }
 
-// NOUVELLE FONCTION : Paramètres MACD adaptés par timeframe (IDENTIQUES AU TRADING)
+// NOUVELLE FONCTION : Paramètres MACD adaptés par timeframe (IDENTIQUES AU TRADING) - SANS LOGS RÉPÉTITIFS
 function getMACDParametersForBacktest(timeframe) {
     const parameters = {
         '4h': { fast: 12, slow: 26, signal: 9, minCandles: 200 },
@@ -346,7 +367,8 @@ function getMACDParametersForBacktest(timeframe) {
     };
     
     const params = parameters[timeframe] || parameters['4h'];
-    log(`📊 MACD ${timeframe} (Backtesting): Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}`, 'DEBUG');
+    // SUPPRESSION DU LOG RÉPÉTITIF
+    // log(`📊 MACD ${timeframe} (Backtesting): Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}`, 'DEBUG');
     return params;
 }
 
@@ -654,7 +676,7 @@ function getTimeframeMinutes(timeframe) {
 // NOUVELLE FONCTION : Exécuter le backtesting avec la logique identique au trading (AMÉLIORÉE)
 async function runBacktestWithTradingLogic() {
     try {
-        console.log('🔍 [DEBUG] Début runBacktestWithTradingLogic...');
+        console.log('🚀 [BACKTEST_DEBUG] === DÉBUT DU BACKTESTING ===');
         
         updateBacktestStatus('Exécution du backtesting avec stratégie identique au trading...', 55);
         
@@ -666,55 +688,69 @@ async function runBacktestWithTradingLogic() {
         let totalSignals = 0;
         let buySignals = 0;
         let filteredSignals = 0;
+        let waitSignals = 0;
         
-        console.log(`✅ [DEBUG] Variables initialisées - Capital: ${equity}, Config:`, backtestConfig);
+        console.log(`✅ [BACKTEST_DEBUG] Variables initialisées - Capital: ${equity}$`);
+        console.log(`📊 [BACKTEST_DEBUG] Configuration:`, backtestConfig);
         
         // Vérifier les données historiques
         if (!backtestData || backtestData.length === 0) {
-            console.error('❌ [DEBUG] backtestData est null ou vide');
             throw new Error('Données historiques manquantes');
         }
         
-        console.log(`✅ [DEBUG] ${backtestData.length} bougies disponibles pour le backtesting`);
+        console.log(`📊 [BACKTEST_DEBUG] ${backtestData.length} bougies disponibles pour le backtesting`);
+        console.log(`📊 [BACKTEST_DEBUG] Données étendues: 4H=${extended4hData?.length || 0}, 1H=${extended1hData?.length || 0}`);
         
-        // Parcourir les données historiques
-        for (let i = 50; i < backtestData.length; i++) {
+        // Parcourir les données historiques (échantillonnage pour optimiser)
+        const sampleRate = Math.max(1, Math.floor(backtestData.length / 100)); // Analyser max 100 points
+        console.log(`📊 [BACKTEST_DEBUG] Échantillonnage: 1 analyse tous les ${sampleRate} bougies`);
+        
+        for (let i = 50; i < backtestData.length; i += sampleRate) {
             const currentCandle = backtestData[i];
             
             if (!currentCandle) {
-                console.error(`❌ [DEBUG] Bougie manquante à l'index ${i}`);
+                console.error(`❌ [BACKTEST_DEBUG] Bougie manquante à l'index ${i}`);
                 continue;
             }
             
-            // Mettre à jour le progrès de façon plus fluide
+            // Mettre à jour le progrès
             const progress = Math.round((i / backtestData.length) * 100);
-            if (i % 10 === 0) { // Mettre à jour tous les 10 index pour éviter trop de mises à jour
-                updateBacktestStatus(`Analyse des données... Bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
+            if (i % (sampleRate * 10) === 0) {
+                updateBacktestStatus(`Analyse bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
+                console.log(`📊 [BACKTEST_DEBUG] Progression: ${i}/${backtestData.length} (${progress}%)`);
             }
             
-            // Analyser le signal multi-timeframe (identique au trading)
+            // Analyser le signal multi-timeframe
+            console.log(`\n🔍 [BACKTEST_DEBUG] === ANALYSE BOUGIE ${i} ===`);
+            console.log(`📅 [BACKTEST_DEBUG] Timestamp: ${new Date(currentCandle.timestamp).toISOString()}`);
+            console.log(`💰 [BACKTEST_DEBUG] Prix: ${currentCandle.close}`);
+            
             const analysis = await analyzeMultiTimeframeForBacktest(
-                backtestData[0].symbol || 'BTCUSDT', 
+                'BTCUSDT', // Symbole fixe pour debug
                 backtestData.slice(0, i + 1),
-                i // Passer l'index de la bougie actuelle
+                i
             );
             
             totalSignals++;
             
             if (!analysis) {
-                console.error(`❌ [DEBUG] Analyse manquante à l'index ${i}`);
+                console.error(`❌ [BACKTEST_DEBUG] Analyse manquante à l'index ${i}`);
                 continue;
             }
             
-            // Debug des signaux
+            // Debug détaillé des signaux
+            console.log(`📊 [BACKTEST_DEBUG] Résultat analyse: ${analysis.finalDecision}`);
+            if (analysis.finalReason) console.log(`📝 [BACKTEST_DEBUG] Raison: ${analysis.finalReason}`);
+            if (analysis.filterReason) console.log(`❌ [BACKTEST_DEBUG] Filtrage: ${analysis.filterReason}`);
+            
+            // Compter les signaux
             if (analysis.finalDecision === 'BUY') {
                 buySignals++;
-                console.log(`✅ [DEBUG] Signal BUY détecté à l'index ${i} - Raison: ${analysis.finalReason}`);
+                console.log(`✅ [BACKTEST_DEBUG] 🚀 SIGNAL BUY DÉTECTÉ ! Total: ${buySignals}`);
             } else if (analysis.finalDecision === 'FILTERED') {
                 filteredSignals++;
-                if (i % 50 === 0) { // Log moins fréquent pour éviter le spam
-                    console.log(`❌ [DEBUG] Signal filtré à l'index ${i} - Raison: ${analysis.filterReason}`);
-                }
+            } else if (analysis.finalDecision === 'WAIT') {
+                waitSignals++;
             }
             
             // Ouvrir une position si signal BUY et pas de position ouverte
@@ -724,7 +760,7 @@ async function runBacktestWithTradingLogic() {
                 
                 const trade = {
                     id: Date.now(),
-                    symbol: backtestData[0].symbol || 'BTCUSDT',
+                    symbol: 'BTCUSDT',
                     side: 'LONG',
                     entryPrice: currentCandle.close,
                     quantity: quantity,
@@ -739,11 +775,13 @@ async function runBacktestWithTradingLogic() {
                 };
                 
                 openTrades.push(trade);
-                console.log(`🚀 [DEBUG] Position ouverte à l'index ${i}: Prix=${trade.entryPrice.toFixed(4)}, Quantité=${trade.quantity.toFixed(6)}`);
-                log(`🚀 Position ouverte: ${trade.symbol} LONG @ ${trade.entryPrice.toFixed(4)} - Raison: ${trade.reason}`, 'SUCCESS');
+                console.log(`🚀 [BACKTEST_DEBUG] 💰 POSITION OUVERTE !`);
+                console.log(`📊 [BACKTEST_DEBUG] Prix: ${trade.entryPrice.toFixed(4)}, Quantité: ${trade.quantity.toFixed(6)}`);
+                console.log(`📊 [BACKTEST_DEBUG] Stop Loss: ${trade.stopLossPrice.toFixed(4)}, Take Profit: ${trade.takeProfitPrice?.toFixed(4) || 'N/A'}`);
+                log(`🚀 Position ouverte: ${trade.symbol} LONG @ ${trade.entryPrice.toFixed(4)}`, 'SUCCESS');
             }
             
-            // Gérer les positions ouvertes
+            // Gérer les positions ouvertes (logique existante)
             for (let j = openTrades.length - 1; j >= 0; j--) {
                 const trade = openTrades[j];
                 
@@ -783,8 +821,8 @@ async function runBacktestWithTradingLogic() {
                     closedTrades.push(trade);
                     openTrades.splice(j, 1);
                     
-                    console.log(`📊 [DEBUG] Position fermée à l'index ${i}: ${closeReason}, PnL=${pnl.toFixed(2)}$`);
-                    log(`📊 Position fermée: ${trade.symbol} - ${closeReason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
+                    console.log(`📊 [BACKTEST_DEBUG] 💸 POSITION FERMÉE: ${closeReason}, PnL=${pnl.toFixed(2)}$`);
+                    log(`📊 Position fermée: ${closeReason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
                         pnl > 0 ? 'SUCCESS' : 'WARNING');
                 }
             }
@@ -798,7 +836,7 @@ async function runBacktestWithTradingLogic() {
         }
         
         // Fermer les positions ouvertes à la fin
-        console.log(`🔍 [DEBUG] Fermeture des positions ouvertes: ${openTrades.length}`);
+        console.log(`🔍 [BACKTEST_DEBUG] Fermeture des positions ouvertes: ${openTrades.length}`);
         openTrades.forEach(trade => {
             const finalCandle = backtestData[backtestData.length - 1];
             const pnl = (finalCandle.close - trade.entryPrice) * trade.quantity;
@@ -814,15 +852,16 @@ async function runBacktestWithTradingLogic() {
             closedTrades.push(trade);
         });
         
-        // Statistiques de debug
-        console.log(`📊 [DEBUG] Statistiques d'analyse:`);
-        console.log(`  - Total signaux analysés: ${totalSignals}`);
-        console.log(`  - Signaux BUY: ${buySignals}`);
-        console.log(`  - Signaux filtrés: ${filteredSignals}`);
-        console.log(`  - Positions ouvertes: ${closedTrades.length}`);
+        // Statistiques finales de debug
+        console.log(`\n📊 [BACKTEST_DEBUG] === STATISTIQUES FINALES ===`);
+        console.log(`📊 [BACKTEST_DEBUG] Total signaux analysés: ${totalSignals}`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux BUY: ${buySignals} (${((buySignals/totalSignals)*100).toFixed(2)}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux WAIT: ${waitSignals} (${((waitSignals/totalSignals)*100).toFixed(2)}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Signaux FILTERED: ${filteredSignals} (${((filteredSignals/totalSignals)*100).toFixed(2)}%)`);
+        console.log(`📊 [BACKTEST_DEBUG] Positions ouvertes: ${closedTrades.length}`);
+        console.log(`📊 [BACKTEST_DEBUG] Capital final: ${equity.toFixed(2)}$ (${((equity-backtestConfig.capital)/backtestConfig.capital*100).toFixed(2)}%)`);
         
         // Calculer les résultats finaux
-        console.log(`🔍 [DEBUG] Calcul des résultats finaux - ${closedTrades.length} trades fermés`);
         backtestResults = {
             equity: equity,
             equityHistory: equityHistory,
@@ -839,15 +878,15 @@ async function runBacktestWithTradingLogic() {
             // Stats supplémentaires pour le debug
             totalSignals: totalSignals,
             buySignals: buySignals,
+            waitSignals: waitSignals,
             filteredSignals: filteredSignals
         };
         
-        console.log('✅ [DEBUG] Résultats finaux calculés:', backtestResults);
-        
+        console.log('✅ [BACKTEST_DEBUG] === BACKTESTING TERMINÉ ===');
         updateBacktestStatus('Backtesting terminé avec succès !', 100);
         
     } catch (error) {
-        console.error('❌ [DEBUG] Erreur dans runBacktestWithTradingLogic:', error);
+        console.error('❌ [BACKTEST_DEBUG] Erreur dans runBacktestWithTradingLogic:', error);
         log(`❌ Erreur lors du backtesting: ${error.message}`, 'ERROR');
         throw error;
     }
