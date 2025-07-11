@@ -5,430 +5,424 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot Trading Bitget Futures - Analyse MACD Volume Dynamique</title>
     <link rel="stylesheet" href="styles/main.css">
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <!-- Section Connexion API -->
-                    <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
-                        <div class="status">
-                            <div class="status-dot" id="connectionStatus"></div>
-                            <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
-                        </div>
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
-                        <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
-                    </div>
-                    
+    <div class="container my-4">
+        <h1 class="text-center mb-4">🚀 Bot Trading Bitget Futures</h1>
+        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">⚙️ Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">📊 Analysis</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions" type="button" role="tab">💼 Positions</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting" type="button" role="tab">🧪 Backtesting</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">📝 Logs</button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="settings" role="tabpanel">
+                <div class="card">
+                    <div class="header">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <!-- Section Connexion API -->
+                                <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.15); padding: 15px; border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                                    <div class="status">
+                                        <div class="status-dot" id="connectionStatus"></div>
+                                        <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">Déconnecté</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">Connecté (Futures)</div>
+                                    <button class="btn btn-api-highlight" onclick="testConnection()" style="font-size: 12px; padding: 8px 15px; background: linear-gradient(45deg, #48bb78, #38a169); box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4); font-weight: bold;">🔗 API</button>
+                                </div>
+                                
 
-                </div>
-                <div>
-                    <h1>🚀 Bot Trading Bitget Futures</h1>
-                    <p>Analyse MACD Temps Réel - Volume TOP Dynamique - Gestion Avancée</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Nouvelle structure en grid pour avoir les deux sections côte à côte -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <!-- Section Paramètres MACD - Rétrécie -->
-            <div class="card" style="padding: 20px;">
-                <h3 style="margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">📊 Paramètres Stratégie MACD</h3>
-                
-                <!-- Champs API cachés mais fonctionnels -->
-                <div style="display: none;">
-                    <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
-                    <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
-                    <input type="password" id="passphrase" value="Charmant16320Charmant16320">
-                </div>
-                
-                <!-- Paramètres en colonnes compactes -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">Capital (%):</label>
-                        <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; padding: 8px; font-size: 13px;">
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">% du capital total</small>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">Levier:</label>
-                        <select id="leverage" style="width: 100%; padding: 8px; font-size: 13px;">
-                            <option value="2" selected>2x (Recommandé)</option>
-                            <option value="3">3x</option>
-                            <option value="5">5x</option>
-                            <option value="10">10x</option>
-                        </select>
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">Multiplicateur position</small>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">Trailing Stop (%):</label>
-                        <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; padding: 8px; font-size: 13px;">
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">Protection en %</small>
-                    </div>
-                    
-                    <!-- Sélecteur de timeframe supprimé - Remplacé par le filtrage progressif 4H → 1H → 15M -->
-                    
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">📊 Stratégie:</label>
-                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px; text-align: center;">
-                            <strong>Multi-Timeframes OPTIMISÉE</strong><br>
-                            <span style="color: #666;">4H → 1H → 15M</span>
-                        </div>
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">Filtrage progressif</small>
-                    </div>
-                    
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 13px;">💳 Balance:</label>
-                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px;">
-                            <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
-                            <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
-                        </div>
-                        <small style="font-size: 10px; display: block; margin-top: 2px;">MAJ automatique</small>
-                    </div>
-                </div>
-                
-                <div style="font-size: 12px; color: #666; margin: 8px 0; text-align: center;">
-                    <strong id="currentSettings">📊 MACD Multi-Timeframes</strong>
-                </div>
-                
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn" onclick="startBot()" id="startBtn" style="flex: 1; padding: 10px; font-size: 14px;">▶️ Démarrer</button>
-                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="flex: 1; padding: 10px; font-size: 14px;">⏹️ Arrêter</button>
-                </div>
-            </div>
-            
-            <!-- Section Analyse MACD -->
-            <div class="card">
-                <h3>📊 Analyse MACD Multi-Timeframes</h3>
-                <div style="margin-bottom: 10px;">
-                    <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
-                </div>
-                <div id="macdAnalysisContainer">
-                    <div class="macd-timeframe-stats">
-                        <div class="timeframe-stat">
-                            <h4>4 Heures</h4>
-                            <div class="stat-numbers">
-                                <span class="bullish">-- haussiers</span>
-                                <span class="bearish">-- baissiers</span>
+                            </div>
+                            <div>
+                                <h3 style="margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">📊 Paramètres Stratégie MACD</h3>
+                                
+                                <!-- Champs API cachés mais fonctionnels -->
+                                <div style="display: none;">
+                                    <input type="password" id="apiKey" value="bg_a6cefdfb426b44f00fa74ac0203a5049">
+                                    <input type="password" id="secretKey" value="0bddf82631180ae2d38d9e0ad6470480a71382e53166944b40b0223b7e65dbcc">
+                                    <input type="password" id="passphrase" value="Charmant16320Charmant16320">
+                                </div>
+                                
+                                <!-- Paramètres en colonnes compactes -->
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label style="font-size: 13px;">Capital (%):</label>
+                                        <input type="number" id="capitalPercent" value="5" min="1" max="20" step="1" style="width: 100%; padding: 8px; font-size: 13px;">
+                                        <small style="font-size: 10px; display: block; margin-top: 2px;">% du capital total</small>
+                                    </div>
+                                    
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label style="font-size: 13px;">Levier:</label>
+                                        <select id="leverage" style="width: 100%; padding: 8px; font-size: 13px;">
+                                            <option value="2" selected>2x (Recommandé)</option>
+                                            <option value="3">3x</option>
+                                            <option value="5">5x</option>
+                                            <option value="10">10x</option>
+                                        </select>
+                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Multiplicateur position</small>
+                                    </div>
+                                    
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label style="font-size: 13px;">Trailing Stop (%):</label>
+                                        <input type="number" id="trailingStop" value="1" min="0.5" max="5" step="0.1" style="width: 100%; padding: 8px; font-size: 13px;">
+                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Protection en %</small>
+                                    </div>
+                                    
+                                    <!-- Sélecteur de timeframe supprimé - Remplacé par le filtrage progressif 4H → 1H → 15M -->
+                                    
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label style="font-size: 13px;">📊 Stratégie:</label>
+                                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px; text-align: center;">
+                                            <strong>Multi-Timeframes OPTIMISÉE</strong><br>
+                                            <span style="color: #666;">4H → 1H → 15M</span>
+                                        </div>
+                                        <small style="font-size: 10px; display: block; margin-top: 2px;">Filtrage progressif</small>
+                                    </div>
+                                    
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label style="font-size: 13px;">💳 Balance:</label>
+                                        <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 11px;">
+                                            <div><strong>USDT:</strong> <span id="usdtBalance">--</span></div>
+                                            <div><strong>Équité:</strong> <span id="totalEquity">--</span></div>
+                                        </div>
+                                        <small style="font-size: 10px; display: block; margin-top: 2px;">MAJ automatique</small>
+                                    </div>
+                                </div>
+                                
+                                <div style="font-size: 12px; color: #666; margin: 8px 0; text-align: center;">
+                                    <strong id="currentSettings">📊 MACD Multi-Timeframes</strong>
+                                </div>
+                                
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn" onclick="startBot()" id="startBtn" style="flex: 1; padding: 10px; font-size: 14px;">▶️ Démarrer</button>
+                                    <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled style="flex: 1; padding: 10px; font-size: 14px;">⏹️ Arrêter</button>
+                                </div>
                             </div>
                         </div>
-                        <div class="timeframe-stat">
-                            <h4>1 Heure</h4>
-                            <div class="stat-numbers">
-                                <span class="bullish">-- haussiers</span>
-                                <span class="bearish">-- baissiers</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="analysis" role="tabpanel">
+                <div class="card">
+                    <h3>📊 Analyse MACD Multi-Timeframes</h3>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
+                    </div>
+                    <div id="macdAnalysisContainer">
+                        <div class="macd-timeframe-stats">
+                            <div class="timeframe-stat">
+                                <h4>4 Heures</h4>
+                                <div class="stat-numbers">
+                                    <span class="bullish">-- haussiers</span>
+                                    <span class="bearish">-- baissiers</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="timeframe-stat">
-                            <h4>15 Minutes</h4>
-                            <div class="stat-numbers">
-                                <span class="bullish">-- haussiers</span>
-                                <span class="bearish">-- baissiers</span>
+                            <div class="timeframe-stat">
+                                <h4>1 Heure</h4>
+                                <div class="stat-numbers">
+                                    <span class="bullish">-- haussiers</span>
+                                    <span class="bearish">-- baissiers</span>
+                                </div>
                             </div>
-                        </div>
+                            <div class="timeframe-stat">
+                                <h4>15 Minutes</h4>
+                                <div class="stat-numbers">
+                                    <span class="bullish">-- haussiers</span>
+                                    <span class="bearish">-- baissiers</span>
+                                </div>
+                            </div>
 
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 4px; font-size: 12px;">
+                        <strong style="color: #2d5a2d;">🎯 STRATÉGIE OPTIMISÉE:</strong> 
+                        <span style="color: #666;">Filtrage progressif</span><br>
+                        <span style="color: #2c5aa0; font-weight: bold;">🥇 4H (FILTRE 1) → 🥈 1H (FILTRE 2) → 🥉 15M (SIGNAL FINAL)</span>
                     </div>
                 </div>
-                <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 4px; font-size: 12px;">
-                    <strong style="color: #2d5a2d;">🎯 STRATÉGIE OPTIMISÉE:</strong> 
-                    <span style="color: #666;">Filtrage progressif</span><br>
-                    <span style="color: #2c5aa0; font-weight: bold;">🥇 4H (FILTRE 1) → 🥈 1H (FILTRE 2) → 🥉 15M (SIGNAL FINAL)</span>
-                </div>
             </div>
-        </div>
-        
-        <div class="grid">
-            <div class="card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                    <h3 style="margin: 0;">💼 Positions & Statistiques</h3>
-                    <button class="btn" onclick="manageTrailingStops()" style="padding: 8px 15px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
-                    <button class="btn" onclick="window.importExistingPositions()" style="padding: 8px 15px; font-size: 13px;">📥 Importer Positions</button>
-                </div>
-                
-                <!-- Statistiques compactes en haut -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Signaux</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Ouvertes</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">Fermées</div>
-                        <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🟢 Gains</div>
-                        <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
-                        <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
-                    </div>
-                </div>
-                
-                <!-- Positions ouvertes -->
-                <div id="positionsContainer">
-                    <div style="text-align: center; color: #666; padding: 20px;">
-                        Aucune position ouverte
-                    </div>
-                </div>
-                
-                <!-- Capital en bas -->
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
-                    <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
-                    <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Logs de Trading (Masqués - Cliquer pour afficher) -->
-        <div class="card" id="logsSection" style="display: none;">
-            <h3>📝 Logs de Trading</h3>
-            <div class="logs" id="logs">
-                [INFO] Bot de trading MACD TOP 20 initialisé...<br>
-                [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
-                [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
-                [INFO] En attente de configuration API...<br>
-            </div>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button class="btn" onclick="clearLogs()" style="flex: 1;">🗑️ Effacer logs</button>
-                <button class="btn" onclick="toggleLogs()" style="flex: 1;">👁️ Masquer logs</button>
-            </div>
-        </div>
-        
-        <!-- Bouton pour afficher les logs -->
-        <div class="card" id="logsToggleCard" style="text-align: center; padding: 15px;">
-            <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
-            <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
-        </div>
-
-        <!-- 🆘 SECTION DIAGNOSTIC STOP LOSS -->
-        <div class="card" style="border: 2px solid #ff6b6b; background: #fff5f5;">
-            <h3 style="color: #d63031;">🆘 Diagnostic & Protection Stop Loss</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                <button class="btn" onclick="runStopLossDiagnosis()" style="background: #0984e3; color: white;">
-                    🔍 Diagnostic Complet
-                </button>
-                <button class="btn" onclick="forceProtectPositions()" style="background: #e17055; color: white;">
-                    🆘 Protéger Toutes Positions
-                </button>
-            </div>
-            <div id="diagnosisResults" style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto;">
-                <p style="color: #666; text-align: center;">Cliquez sur "Diagnostic Complet" pour analyser les problèmes de stop loss</p>
-            </div>
-            <div style="margin-top: 10px; padding: 8px; background: #ffeaa7; border-radius: 5px; font-size: 11px;">
-                <strong>⚠️ Utilisation:</strong> Si vous avez des positions sans stop loss, utilisez ces outils pour diagnostiquer et corriger le problème.
-            </div>
-        </div>
-        
-
-
-        <!-- NOUVELLE SECTION BACKTESTING -->
-        <div class="card" id="backtestingCard">
-            <h3>🧪 Backtesting de Stratégies</h3>
-            
-            <!-- Sélection de la Paire -->
-            <div class="form-group" style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                    <label id="chartSelectorLabel">Sélectionner une paire pour le backtesting:</label>
-                    <button onclick="window.updateChartSelector()" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;">🔄 Actualiser</button>
-                </div>
-                <select id="chartSymbol" onchange="updateSelectedPair()">
-                    <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
-                </select>
-                <small>⚡ TOP 30 Volume Bitget (temps réel) - Mise à jour: <span id="lastVolumeUpdate">En cours...</span> - Capital fixe: 1000 USDT</small>
-            </div>
-            
-            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <!-- Configuration de la Stratégie -->
-                <div>
-                    <h4>⚙️ Configuration de la Stratégie</h4>
-                    <div class="form-group">
-                        <label>Type de Stratégie:</label>
-                        <select id="backtestStrategy">
-                            <option value="macd">MACD Classique</option>
-                            <option value="macd_multi">MACD Multi-Timeframes</option>
-                            <option value="rsi">RSI</option>
-                            <option value="bollinger">Bandes de Bollinger</option>
-                            <option value="ema_cross">Croisement EMA</option>
-                        </select>
+            <div class="tab-pane fade" id="positions" role="tabpanel">
+                <div class="card">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                        <h3 style="margin: 0;">💼 Positions & Statistiques</h3>
+                        <button class="btn" onclick="manageTrailingStops()" style="padding: 8px 15px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
+                        <button class="btn" onclick="window.importExistingPositions()" style="padding: 8px 15px; font-size: 13px;">📥 Importer Positions</button>
                     </div>
                     
-                    <div id="macdParams" class="strategy-params">
-                        <div class="form-group">
-                            <label>MACD Fast:</label>
-                            <input type="number" id="macdFast" value="12" min="1" max="50">
+                    <!-- Statistiques compactes en haut -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 11px; color: #666;">Signaux</div>
+                            <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
                         </div>
-                        <div class="form-group">
-                            <label>MACD Slow:</label>
-                            <input type="number" id="macdSlow" value="26" min="1" max="100">
+                        <div style="text-align: center;">
+                            <div style="font-size: 11px; color: #666;">Ouvertes</div>
+                            <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
                         </div>
-                        <div class="form-group">
-                            <label>MACD Signal:</label>
-                            <input type="number" id="macdSignal" value="9" min="1" max="50">
+                        <div style="text-align: center;">
+                            <div style="font-size: 11px; color: #666;">Fermées</div>
+                            <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 11px; color: #666;">🟢 Gains</div>
+                            <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
+                            <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
                         </div>
                     </div>
                     
-                    <div id="rsiParams" class="strategy-params" style="display: none;">
-                        <div class="form-group">
-                            <label>RSI Période:</label>
-                            <input type="number" id="rsiPeriod" value="14" min="1" max="50">
-                        </div>
-                        <div class="form-group">
-                            <label>RSI Survente:</label>
-                            <input type="number" id="rsiOversold" value="30" min="1" max="50">
-                        </div>
-                        <div class="form-group">
-                            <label>RSI Surachat:</label>
-                            <input type="number" id="rsiOverbought" value="70" min="50" max="100">
-                        </div>
-                    </div>
-                    
-                    <div id="emaParams" class="strategy-params" style="display: none;">
-                        <div class="form-group">
-                            <label>EMA Rapide:</label>
-                            <input type="number" id="emaFast" value="9" min="1" max="50">
-                        </div>
-                        <div class="form-group">
-                            <label>EMA Lente:</label>
-                            <input type="number" id="emaSlow" value="21" min="1" max="100">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Configuration du Test -->
-                <div>
-                    <h4>📅 Configuration du Test</h4>
-                    <div class="form-group">
-                        <label>Timeframe d'Analyse:</label>
-                        <select id="backtestTimeframe">
-                            <option value="5m">5 minutes</option>
-                            <option value="15m" selected>15 minutes</option>
-                            <option value="1h">1 heure</option>
-                            <option value="4h">4 heures</option>
-                            <option value="1d">1 jour</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Durée du Test:</label>
-                        <select id="backtestDuration">
-                            <option value="1">24 heures</option>
-                            <option value="2">48 heures</option>
-                            <option value="7" selected>7 jours</option>
-                            <option value="30">30 jours</option>
-                            <option value="90">90 jours</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Taille Position (%):</label>
-                        <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1">
-                        <small>Pourcentage du capital (1000 USDT) à utiliser par trade</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Trailing Stop Loss (%):</label>
-                        <input type="number" id="backtestTrailingStop" value="1.5" min="0.1" max="5" step="0.1">
-                        <small>Distance de trailing en % (calculé sur données 1min pour précision)</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Take Profit (%):</label>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit()">
-                            <label for="enableTakeProfit" style="margin: 0;">Activer</label>
-                            <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
-                        </div>
-                        <small>Objectif de profit en % avant fermeture automatique. Décochez pour utiliser uniquement le trailing stop loss.</small>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Boutons de Contrôle -->
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <button class="btn" onclick="startBacktest()" id="startBacktestBtn" style="flex: 1; background: #28a745;">
-                    🚀 Lancer le Backtesting
-                </button>
-                <button class="btn" onclick="stopBacktest()" id="stopBacktestBtn" style="flex: 1; background: #dc3545; display: none;">
-                    ⏹️ Arrêter le Test
-                </button>
-                <button class="btn" onclick="exportBacktestResults()" id="exportBacktestBtn" style="flex: 1; background: #007bff; display: none;">
-                    📊 Exporter Résultats
-                </button>
-            </div>
-            
-            <!-- Résultats du Backtesting -->
-            <div id="backtestResults" style="display: none;">
-                <h4>📊 Résultats du Backtesting</h4>
-                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div class="stat-card">
-                        <h5>💰 Performance</h5>
-                        <div class="stat-value" id="backtestProfit">+0.00%</div>
-                        <small>Profit/Perte Total</small>
-                    </div>
-                    <div class="stat-card">
-                        <h5>📈 Trades</h5>
-                        <div class="stat-value" id="backtestTrades">0</div>
-                        <small>Nombre de Trades</small>
-                    </div>
-                    <div class="stat-card">
-                        <h5>✅ Win Rate</h5>
-                        <div class="stat-value" id="backtestWinRate">0%</div>
-                        <small>Taux de Réussite</small>
-                    </div>
-                    <div class="stat-card">
-                        <h5>📊 Sharpe Ratio</h5>
-                        <div class="stat-value" id="backtestSharpe">0.00</div>
-                        <small>Ratio Risque/Rendement</small>
-                    </div>
-                    <div class="stat-card">
-                        <h5>📉 Max Drawdown</h5>
-                        <div class="stat-value" id="backtestDrawdown">0.00%</div>
-                        <small>Perte Maximum</small>
-                    </div>
-                    <div class="stat-card">
-                        <h5>⏱️ Durée Moyenne</h5>
-                        <div class="stat-value" id="backtestAvgDuration">0h</div>
-                        <small>Durée des Trades</small>
-                    </div>
-                </div>
-                
-                <!-- Graphique des Résultats -->
-                <div id="backtestChart" style="height: 400px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #666;">
-                        📊 Graphique des performances sera affiché ici
-                    </div>
-                </div>
-                
-                <!-- Historique des Trades -->
-                <div>
-                    <h5>📋 Historique des Trades</h5>
-                    <div id="backtestTradeHistory" style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                    <!-- Positions ouvertes -->
+                    <div id="positionsContainer">
                         <div style="text-align: center; color: #666; padding: 20px;">
-                            Aucun trade effectué pour le moment
+                            Aucune position ouverte
                         </div>
+                    </div>
+                    
+                    <!-- Capital en bas -->
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
+                        <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
+                        <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
                     </div>
                 </div>
             </div>
-            
-            <!-- Statut du Backtesting -->
-            <div id="backtestStatus" style="display: none; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="loading-spinner" style="width: 20px; height: 20px;"></div>
-                    <span id="backtestStatusText">Initialisation du backtesting...</span>
-                </div>
-                <div style="margin-top: 10px;">
-                    <div class="progress-bar" style="width: 100%; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
-                        <div id="backtestProgress" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s ease;"></div>
+            <div class="tab-pane fade" id="backtesting" role="tabpanel">
+                <div class="card">
+                    <h3>🧪 Backtesting de Stratégies</h3>
+                    
+                    <!-- Sélection de la Paire -->
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label id="chartSelectorLabel">Sélectionner une paire pour le backtesting:</label>
+                            <button onclick="window.updateChartSelector()" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;">🔄 Actualiser</button>
+                        </div>
+                        <select id="chartSymbol" onchange="updateSelectedPair()">
+                            <option value="BINANCE:BTCUSDT">🔄 Chargement TOP 30 Volume...</option>
+                        </select>
+                        <small>⚡ TOP 30 Volume Bitget (temps réel) - Mise à jour: <span id="lastVolumeUpdate">En cours...</span> - Capital fixe: 1000 USDT</small>
                     </div>
-                    <small id="backtestProgressText" style="color: #666; margin-top: 5px; display: block;">0% terminé</small>
+                    
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <!-- Configuration de la Stratégie -->
+                        <div>
+                            <h4>⚙️ Configuration de la Stratégie</h4>
+                            <div class="form-group">
+                                <label>Type de Stratégie:</label>
+                                <select id="backtestStrategy">
+                                    <option value="macd">MACD Classique</option>
+                                    <option value="macd_multi">MACD Multi-Timeframes</option>
+                                    <option value="rsi">RSI</option>
+                                    <option value="bollinger">Bandes de Bollinger</option>
+                                    <option value="ema_cross">Croisement EMA</option>
+                                </select>
+                            </div>
+                            
+                            <div id="macdParams" class="strategy-params">
+                                <div class="form-group">
+                                    <label>MACD Fast:</label>
+                                    <input type="number" id="macdFast" value="12" min="1" max="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>MACD Slow:</label>
+                                    <input type="number" id="macdSlow" value="26" min="1" max="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>MACD Signal:</label>
+                                    <input type="number" id="macdSignal" value="9" min="1" max="50">
+                                </div>
+                            </div>
+                            
+                            <div id="rsiParams" class="strategy-params" style="display: none;">
+                                <div class="form-group">
+                                    <label>RSI Période:</label>
+                                    <input type="number" id="rsiPeriod" value="14" min="1" max="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>RSI Survente:</label>
+                                    <input type="number" id="rsiOversold" value="30" min="1" max="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>RSI Surachat:</label>
+                                    <input type="number" id="rsiOverbought" value="70" min="50" max="100">
+                                </div>
+                            </div>
+                            
+                            <div id="emaParams" class="strategy-params" style="display: none;">
+                                <div class="form-group">
+                                    <label>EMA Rapide:</label>
+                                    <input type="number" id="emaFast" value="9" min="1" max="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>EMA Lente:</label>
+                                    <input type="number" id="emaSlow" value="21" min="1" max="100">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Configuration du Test -->
+                        <div>
+                            <h4>📅 Configuration du Test</h4>
+                            <div class="form-group">
+                                <label>Timeframe d'Analyse:</label>
+                                <select id="backtestTimeframe">
+                                    <option value="5m">5 minutes</option>
+                                    <option value="15m" selected>15 minutes</option>
+                                    <option value="1h">1 heure</option>
+                                    <option value="4h">4 heures</option>
+                                    <option value="1d">1 jour</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Durée du Test:</label>
+                                <select id="backtestDuration">
+                                    <option value="1">24 heures</option>
+                                    <option value="2">48 heures</option>
+                                    <option value="7" selected>7 jours</option>
+                                    <option value="30">30 jours</option>
+                                    <option value="90">90 jours</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Taille Position (%):</label>
+                                <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1">
+                                <small>Pourcentage du capital (1000 USDT) à utiliser par trade</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Trailing Stop Loss (%):</label>
+                                <input type="number" id="backtestTrailingStop" value="1.5" min="0.1" max="5" step="0.1">
+                                <small>Distance de trailing en % (calculé sur données 1min pour précision)</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Take Profit (%):</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit()">
+                                    <label for="enableTakeProfit" style="margin: 0;">Activer</label>
+                                    <input type="number" id="backtestTakeProfit" value="4" min="0.1" max="20" step="0.1">
+                                </div>
+                                <small>Objectif de profit en % avant fermeture automatique. Décochez pour utiliser uniquement le trailing stop loss.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Boutons de Contrôle -->
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                        <button class="btn" onclick="startBacktest()" id="startBacktestBtn" style="flex: 1; background: #28a745;">
+                            🚀 Lancer le Backtesting
+                        </button>
+                        <button class="btn" onclick="stopBacktest()" id="stopBacktestBtn" style="flex: 1; background: #dc3545; display: none;">
+                            ⏹️ Arrêter le Test
+                        </button>
+                        <button class="btn" onclick="exportBacktestResults()" id="exportBacktestBtn" style="flex: 1; background: #007bff; display: none;">
+                            📊 Exporter Résultats
+                        </button>
+                    </div>
+                    
+                    <!-- Résultats du Backtesting -->
+                    <div id="backtestResults" style="display: none;">
+                        <h4>📊 Résultats du Backtesting</h4>
+                        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div class="stat-card">
+                                <h5>💰 Performance</h5>
+                                <div class="stat-value" id="backtestProfit">+0.00%</div>
+                                <small>Profit/Perte Total</small>
+                            </div>
+                            <div class="stat-card">
+                                <h5>📈 Trades</h5>
+                                <div class="stat-value" id="backtestTrades">0</div>
+                                <small>Nombre de Trades</small>
+                            </div>
+                            <div class="stat-card">
+                                <h5>✅ Win Rate</h5>
+                                <div class="stat-value" id="backtestWinRate">0%</div>
+                                <small>Taux de Réussite</small>
+                            </div>
+                            <div class="stat-card">
+                                <h5>📊 Sharpe Ratio</h5>
+                                <div class="stat-value" id="backtestSharpe">0.00</div>
+                                <small>Ratio Risque/Rendement</small>
+                            </div>
+                            <div class="stat-card">
+                                <h5>📉 Max Drawdown</h5>
+                                <div class="stat-value" id="backtestDrawdown">0.00%</div>
+                                <small>Perte Maximum</small>
+                            </div>
+                            <div class="stat-card">
+                                <h5>⏱️ Durée Moyenne</h5>
+                                <div class="stat-value" id="backtestAvgDuration">0h</div>
+                                <small>Durée des Trades</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Graphique des Résultats -->
+                        <div id="backtestChart" style="height: 400px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #666;">
+                                📊 Graphique des performances sera affiché ici
+                            </div>
+                        </div>
+                        
+                        <!-- Historique des Trades -->
+                        <div>
+                            <h5>📋 Historique des Trades</h5>
+                            <div id="backtestTradeHistory" style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                                <div style="text-align: center; color: #666; padding: 20px;">
+                                    Aucun trade effectué pour le moment
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statut du Backtesting -->
+                    <div id="backtestStatus" style="display: none; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="loading-spinner" style="width: 20px; height: 20px;"></div>
+                            <span id="backtestStatusText">Initialisation du backtesting...</span>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div class="progress-bar" style="width: 100%; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
+                                <div id="backtestProgress" style="width: 0%; height: 100%; background: #28a745; transition: width 0.3s ease;"></div>
+                            </div>
+                            <small id="backtestProgressText" style="color: #666; margin-top: 5px; display: block;">0% terminé</small>
+                        </div>
+                    </div>
+                    <small>⚠️ Note: Backtesting uses Binance historical data for simulations on Bitget - results may vary due to exchange differences.</small>
+                    <canvas id="equityCurveChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="logs" role="tabpanel">
+                <div class="card">
+                    <h3>📝 Logs de Trading</h3>
+                    <div class="logs" id="logs">
+                        [INFO] Bot de trading MACD TOP 20 initialisé...<br>
+                        [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
+                        [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
+                        [INFO] En attente de configuration API...<br>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button class="btn" onclick="clearLogs()" style="flex: 1;">🗑️ Effacer logs</button>
+                        <button class="btn" onclick="toggleLogs()" style="flex: 1;">👁️ Masquer logs</button>
+                    </div>
+                </div>
+                <!-- Bouton pour afficher les logs -->
+                <div class="card" id="logsToggleCard" style="text-align: center; padding: 15px;">
+                    <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
+                    <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
                 </div>
             </div>
         </div>
@@ -441,91 +435,6 @@
     <script src="js/trading.js"></script>
     <script src="js/backtesting.js?v=1.2"></script>
     <script src="js/main.js"></script>
-    
-    <!-- 🆘 FONCTIONS DIAGNOSTIC STOP LOSS -->
-    <script>
-        async function runStopLossDiagnosis() {
-            const resultsDiv = document.getElementById('diagnosisResults');
-            resultsDiv.innerHTML = '<p style="color: #0984e3;">🔄 Diagnostic en cours...</p>';
-            
-            try {
-                // Capturer les logs de la console
-                const originalLog = console.log;
-                let diagnosticLogs = [];
-                
-                console.log = (...args) => {
-                    diagnosticLogs.push(args.join(' '));
-                    originalLog.apply(console, args);
-                };
-                
-                // Exécuter le diagnostic
-                const result = await window.diagnosisStopLoss();
-                
-                // Restaurer console.log
-                console.log = originalLog;
-                
-                // Afficher les résultats
-                let html = '<div style="color: #2d3436; line-height: 1.4;">';
-                html += `<strong>📊 RÉSULTATS DIAGNOSTIC:</strong><br>`;
-                html += `• API configurée: ${result.apiConfigured ? '✅' : '❌'}<br>`;
-                html += `• Fonctions disponibles: ${result.functionsAvailable ? '✅' : '❌'}<br>`;
-                html += `• Positions ouvertes: ${result.positionsCount}<br>`;
-                html += `• Positions protégées: ${result.protectedPositions} ✅<br>`;
-                html += `• Positions NON protégées: ${result.unprotectedPositions} ❌<br>`;
-                html += `• Bot en cours: ${result.botRunning ? '✅' : '❌'}<br>`;
-                html += `• Surveillance active: ${result.intervalActive ? '✅' : '❌'}<br><br>`;
-                
-                if (result.unprotectedPositions > 0) {
-                    html += `<strong style="color: #d63031;">⚠️ ATTENTION: ${result.unprotectedPositions} position(s) à risque!</strong><br>`;
-                    html += `<em>Utilisez "Protéger Toutes Positions" pour corriger.</em><br><br>`;
-                }
-                
-                // Afficher les logs détaillés
-                html += '<details><summary><strong>📋 Logs détaillés (cliquer pour voir)</strong></summary>';
-                html += '<div style="background: #2d3436; color: #00b894; padding: 8px; margin-top: 5px; border-radius: 3px; font-size: 10px;">';
-                diagnosticLogs.forEach(log => {
-                    html += log.replace(/\n/g, '<br>') + '<br>';
-                });
-                html += '</div></details>';
-                html += '</div>';
-                
-                resultsDiv.innerHTML = html;
-                
-            } catch (error) {
-                resultsDiv.innerHTML = `<p style="color: #d63031;">❌ Erreur diagnostic: ${error.message}</p>`;
-            }
-        }
-        
-        async function forceProtectPositions() {
-            const resultsDiv = document.getElementById('diagnosisResults');
-            resultsDiv.innerHTML = '<p style="color: #e17055;">🆘 Protection forcée en cours...</p>';
-            
-            try {
-                const result = await window.forceProtectAllPositions();
-                
-                let html = '<div style="color: #2d3436; line-height: 1.4;">';
-                html += `<strong>🆘 PROTECTION FORCÉE:</strong><br>`;
-                html += `• Positions analysées: ${result.total}<br>`;
-                html += `• Positions protégées: ${result.protected} ✅<br>`;
-                html += `• Échecs: ${result.failed} ❌<br>`;
-                html += `• Statut: ${result.success ? '✅ SUCCÈS' : '❌ ÉCHEC'}<br>`;
-                html += `• Message: ${result.message}<br>`;
-                
-                if (result.success) {
-                    html += '<br><strong style="color: #00b894;">✅ Toutes les positions sont maintenant protégées!</strong>';
-                } else if (result.failed > 0) {
-                    html += '<br><strong style="color: #d63031;">⚠️ Certaines positions n\'ont pas pu être protégées.</strong><br>';
-                    html += '<em>Vérifiez les logs pour plus de détails.</em>';
-                }
-                
-                html += '</div>';
-                resultsDiv.innerHTML = html;
-                
-            } catch (error) {
-                resultsDiv.innerHTML = `<p style="color: #d63031;">❌ Erreur protection: ${error.message}</p>`;
-            }
-        }
-    </script>
     
     <script>
         // Variables pour le backtesting - DÉFINITIF
@@ -650,6 +559,7 @@
             }, 1000);
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html> 
