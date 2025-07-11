@@ -45,15 +45,6 @@ let backtestConfig = {
         fast: 12,
         slow: 26,
         signal: 9
-    },
-    rsiParams: {
-        period: 14,
-        oversold: 30,
-        overbought: 70
-    },
-    emaParams: {
-        fast: 9,
-        slow: 21
     }
 };
 
@@ -220,15 +211,6 @@ async function updateBacktestConfig() {
             fast: parseInt(document.getElementById('macdFast').value),
             slow: parseInt(document.getElementById('macdSlow').value),
             signal: parseInt(document.getElementById('macdSignal').value)
-        },
-        rsiParams: {
-            period: parseInt(document.getElementById('rsiPeriod').value),
-            oversold: parseInt(document.getElementById('rsiOversold').value),
-            overbought: parseInt(document.getElementById('rsiOverbought').value)
-        },
-        emaParams: {
-            fast: parseInt(document.getElementById('emaFast').value),
-            slow: parseInt(document.getElementById('emaSlow').value)
         }
     };
 }
