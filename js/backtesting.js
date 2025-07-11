@@ -18,7 +18,7 @@
 // Backtesting System for Trading Strategies
 console.log('📁 Loading backtesting.js...');
 
-// Variables globales pour le backtesting
+// Variables globales pour le backtesting avec gardes d'initialisation
 let backtestRunning = false;
 let backtestData = null;
 let backtestResults = null;
@@ -27,7 +27,7 @@ let equityChart = null;
 let extended4hData = null;
 let extended1hData = null;
 
-// Configuration du backtesting (simplifiée)
+// Configuration du backtesting (simplifiée et sécurisée)
 let backtestConfig = {
     timeframe: '15m', // Base for simulation
     duration: 7, // jours
@@ -37,6 +37,199 @@ let backtestConfig = {
     takeProfit: 4, // pourcentage
     enableTakeProfit: true, // activer/désactiver le take profit
 };
+
+// NOUVELLE FONCTION : Gardes d'initialisation pour les variables globales
+function initializeBacktestingVariables() {
+    try {
+        console.log('🔍 [INIT] Initialisation des variables de backtesting...');
+        
+        // Réinitialiser les variables si nécessaire
+        if (typeof backtestRunning !== 'boolean') {
+            backtestRunning = false;
+            console.log('⚠️ [INIT] backtestRunning réinitialisé à false');
+        }
+        
+        if (backtestData !== null && (!Array.isArray(backtestData) || backtestData.length === 0)) {
+            backtestData = null;
+            console.log('⚠️ [INIT] backtestData réinitialisé à null');
+        }
+        
+        if (backtestResults !== null && typeof backtestResults !== 'object') {
+            backtestResults = null;
+            console.log('⚠️ [INIT] backtestResults réinitialisé à null');
+        }
+        
+        if (backtestInterval !== null && typeof backtestInterval !== 'number' && typeof backtestInterval !== 'object') {
+            backtestInterval = null;
+            console.log('⚠️ [INIT] backtestInterval réinitialisé à null');
+        }
+        
+        if (equityChart !== null && typeof equityChart !== 'object') {
+            equityChart = null;
+            console.log('⚠️ [INIT] equityChart réinitialisé à null');
+        }
+        
+        if (extended4hData !== null && (!Array.isArray(extended4hData) || extended4hData.length === 0)) {
+            extended4hData = null;
+            console.log('⚠️ [INIT] extended4hData réinitialisé à null');
+        }
+        
+        if (extended1hData !== null && (!Array.isArray(extended1hData) || extended1hData.length === 0)) {
+            extended1hData = null;
+            console.log('⚠️ [INIT] extended1hData réinitialisé à null');
+        }
+        
+        // Valider et corriger la configuration
+        if (!backtestConfig || typeof backtestConfig !== 'object') {
+            backtestConfig = {
+                timeframe: '15m',
+                duration: 7,
+                capital: 1000,
+                positionSize: 10,
+                trailingStop: 1.5,
+                takeProfit: 4,
+                enableTakeProfit: true
+            };
+            console.log('⚠️ [INIT] backtestConfig réinitialisé avec valeurs par défaut');
+        } else {
+            // Valider chaque propriété de la configuration
+            if (typeof backtestConfig.timeframe !== 'string' || !backtestConfig.timeframe) {
+                backtestConfig.timeframe = '15m';
+                console.log('⚠️ [INIT] backtestConfig.timeframe corrigé');
+            }
+            
+            if (typeof backtestConfig.duration !== 'number' || backtestConfig.duration <= 0) {
+                backtestConfig.duration = 7;
+                console.log('⚠️ [INIT] backtestConfig.duration corrigé');
+            }
+            
+            if (typeof backtestConfig.capital !== 'number' || backtestConfig.capital <= 0) {
+                backtestConfig.capital = 1000;
+                console.log('⚠️ [INIT] backtestConfig.capital corrigé');
+            }
+            
+            if (typeof backtestConfig.positionSize !== 'number' || backtestConfig.positionSize <= 0 || backtestConfig.positionSize > 100) {
+                backtestConfig.positionSize = 10;
+                console.log('⚠️ [INIT] backtestConfig.positionSize corrigé');
+            }
+            
+            if (typeof backtestConfig.trailingStop !== 'number' || backtestConfig.trailingStop <= 0 || backtestConfig.trailingStop > 10) {
+                backtestConfig.trailingStop = 1.5;
+                console.log('⚠️ [INIT] backtestConfig.trailingStop corrigé');
+            }
+            
+            if (typeof backtestConfig.takeProfit !== 'number' || backtestConfig.takeProfit <= 0 || backtestConfig.takeProfit > 50) {
+                backtestConfig.takeProfit = 4;
+                console.log('⚠️ [INIT] backtestConfig.takeProfit corrigé');
+            }
+            
+            if (typeof backtestConfig.enableTakeProfit !== 'boolean') {
+                backtestConfig.enableTakeProfit = true;
+                console.log('⚠️ [INIT] backtestConfig.enableTakeProfit corrigé');
+            }
+        }
+        
+        console.log('✅ [INIT] Variables de backtesting initialisées et validées');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ [INIT] Erreur lors de l\'initialisation des variables:', error);
+        return false;
+    }
+}
+
+// NOUVELLE FONCTION : Validation des variables avant exécution
+function validateBacktestingState() {
+    const validationErrors = [];
+    
+    try {
+        // Vérifier l'état des variables critiques
+        if (typeof backtestRunning !== 'boolean') {
+            validationErrors.push('backtestRunning n\'est pas un booléen');
+        }
+        
+        if (backtestRunning && backtestData === null) {
+            validationErrors.push('backtestData est null alors que le backtesting est en cours');
+        }
+        
+        if (backtestData !== null && (!Array.isArray(backtestData) || backtestData.length === 0)) {
+            validationErrors.push('backtestData est invalide');
+        }
+        
+        if (!backtestConfig || typeof backtestConfig !== 'object') {
+            validationErrors.push('backtestConfig est invalide');
+        }
+        
+        // Vérifier les propriétés critiques de la configuration
+        if (backtestConfig) {
+            if (typeof backtestConfig.capital !== 'number' || backtestConfig.capital <= 0) {
+                validationErrors.push('backtestConfig.capital est invalide');
+            }
+            
+            if (typeof backtestConfig.positionSize !== 'number' || backtestConfig.positionSize <= 0 || backtestConfig.positionSize > 100) {
+                validationErrors.push('backtestConfig.positionSize est invalide');
+            }
+            
+            if (typeof backtestConfig.trailingStop !== 'number' || backtestConfig.trailingStop <= 0 || backtestConfig.trailingStop > 10) {
+                validationErrors.push('backtestConfig.trailingStop est invalide');
+            }
+        }
+        
+        if (validationErrors.length > 0) {
+            console.error('❌ [VALIDATION] Erreurs de validation:', validationErrors);
+            return false;
+        }
+        
+        console.log('✅ [VALIDATION] État du backtesting validé');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ [VALIDATION] Erreur lors de la validation:', error);
+        return false;
+    }
+}
+
+// NOUVELLE FONCTION : Nettoyage sécurisé des variables
+function cleanupBacktestingVariables() {
+    try {
+        console.log('🧹 [CLEANUP] Nettoyage des variables de backtesting...');
+        
+        // Nettoyer les données
+        backtestData = null;
+        backtestResults = null;
+        extended4hData = null;
+        extended1hData = null;
+        
+        // Nettoyer les timers
+        if (backtestInterval) {
+            clearInterval(backtestInterval);
+            backtestInterval = null;
+        }
+        
+        // Nettoyer les graphiques
+        if (equityChart) {
+            try {
+                equityChart.destroy();
+            } catch (chartError) {
+                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique:', chartError);
+            }
+            equityChart = null;
+        }
+        
+        // Réinitialiser l'état
+        backtestRunning = false;
+        
+        console.log('✅ [CLEANUP] Variables nettoyées');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ [CLEANUP] Erreur lors du nettoyage:', error);
+        return false;
+    }
+}
+
+// Initialiser les variables au chargement du module
+initializeBacktestingVariables();
 
 // NOUVELLE FONCTION : Copie exacte de la fonction analyzeMultiTimeframe du trading principal
 // 🔧 CORRECTION: Analyse multi-timeframe avec données étendues pour 4H et 1H
@@ -48,7 +241,13 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         const results = {};
         
         // ÉTAPE 1 : Analyser le dernier signal 4H connu (peut être en dehors des 7 jours)
-        const data4h = extended4hData.filter(c => c.timestamp <= currentTime);
+        // Validation des données étendues 4H
+        if (!extended4hData || extended4hData.length === 0) {
+            console.log(`❌ [DEBUG] Données étendues 4H manquantes ou vides`);
+            return { finalDecision: 'FILTERED', filterReason: 'Données étendues 4H manquantes' };
+        }
+        
+        const data4h = extended4hData.filter(c => c && c.timestamp && c.timestamp <= currentTime);
         console.log(`📊 [DEBUG] 4H: Utilisation de ${data4h.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
         
         if (data4h.length < 50) {
@@ -76,7 +275,13 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         }
         
         // ÉTAPE 2 : Si 4H est haussier, analyser le dernier signal 1H
-        const data1h = extended1hData.filter(c => c.timestamp <= currentTime);
+        // Validation des données étendues 1H
+        if (!extended1hData || extended1hData.length === 0) {
+            console.log(`❌ [DEBUG] Données étendues 1H manquantes ou vides`);
+            return { finalDecision: 'FILTERED', filterReason: 'Données étendues 1H manquantes' };
+        }
+        
+        const data1h = extended1hData.filter(c => c && c.timestamp && c.timestamp <= currentTime);
         console.log(`📊 [DEBUG] 1H: Utilisation de ${data1h.length} bougies étendues jusqu'à ${new Date(currentTime).toISOString()}`);
         
         if (data1h.length < 50) {
@@ -140,9 +345,26 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
     }
 }
 
-// NOUVELLE FONCTION : Trouver le dernier signal dans un timeframe
+// NOUVELLE FONCTION : Trouver le dernier signal dans un timeframe (SÉCURISÉE)
 async function findLastSignalInTimeframe(symbol, timeframe, data) {
+    const startTime = Date.now();
+    const maxExecutionTime = 30000; // 30 secondes maximum
+    let iterationCount = 0;
+    const maxIterations = 50; // Maximum 50 itérations
+    
     try {
+        // Validation des entrées
+        if (!symbol || typeof symbol !== 'string') {
+            throw new Error('Symbol invalide');
+        }
+        if (!timeframe || typeof timeframe !== 'string') {
+            throw new Error('Timeframe invalide');
+        }
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            console.log(`⚠️ [SIGNAL_DEBUG] Données vides pour ${timeframe}`);
+            return { signal: 'NEUTRAL', reason: 'Données vides', signalIndex: -1 };
+        }
+        
         console.log(`🔍 [SIGNAL_DEBUG] Recherche du dernier signal ${timeframe} dans ${data.length} bougies`);
         
         // Optimisation : analyser seulement les 100 dernières bougies pour éviter les boucles infinies
@@ -150,19 +372,50 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         let lastSignal = null;
         let lastSignalIndex = -1;
         
-        // Parcourir les données de la fin vers le début (optimisé)
+        // Validation des indices
+        if (startIndex >= data.length) {
+            console.log(`⚠️ [SIGNAL_DEBUG] Index de départ invalide pour ${timeframe}`);
+            return { signal: 'NEUTRAL', reason: 'Index invalide', signalIndex: -1 };
+        }
+        
+        // Parcourir les données de la fin vers le début (optimisé et sécurisé)
         for (let i = data.length - 1; i >= startIndex; i -= 5) { // Pas de 5 pour optimiser
+            iterationCount++;
+            
+            // Protection contre les boucles infinies
+            if (iterationCount > maxIterations) {
+                console.error(`❌ [SIGNAL_DEBUG] Limite d'itérations atteinte (${maxIterations}) pour ${timeframe}`);
+                break;
+            }
+            
+            // Protection contre l'exécution trop longue
+            if (Date.now() - startTime > maxExecutionTime) {
+                console.error(`❌ [SIGNAL_DEBUG] Timeout d'exécution (${maxExecutionTime}ms) pour ${timeframe}`);
+                break;
+            }
+            
+            // Validation de l'indice
+            if (i < 0 || i >= data.length) {
+                console.error(`❌ [SIGNAL_DEBUG] Index invalide ${i} pour ${timeframe}`);
+                continue;
+            }
+            
             const subData = data.slice(0, i + 1);
             if (subData.length < 50) continue;
             
-            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
-            
-            // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
-            if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH') {
-                lastSignal = analysis;
-                lastSignalIndex = i;
-                console.log(`✅ [SIGNAL_DEBUG] Dernier signal ${timeframe} trouvé: ${analysis.signal} à l'index ${i}`);
-                break;
+            try {
+                const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
+                
+                // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
+                if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH')) {
+                    lastSignal = analysis;
+                    lastSignalIndex = i;
+                    console.log(`✅ [SIGNAL_DEBUG] Dernier signal ${timeframe} trouvé: ${analysis.signal} à l'index ${i} (${iterationCount} itérations)`);
+                    break;
+                }
+            } catch (analysisError) {
+                console.error(`❌ [SIGNAL_DEBUG] Erreur analyse à l'index ${i}:`, analysisError);
+                continue;
             }
         }
         
@@ -170,7 +423,7 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         if (!lastSignal) {
             lastSignal = { signal: 'NEUTRAL', reason: 'Aucun signal clair trouvé' };
             lastSignalIndex = data.length - 1;
-            console.log(`⚠️ [SIGNAL_DEBUG] Aucun signal ${timeframe} trouvé, considéré comme NEUTRAL`);
+            console.log(`⚠️ [SIGNAL_DEBUG] Aucun signal ${timeframe} trouvé après ${iterationCount} itérations, considéré comme NEUTRAL`);
         }
         
         lastSignal.signalIndex = lastSignalIndex;
@@ -182,33 +435,85 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
     }
 }
 
-// NOUVELLE FONCTION : Vérifier si un nouveau signal haussier est apparu après un signal baissier
+// NOUVELLE FONCTION : Vérifier si un nouveau signal haussier est apparu après un signal baissier (SÉCURISÉE)
 async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex) {
+    const startTime = Date.now();
+    const maxExecutionTime = 30000; // 30 secondes maximum
+    let iterationCount = 0;
+    const maxIterations = 30; // Maximum 30 itérations
+    
     try {
+        // Validation des entrées
+        if (!symbol || typeof symbol !== 'string') {
+            throw new Error('Symbol invalide');
+        }
+        if (!timeframe || typeof timeframe !== 'string') {
+            throw new Error('Timeframe invalide');
+        }
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            console.log(`⚠️ [SIGNAL_DEBUG] Données vides pour nouveau signal ${timeframe}`);
+            return null;
+        }
+        if (typeof lastSignalIndex !== 'number' || lastSignalIndex < 0) {
+            console.log(`⚠️ [SIGNAL_DEBUG] Index de dernier signal invalide: ${lastSignalIndex}`);
+            return null;
+        }
+        
         console.log(`🔍 [SIGNAL_DEBUG] Recherche nouveau signal haussier ${timeframe} après index ${lastSignalIndex}`);
         
         // Optimisation : limiter la recherche aux 50 dernières bougies après le dernier signal
         const startSearch = Math.max(lastSignalIndex + 1, data.length - 50);
         const endSearch = data.length;
         
+        // Validation des bornes
+        if (startSearch >= endSearch || startSearch >= data.length) {
+            console.log(`⚠️ [SIGNAL_DEBUG] Bornes de recherche invalides: ${startSearch} >= ${endSearch}`);
+            return null;
+        }
+        
         console.log(`🔍 [SIGNAL_DEBUG] Recherche ${timeframe} de l'index ${startSearch} à ${endSearch}`);
         
-        // Chercher un nouveau signal haussier (optimisé avec pas de 3)
+        // Chercher un nouveau signal haussier (optimisé avec pas de 3 et sécurisé)
         for (let i = startSearch; i < endSearch; i += 3) {
+            iterationCount++;
+            
+            // Protection contre les boucles infinies
+            if (iterationCount > maxIterations) {
+                console.error(`❌ [SIGNAL_DEBUG] Limite d'itérations atteinte (${maxIterations}) pour nouveau signal ${timeframe}`);
+                break;
+            }
+            
+            // Protection contre l'exécution trop longue
+            if (Date.now() - startTime > maxExecutionTime) {
+                console.error(`❌ [SIGNAL_DEBUG] Timeout d'exécution (${maxExecutionTime}ms) pour nouveau signal ${timeframe}`);
+                break;
+            }
+            
+            // Validation de l'indice
+            if (i < 0 || i >= data.length) {
+                console.error(`❌ [SIGNAL_DEBUG] Index invalide ${i} pour nouveau signal ${timeframe}`);
+                continue;
+            }
+            
             const subData = data.slice(0, i + 1);
             if (subData.length < 50) continue;
             
-            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
-            
-            // Si on trouve un signal haussier (BUY ou BULLISH), c'est un nouveau signal
-            if (analysis.signal === 'BUY' || analysis.signal === 'BULLISH') {
-                analysis.signalIndex = i;
-                console.log(`✅ [SIGNAL_DEBUG] Nouveau signal haussier ${timeframe} trouvé à l'index ${i}: ${analysis.signal}`);
-                return analysis;
+            try {
+                const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
+                
+                // Si on trouve un signal haussier (BUY ou BULLISH), c'est un nouveau signal
+                if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH')) {
+                    analysis.signalIndex = i;
+                    console.log(`✅ [SIGNAL_DEBUG] Nouveau signal haussier ${timeframe} trouvé à l'index ${i}: ${analysis.signal} (${iterationCount} itérations)`);
+                    return analysis;
+                }
+            } catch (analysisError) {
+                console.error(`❌ [SIGNAL_DEBUG] Erreur analyse nouveau signal à l'index ${i}:`, analysisError);
+                continue;
             }
         }
         
-        console.log(`❌ [SIGNAL_DEBUG] Aucun nouveau signal haussier ${timeframe} trouvé`);
+        console.log(`❌ [SIGNAL_DEBUG] Aucun nouveau signal haussier ${timeframe} trouvé après ${iterationCount} itérations`);
         return null; // Aucun nouveau signal haussier trouvé
         
     } catch (error) {
@@ -372,73 +677,184 @@ function getMACDParametersForBacktest(timeframe) {
     return params;
 }
 
-// Fonction pour récupérer les données klines depuis l'API Binance
+// Fonction pour récupérer les données klines depuis l'API Binance (AMÉLIORÉE)
 async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
-    try {
-        // Conversion des timeframes pour Binance
-        const binanceIntervals = {
-            '1m': '1m',
-            '3m': '3m',
-            '5m': '5m',
-            '15m': '15m',
-            '30m': '30m',
-            '1h': '1h',
-            '4h': '4h',
-            '6h': '6h',
-            '12h': '12h',
-            '1d': '1d',
-            '3d': '3d',
-            '1w': '1w'
-        };
-        
-        const binanceInterval = binanceIntervals[interval] || '15m';
-        
-        // Limiter à 1000 (limite Binance)
-        if (limit > 1000) {
-            limit = 1000;
-        }
-        
-        // URL de l'API Binance (pas besoin d'authentification pour les données de marché)
-        let url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${binanceInterval}&limit=${limit}`;
-        if (startTime) url += `&startTime=${startTime}`;
-        if (endTime) url += `&endTime=${endTime}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-            const klines = data.map(candle => ({
-                timestamp: parseInt(candle[0]),
-                open: parseFloat(candle[1]),
-                high: parseFloat(candle[2]),
-                low: parseFloat(candle[3]),
-                close: parseFloat(candle[4]),
-                volume: parseFloat(candle[5])
-            }));
-            
-            log(`📊 Binance: ${symbol} - ${klines.length} bougies ${interval} récupérées`, 'INFO');
-            return klines;
-        } else {
-            log(`❌ Erreur API Binance: ${data.msg || 'Réponse invalide'}`, 'ERROR');
-            return [];
-        }
-    } catch (error) {
-        log(`❌ Erreur réseau Binance ${symbol}: ${error.message}`, 'ERROR');
-        return [];
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 seconde
+    let lastError = null;
+    
+    // Conversion des timeframes pour Binance
+    const binanceIntervals = {
+        '1m': '1m',
+        '3m': '3m',
+        '5m': '5m',
+        '15m': '15m',
+        '30m': '30m',
+        '1h': '1h',
+        '4h': '4h',
+        '6h': '6h',
+        '12h': '12h',
+        '1d': '1d',
+        '3d': '3d',
+        '1w': '1w'
+    };
+    
+    const binanceInterval = binanceIntervals[interval] || '15m';
+    
+    // Limiter à 1000 (limite Binance)
+    if (limit > 1000) {
+        limit = 1000;
     }
+    
+    // URL de l'API Binance (pas besoin d'authentification pour les données de marché)
+    let url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${binanceInterval}&limit=${limit}`;
+    if (startTime) url += `&startTime=${startTime}`;
+    if (endTime) url += `&endTime=${endTime}`;
+    
+    console.log(`🔍 [API] Tentative de récupération: ${symbol} ${interval} (${limit} bougies)`);
+    
+    // Boucle de retry avec backoff exponentiel
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🔍 [API] Tentative ${attempt + 1}/${maxRetries + 1} pour ${symbol}`);
+            
+            // Créer un AbortController pour le timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 secondes timeout
+            
+            const response = await fetch(url, {
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            // Vérifier le statut de la réponse
+            if (!response.ok) {
+                if (response.status === 429) {
+                    // Rate limit exceeded
+                    const retryAfter = response.headers.get('Retry-After') || 60;
+                    console.log(`⚠️ [API] Rate limit atteint, attente ${retryAfter}s avant retry`);
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, parseInt(retryAfter) * 1000));
+                        continue;
+                    }
+                    throw new Error(`Rate limit dépassé: ${response.status} ${response.statusText}`);
+                } else if (response.status === 403) {
+                    throw new Error(`Accès interdit (possiblement IP bloquée): ${response.status} ${response.statusText}`);
+                } else if (response.status >= 500) {
+                    // Erreur serveur, on peut retry
+                    throw new Error(`Erreur serveur (retry possible): ${response.status} ${response.statusText}`);
+                } else {
+                    // Autres erreurs HTTP
+                    throw new Error(`Erreur HTTP: ${response.status} ${response.statusText}`);
+                }
+            }
+            
+            const data = await response.json();
+            
+            // Validation de la réponse
+            if (!data) {
+                throw new Error('Réponse vide de l\'API Binance');
+            }
+            
+            if (Array.isArray(data)) {
+                if (data.length === 0) {
+                    console.log(`⚠️ [API] Aucune donnée disponible pour ${symbol} ${interval}`);
+                    return [];
+                }
+                
+                const klines = data.map((candle, index) => {
+                    // Validation des données de chaque bougie
+                    if (!candle || !Array.isArray(candle) || candle.length < 6) {
+                        console.error(`❌ [API] Bougie invalide à l'index ${index}:`, candle);
+                        return null;
+                    }
+                    
+                    return {
+                        timestamp: parseInt(candle[0]),
+                        open: parseFloat(candle[1]),
+                        high: parseFloat(candle[2]),
+                        low: parseFloat(candle[3]),
+                        close: parseFloat(candle[4]),
+                        volume: parseFloat(candle[5])
+                    };
+                }).filter(candle => candle !== null); // Filtrer les bougies invalides
+                
+                console.log(`✅ [API] ${symbol} - ${klines.length} bougies ${interval} récupérées avec succès`);
+                log(`📊 Binance: ${symbol} - ${klines.length} bougies ${interval} récupérées`, 'INFO');
+                return klines;
+            } else if (data.code && data.msg) {
+                // Erreur API Binance
+                const errorMsg = `Erreur API Binance (${data.code}): ${data.msg}`;
+                console.error(`❌ [API] ${errorMsg}`);
+                
+                // Certaines erreurs ne méritent pas de retry
+                if (data.code === -1121 || data.code === -1100) { // Invalid symbol ou Illegal characters
+                    throw new Error(errorMsg);
+                }
+                
+                throw new Error(errorMsg);
+            } else {
+                throw new Error(`Format de réponse inattendu: ${typeof data}`);
+            }
+            
+        } catch (error) {
+            lastError = error;
+            console.error(`❌ [API] Erreur tentative ${attempt + 1}:`, error.message);
+            
+            // Gestion spécifique des erreurs
+            if (error.name === 'AbortError') {
+                console.error(`❌ [API] Timeout après 30 secondes pour ${symbol}`);
+            } else if (error.message.includes('CORS') || error.message.includes('Network')) {
+                console.error(`❌ [API] Erreur réseau/CORS pour ${symbol}`);
+            } else if (error.message.includes('Rate limit') || error.message.includes('403')) {
+                console.error(`❌ [API] Erreur d'accès pour ${symbol}`);
+            }
+            
+            // Si c'est la dernière tentative, on sort
+            if (attempt === maxRetries) {
+                break;
+            }
+            
+            // Attendre avant le prochain retry (backoff exponentiel)
+            const delay = baseDelay * Math.pow(2, attempt);
+            console.log(`⏳ [API] Attente ${delay}ms avant retry pour ${symbol}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    
+    // Toutes les tentatives ont échoué
+    const finalError = `Échec après ${maxRetries + 1} tentatives: ${lastError?.message || 'Erreur inconnue'}`;
+    console.error(`❌ [API] ${finalError}`);
+    log(`❌ Erreur réseau Binance ${symbol}: ${finalError}`, 'ERROR');
+    
+    return []; // Retourner un tableau vide en cas d'échec
 }
 
 // Fonctions supprimées - utilisaient des appels API inutiles
 // La nouvelle logique utilise uniquement la stratégie fixe identique au trading principal
 
-// Fonction pour démarrer le backtesting
+// Fonction pour démarrer le backtesting (AVEC VALIDATION)
 async function startBacktest() {
-    if (backtestRunning) {
-        log('⚠️ Un backtesting est déjà en cours', 'WARNING');
-        return;
-    }
-    
     try {
+        // Validation préliminaire des variables
+        if (!validateBacktestingState()) {
+            console.error('❌ [VALIDATION] État invalide, réinitialisation des variables...');
+            initializeBacktestingVariables();
+            if (!validateBacktestingState()) {
+                throw new Error('Impossible de valider l\'état du backtesting après réinitialisation');
+            }
+        }
+        
+        if (backtestRunning) {
+            log('⚠️ Un backtesting est déjà en cours', 'WARNING');
+            return;
+        }
+        
         // 🔍 DEBUG: Vérifier l'élément chartSymbol
         console.log('🔍 [DEBUG] Vérification de l\'élément chartSymbol...');
         const chartSymbolElement = document.getElementById('chartSymbol');
@@ -520,27 +936,35 @@ async function startBacktest() {
         console.error('❌ [DEBUG] Erreur dans startBacktest:', error);
         log(`❌ Erreur backtesting: ${error.message}`, 'ERROR');
         console.error('Erreur backtesting:', error);
-    } finally {
-        backtestRunning = false;
-        updateBacktestUI(false);
-        // Nettoyer les données étendues
-        extended4hData = null;
-        extended1hData = null;
+        
+        // Nettoyer les variables en cas d'erreur
+        cleanupBacktestingVariables();
     }
 }
 
-// Fonction pour arrêter le backtesting
+// Fonction pour arrêter le backtesting (AVEC NETTOYAGE)
 function stopBacktest() {
-    if (!backtestRunning) return;
-    
-    backtestRunning = false;
-    if (backtestInterval) {
-        clearInterval(backtestInterval);
-        backtestInterval = null;
+    try {
+        if (!backtestRunning) {
+            console.log('⚠️ Aucun backtesting en cours');
+            return;
+        }
+        
+        console.log('⏹️ Arrêt du backtesting...');
+        
+        // Nettoyer proprement toutes les variables
+        cleanupBacktestingVariables();
+        
+        // Mettre à jour l'interface
+        updateBacktestUI(false);
+        
+        log('⏹️ Backtesting arrêté par l\'utilisateur', 'INFO');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors de l\'arrêt du backtesting:', error);
+        // Forcer le nettoyage en cas d'erreur
+        cleanupBacktestingVariables();
     }
-    
-    updateBacktestUI(false);
-    log('⏹️ Backtesting arrêté par l\'utilisateur', 'INFO');
 }
 
 // Mettre à jour la configuration du backtesting
@@ -1171,35 +1595,80 @@ function displayBacktestResults() {
 }
 
 function plotEquityCurve(equity, timestamps) {
-    const ctx = document.getElementById('equityCurveChart').getContext('2d');
-    
-    // Destroy existing chart if it exists
-    if (equityChart) {
-        equityChart.destroy();
-        equityChart = null;
-    }
-    
-    // Create new chart
-    equityChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: timestamps.map(ts => new Date(ts).toLocaleDateString()),
-            datasets: [{
-                label: 'Courbe d\'équité',
-                data: equity,
-                borderColor: '#28a745',
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: false
+    try {
+        const canvas = document.getElementById('equityCurveChart');
+        const placeholder = document.getElementById('chartPlaceholder');
+        
+        if (!canvas) {
+            console.error('❌ [CHART] Canvas equityCurveChart non trouvé');
+            return;
+        }
+        
+        // Masquer le placeholder
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (equityChart) {
+            equityChart.destroy();
+            equityChart = null;
+        }
+        
+        // Create new chart
+        equityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: timestamps.map(ts => new Date(ts).toLocaleDateString()),
+                datasets: [{
+                    label: 'Courbe d\'équité',
+                    data: equity,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Équité (USDT)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
                 }
             }
+        });
+        
+        console.log('✅ [CHART] Graphique d\'équité créé avec succès');
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur création graphique:', error);
+        // Remettre le placeholder en cas d'erreur
+        const placeholder = document.getElementById('chartPlaceholder');
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            placeholder.textContent = '❌ Erreur lors de la création du graphique';
         }
-    });
+    }
 }
 
 // Afficher l'historique des trades
@@ -1298,12 +1767,17 @@ function exportBacktestResults() {
 
 // Mettre à jour l'interface utilisateur
 function updateBacktestUI(running) {
-    document.getElementById('startBacktestBtn').style.display = running ? 'none' : 'block';
-    document.getElementById('stopBacktestBtn').style.display = running ? 'block' : 'none';
-    document.getElementById('backtestStatus').style.display = running ? 'block' : 'none';
+    const startBtn = document.getElementById('startBacktestBtn');
+    const stopBtn = document.getElementById('stopBacktestBtn');
+    const statusDiv = document.getElementById('backtestStatus');
     
-    // Désactiver les contrôles pendant l'exécution
-    document.querySelectorAll('#backtestingCard input, #backtestingCard select').forEach(el => {
+    // Vérifier que les éléments existent avant de les modifier
+    if (startBtn) startBtn.style.display = running ? 'none' : 'block';
+    if (stopBtn) stopBtn.style.display = running ? 'block' : 'none';
+    if (statusDiv) statusDiv.style.display = running ? 'block' : 'none';
+    
+    // Désactiver les contrôles pendant l'exécution (sélecteur corrigé)
+    document.querySelectorAll('#backtesting input, #backtesting select').forEach(el => {
         el.disabled = running;
     });
 }
@@ -1463,12 +1937,33 @@ async function optimizeMACD() {
 
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
-    // Gérer le changement de stratégie
-    const strategySelect = document.getElementById('backtestStrategy');
-    if (strategySelect) {
-        strategySelect.addEventListener('change', updateStrategyParams);
-        // Initialiser l'affichage des paramètres
-        updateStrategyParams();
+    // Initialiser le backtesting quand la page est chargée
+    console.log('✅ Backtesting module initialized');
+    
+    // Vérifier la présence des éléments critiques
+    const criticalElements = [
+        'chartSymbol',
+        'backtestDuration',
+        'backtestPositionSize',
+        'backtestTrailingStop',
+        'backtestTakeProfit',
+        'enableTakeProfit',
+        'startBacktestBtn',
+        'stopBacktestBtn'
+    ];
+    
+    const missingElements = [];
+    criticalElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            missingElements.push(elementId);
+        }
+    });
+    
+    if (missingElements.length > 0) {
+        console.warn('⚠️ Éléments HTML manquants pour le backtesting:', missingElements);
+    } else {
+        console.log('✅ Tous les éléments HTML critiques sont présents');
     }
 });
 
@@ -1621,147 +2116,6 @@ window.exportBacktestResults = exportBacktestResults;
 window.updateChartTimeframe = updateChartTimeframe;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
-window.optimizeMACD = optimizeMACD; // Add this line to make optimizeMACD accessible
+window.optimizeMACD = optimizeMACD;
 
 console.log('✅ Backtesting system loaded successfully');
-
-// CORRECTION TEMPORAIRE - Désactiver la précision
-window.checkTrailingStopPrecision_DISABLED = true;
-
-// FONCTION TEMPORAIRE DE DIAGNOSTIC : Version simplifiée pour identifier le problème
-async function runBacktestWithTradingLogic() {
-    console.log('🚀 [DIAGNOSTIC] === DÉBUT DU DIAGNOSTIC ===');
-    
-    try {
-        updateBacktestStatus('Diagnostic du backtesting...', 55);
-        
-        // Vérifications de base
-        console.log('🔍 [DIAGNOSTIC] Vérification des données...');
-        console.log(`📊 [DIAGNOSTIC] backtestData: ${backtestData ? backtestData.length : 'NULL'} bougies`);
-        console.log(`📊 [DIAGNOSTIC] extended4hData: ${extended4hData ? extended4hData.length : 'NULL'} bougies`);
-        console.log(`📊 [DIAGNOSTIC] extended1hData: ${extended1hData ? extended1hData.length : 'NULL'} bougies`);
-        console.log(`📊 [DIAGNOSTIC] Configuration:`, backtestConfig);
-        
-        if (!backtestData || backtestData.length === 0) {
-            throw new Error('backtestData manquant');
-        }
-        
-        // Initialiser les variables
-        let equity = backtestConfig.capital;
-        let closedTrades = [];
-        let equityHistory = [];
-        let totalAnalyses = 0;
-        let errorsCount = 0;
-        
-        console.log('✅ [DIAGNOSTIC] Variables initialisées');
-        
-        // Test simple : analyser seulement 5 bougies pour commencer
-        const testIndices = [50, 100, 200, 400, 600].filter(i => i < backtestData.length);
-        console.log(`🔍 [DIAGNOSTIC] Test sur ${testIndices.length} bougies: ${testIndices}`);
-        
-        for (const i of testIndices) {
-            try {
-                console.log(`\n🔍 [DIAGNOSTIC] === TEST BOUGIE ${i} ===`);
-                const currentCandle = backtestData[i];
-                
-                if (!currentCandle) {
-                    console.error(`❌ [DIAGNOSTIC] Bougie ${i} manquante`);
-                    continue;
-                }
-                
-                console.log(`📅 [DIAGNOSTIC] Timestamp: ${new Date(currentCandle.timestamp).toISOString()}`);
-                console.log(`💰 [DIAGNOSTIC] Prix: ${currentCandle.close}`);
-                
-                // Test simple d'analyse MACD 15M seulement (sans multi-timeframe)
-                console.log(`🔍 [DIAGNOSTIC] Test analyse MACD 15M simple...`);
-                const data15m = backtestData.slice(0, i + 1);
-                const analysis15m = await analyzePairMACDForBacktest('SUIUSDT', '15m', data15m);
-                
-                console.log(`📊 [DIAGNOSTIC] Résultat 15M:`, analysis15m);
-                totalAnalyses++;
-                
-                // Simuler une position simple si signal BUY
-                if (analysis15m.signal === 'BUY') {
-                    console.log(`✅ [DIAGNOSTIC] Signal BUY détecté en 15M !`);
-                    
-                    // Créer une position de test
-                    const trade = {
-                        id: Date.now(),
-                        symbol: 'SUIUSDT',
-                        side: 'LONG',
-                        entryPrice: currentCandle.close,
-                        entryTime: currentCandle.timestamp,
-                        entryIndex: i,
-                        exitPrice: currentCandle.close * 1.02, // +2% simulé
-                        exitTime: currentCandle.timestamp + 60000, // +1 minute
-                        exitReason: 'Test simulé',
-                        pnl: 20, // PnL simulé
-                        pnlPercent: 2
-                    };
-                    
-                    closedTrades.push(trade);
-                    console.log(`🚀 [DIAGNOSTIC] Position de test créée !`);
-                }
-                
-                updateBacktestStatus(`Test bougie ${i}...`, 60 + (testIndices.indexOf(i) / testIndices.length) * 30);
-                
-            } catch (candleError) {
-                errorsCount++;
-                console.error(`❌ [DIAGNOSTIC] Erreur bougie ${i}:`, candleError);
-                console.error(`❌ [DIAGNOSTIC] Stack:`, candleError.stack);
-            }
-        }
-        
-        // Résultats du diagnostic
-        console.log(`\n📊 [DIAGNOSTIC] === RÉSULTATS DU DIAGNOSTIC ===`);
-        console.log(`📊 [DIAGNOSTIC] Analyses réussies: ${totalAnalyses}`);
-        console.log(`📊 [DIAGNOSTIC] Erreurs: ${errorsCount}`);
-        console.log(`📊 [DIAGNOSTIC] Positions de test: ${closedTrades.length}`);
-        
-        // Créer des résultats de test
-        backtestResults = {
-            equity: equity,
-            equityHistory: [],
-            trades: closedTrades,
-            totalTrades: closedTrades.length,
-            winningTrades: closedTrades.filter(t => t.pnl > 0).length,
-            losingTrades: closedTrades.filter(t => t.pnl < 0).length,
-            totalPnL: closedTrades.reduce((sum, t) => sum + t.pnl, 0),
-            totalPnLPercent: 0,
-            winRate: closedTrades.length > 0 ? (closedTrades.filter(t => t.pnl > 0).length / closedTrades.length) * 100 : 0,
-            maxDrawdown: 0,
-            avgTradeDuration: 0,
-            // Stats de diagnostic
-            totalAnalyses: totalAnalyses,
-            errorsCount: errorsCount,
-            diagnostic: true
-        };
-        
-        console.log('✅ [DIAGNOSTIC] === DIAGNOSTIC TERMINÉ ===');
-        updateBacktestStatus('Diagnostic terminé !', 100);
-        
-    } catch (error) {
-        console.error('❌ [DIAGNOSTIC] ERREUR CRITIQUE:', error);
-        console.error('❌ [DIAGNOSTIC] Stack trace:', error.stack);
-        
-        // Résultats d'erreur
-        backtestResults = {
-            equity: backtestConfig.capital,
-            equityHistory: [],
-            trades: [],
-            totalTrades: 0,
-            winningTrades: 0,
-            losingTrades: 0,
-            totalPnL: 0,
-            totalPnLPercent: 0,
-            winRate: 0,
-            maxDrawdown: 0,
-            avgTradeDuration: 0,
-            error: error.message,
-            diagnostic: true
-        };
-        
-        log(`❌ Erreur diagnostic: ${error.message}`, 'ERROR');
-        throw error;
-    }
-}
