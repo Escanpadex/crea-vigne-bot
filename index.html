@@ -223,10 +223,6 @@
                                 <label>Type de Stratégie:</label>
                                 <select id="backtestStrategy">
                                     <option value="macd">MACD Classique</option>
-                                    <option value="macd_multi">MACD Multi-Timeframes</option>
-                                    <option value="rsi">RSI</option>
-                                    <option value="bollinger">Bandes de Bollinger</option>
-                                    <option value="ema_cross">Croisement EMA</option>
                                 </select>
                             </div>
                             
@@ -242,32 +238,6 @@
                                 <div class="form-group">
                                     <label>MACD Signal:</label>
                                     <input type="number" id="macdSignal" value="9" min="1" max="50">
-                                </div>
-                            </div>
-                            
-                            <div id="rsiParams" class="strategy-params" style="display: none;">
-                                <div class="form-group">
-                                    <label>RSI Période:</label>
-                                    <input type="number" id="rsiPeriod" value="14" min="1" max="50">
-                                </div>
-                                <div class="form-group">
-                                    <label>RSI Survente:</label>
-                                    <input type="number" id="rsiOversold" value="30" min="1" max="50">
-                                </div>
-                                <div class="form-group">
-                                    <label>RSI Surachat:</label>
-                                    <input type="number" id="rsiOverbought" value="70" min="50" max="100">
-                                </div>
-                            </div>
-                            
-                            <div id="emaParams" class="strategy-params" style="display: none;">
-                                <div class="form-group">
-                                    <label>EMA Rapide:</label>
-                                    <input type="number" id="emaFast" value="9" min="1" max="50">
-                                </div>
-                                <div class="form-group">
-                                    <label>EMA Lente:</label>
-                                    <input type="number" id="emaSlow" value="21" min="1" max="100">
                                 </div>
                             </div>
                         </div>
