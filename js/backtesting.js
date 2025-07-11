@@ -34,32 +34,13 @@ let equityChart = null;
 
 // Configuration du backtesting
 let backtestConfig = {
-    strategy: 'macd',
-    timeframe: '15m',
+    timeframe: '15m', // Base for simulation
     duration: 7, // jours
     capital: 1000, // Capital fixe
     positionSize: 10, // pourcentage
     trailingStop: 1.5, // pourcentage
     takeProfit: 4, // pourcentage
     enableTakeProfit: true, // activer/désactiver le take profit
-    macdParams: {
-        fast: 12,
-        slow: 26,
-        signal: 9
-    },
-    rsiParams: {
-        period: 14,
-        oversold: 30,
-        overbought: 70
-    },
-    emaParams: {
-        fast: 12,
-        slow: 26
-    },
-    bollingerParams: {
-        period: 20,
-        multiplier: 2
-    }
 };
 
 // Fonction pour récupérer les données klines depuis l'API Binance
@@ -124,29 +105,7 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startT
 
 // Gestion des paramètres de stratégie
 function updateStrategyParams() {
-    const strategy = document.getElementById('backtestStrategy').value;
-    
-    // Masquer tous les paramètres
-    document.querySelectorAll('.strategy-params').forEach(el => {
-        el.style.display = 'none';
-    });
-    
-    // Afficher les paramètres de la stratégie sélectionnée
-    switch(strategy) {
-        case 'macd':
-        case 'macd_multi':
-            document.getElementById('macdParams').style.display = 'block';
-            break;
-        case 'rsi':
-            document.getElementById('rsiParams').style.display = 'block';
-            break;
-        case 'ema_cross':
-            document.getElementById('emaParams').style.display = 'block';
-            break;
-        case 'bollinger':
-            // Pas de paramètres spécifiques pour Bollinger pour le moment
-            break;
-    }
+    // This function is no longer needed as strategy is hardcoded
 }
 
 // Fonction pour démarrer le backtesting
@@ -172,17 +131,17 @@ async function startBacktest() {
         backtestRunning = true;
         updateBacktestUI(true);
         
-        log(`🚀 Démarrage du backtesting: ${symbol} - ${backtestConfig.strategy} - ${backtestConfig.duration} jours`, 'INFO');
+        log(`🚀 Démarrage du backtesting: ${symbol} - MACD Multi-Timeframe - ${backtestConfig.duration} jours`, 'INFO');
         
-        // Récupérer les données historiques
-        await fetchBacktestData(symbol);
+        // Récupérer les données historiques pour les trois timeframes
+        await fetchMultiTimeframeData(symbol);
         
         if (!backtestData || backtestData.length === 0) {
             throw new Error('Impossible de récupérer les données historiques');
         }
         
-        // Exécuter le backtesting
-        await runBacktestStrategy();
+        // Exécuter le backtesting multi-timeframe
+        await runMultiTimeframeBacktest();
         
         // Afficher les résultats
         displayBacktestResults();
@@ -215,32 +174,13 @@ function stopBacktest() {
 // Mettre à jour la configuration du backtesting
 async function updateBacktestConfig() {
     backtestConfig = {
-        strategy: document.getElementById('backtestStrategy').value,
-        timeframe: document.getElementById('backtestTimeframe').value,
+        timeframe: document.getElementById('backtestTimeframe').value, // Keep this for UI
         duration: parseInt(document.getElementById('backtestDuration').value),
         capital: 1000, // Capital fixe
         positionSize: parseFloat(document.getElementById('backtestPositionSize').value),
         trailingStop: parseFloat(document.getElementById('backtestTrailingStop').value),
         takeProfit: parseFloat(document.getElementById('backtestTakeProfit').value),
         enableTakeProfit: document.getElementById('enableTakeProfit').checked,
-        macdParams: {
-            fast: parseInt(document.getElementById('macdFast').value),
-            slow: parseInt(document.getElementById('macdSlow').value),
-            signal: parseInt(document.getElementById('macdSignal').value)
-        },
-        rsiParams: {
-            period: parseInt(document.getElementById('rsiPeriod').value),
-            oversold: parseFloat(document.getElementById('rsiOversold').value),
-            overbought: parseFloat(document.getElementById('rsiOverbought').value)
-        },
-        emaParams: {
-            fast: parseInt(document.getElementById('emaFast').value),
-            slow: parseInt(document.getElementById('emaSlow').value)
-        },
-        bollingerParams: {
-            period: parseInt(document.getElementById('bollingerPeriod').value),
-            multiplier: parseFloat(document.getElementById('bollingerMultiplier').value)
-        }
     };
 }
 
@@ -265,23 +205,29 @@ function validateBacktestConfig() {
 }
 
 // Récupérer les données historiques via API Binance
-async function fetchBacktestData(symbol, timeframe = backtestConfig.timeframe) {
+async function fetchMultiTimeframeData(symbol) {
     try {
         updateBacktestStatus('Récupération des données historiques via Binance...', 10);
         
-        const timeframeMs = getTimeframeMinutes(timeframe) * 60 * 1000;
+        const timeframeMs = getTimeframeMinutes(backtestConfig.timeframe) * 60 * 1000;
         const totalMs = backtestConfig.duration * 24 * 60 * 60 * 1000;
         const now = Date.now();
         let endTime = now;
         let startTime = now - totalMs;
         let allData = [];
         
-        while (endTime > startTime) {
-            const currentStart = Math.max(startTime, endTime - (1000 * timeframeMs));
-            log(`📊 Récupération de bougies de ${new Date(currentStart).toLocaleString()} à ${new Date(endTime).toLocaleString()}`, 'INFO');
-            const data = await getBinanceKlineData(symbol, 1000, timeframe, currentStart, endTime);
+        // Fetch data for 4h, 1h, and 15m timeframes
+        const timeframesToFetch = ['4h', '1h', '15m'];
+        for (const tf of timeframesToFetch) {
+            const tfMs = getTimeframeMinutes(tf) * 60 * 1000;
+            const currentStart = Math.max(startTime, endTime - (1000 * tfMs));
+            log(`📊 Récupération de bougies de ${new Date(currentStart).toLocaleString()} à ${new Date(endTime).toLocaleString()} (Timeframe: ${tf})`, 'INFO');
+            const data = await getBinanceKlineData(symbol, 1000, tf, currentStart, endTime);
             
-            if (data.length === 0) break;
+            if (data.length === 0) {
+                log(`⚠️ Aucune donnée récupérée pour le timeframe ${tf}. Arrêt de la récupération.`, 'WARNING');
+                break; // Stop if no data for any timeframe
+            }
             
             allData = data.concat(allData); // Prepend
             endTime = data[0].timestamp - 1;
@@ -292,7 +238,7 @@ async function fetchBacktestData(symbol, timeframe = backtestConfig.timeframe) {
         // Add extra 100 candles for indicators if possible
         if (allData.length > 0) {
             const extraStart = allData[0].timestamp - (100 * timeframeMs);
-            const extraData = await getBinanceKlineData(symbol, 100, timeframe, extraStart, allData[0].timestamp - 1);
+            const extraData = await getBinanceKlineData(symbol, 100, backtestConfig.timeframe, extraStart, allData[0].timestamp - 1);
             allData = extraData.concat(allData);
         }
         
@@ -333,8 +279,8 @@ function getTimeframeMinutes(timeframe) {
 }
 
 // Exécuter la stratégie de backtesting
-async function runBacktestStrategy() {
-    updateBacktestStatus('Exécution de la stratégie...', 30);
+async function runMultiTimeframeBacktest() {
+    updateBacktestStatus('Exécution de la stratégie multi-timeframe...', 30);
     
     backtestResults = {
         trades: [],
@@ -353,40 +299,43 @@ async function runBacktestStrategy() {
         }
     };
     
-    // Calculer les indicateurs selon la stratégie
-    let indicators = null;
-    switch(backtestConfig.strategy) {
-        case 'macd':
-        case 'macd_multi':
-            indicators = calculateMACDIndicators();
-            break;
-        case 'rsi':
-            indicators = calculateRSIIndicators();
-            break;
-        case 'ema_cross':
-            indicators = calculateEMAIndicators();
-            break;
-        case 'bollinger':
-            indicators = calculateBollingerIndicators();
-            break;
+    // Simuler les trades à chaque point historique
+    for (let i = 0; i < backtestData.length; i++) {
+        const candle = backtestData[i];
+        
+        // Mettre à jour le progrès
+        if (i % 10 === 0) {
+            updateBacktestStatus(`Analyse bougie ${i}/${backtestData.length}`, 30 + ((i / backtestData.length) * 60));
+        }
+        
+        // Vérifier les signaux d'entrée
+        const signal = getEntrySignal(candle, i);
+        
+        // Log des premiers signaux pour debug
+        if (i < 60 && signal !== 'HOLD') {
+            log(`🎯 Signal ${signal} détecté à l'index ${i} - Prix: ${candle.close}`, 'INFO');
+        }
+        
+        // CORRECTION 2 : Uniquement les signaux BUY pour ouvrir des trades LONG
+        // Plus de signaux SELL - fermeture uniquement par trailing stop
+        if (signal === 'BUY') {
+            openTrade(candle, 'LONG');
+        }
+        
+        // Vérifier les trades ouverts
+        await checkOpenTrades(candle, i);
+        
+        // Mettre à jour l'équité
+        updateEquity(candle);
+        
+        // Petit délai pour éviter de bloquer l'interface
+        if (i % 50 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1));
+        }
     }
     
-    if (!indicators) {
-        throw new Error('Impossible de calculer les indicateurs');
-    }
-    
-    // Simuler les trades
-    await simulateTrades(indicators);
-    
-    // Calculer les statistiques finales
-    calculateFinalStats();
-    
-    updateBacktestStatus('Backtesting terminé', 100);
-    
-    // CORRECTION 1 : Assurer l'affichage des résultats
-    displayBacktestResults();
-    
-    log(`✅ Backtesting terminé avec succès`, 'SUCCESS');
+    log(`📊 Résumé des signaux: BUY=${signalCount.BUY}, SELL=${signalCount.SELL}, HOLD=${signalCount.HOLD}`, 'INFO');
+    log(`💼 Trades fermés: ${backtestResults.trades.length}`, 'INFO');
 }
 
 // 🧮 Calculer MACD avancé (fonction intégrée pour le backtesting)
@@ -629,7 +578,7 @@ async function simulateTrades(indicators) {
         }
         
         // Vérifier les signaux d'entrée
-        const signal = getEntrySignal(indicators, i);
+        const signal = getEntrySignal(candle, i);
         signalCount[signal]++;
         
         // Log des premiers signaux pour debug
@@ -660,34 +609,19 @@ async function simulateTrades(indicators) {
 }
 
 // Obtenir le signal d'entrée selon la stratégie
-function getEntrySignal(indicators, index) {
-    switch(backtestConfig.strategy) {
-        case 'macd':
-        case 'macd_multi':
-            return getMACDSignal(indicators, index);
-        case 'rsi':
-            return getRSISignal(indicators, index);
-        case 'ema_cross':
-            return getEMASignal(indicators, index);
-        case 'bollinger':
-            return getBollingerSignal(indicators, index);
-        default:
-            return 'HOLD';
-    }
-}
-
-// 🎯 Signal MACD Avancé avec analyse de tendance
-function getMACDSignal(indicators, index) {
-    const macd = indicators.macd[index];
-    const signal = indicators.signal[index];
-    const histogram = indicators.histogram[index];
-    const crossover = indicators.crossover[index];
-    const trend = indicators.trend[index];
+function getEntrySignal(candle, index) {
+    const macdData = calculateMACDForBacktest(backtestData.slice(0, index + 1).map(c => c.close));
+    
+    const macd = macdData.macdArray[index];
+    const signal = macdData.signalArray[index];
+    const histogram = macdData.histogramArray[index];
+    const crossover = macdData.crossoverArray[index];
+    const trend = macdData.trendArray[index];
     
     // Données précédentes pour analyse
-    const prevMacd = indicators.macd[index - 1];
-    const prevSignal = indicators.signal[index - 1];
-    const prevHistogram = indicators.histogram[index - 1];
+    const prevMacd = macdData.macdArray[index - 1];
+    const prevSignal = macdData.signalArray[index - 1];
+    const prevHistogram = macdData.histogramArray[index - 1];
     
     // Log de debug pour les premières bougies
     if (index < 55 && index % 10 === 0) {
@@ -1134,7 +1068,7 @@ function exportBacktestResults() {
         results: backtestResults,
         summary: {
             symbol: document.getElementById('chartSymbol').value.split(':')[1],
-            strategy: backtestConfig.strategy,
+            strategy: 'MACD Multi-Timeframe', // Hardcoded
             timeframe: backtestConfig.timeframe,
             duration: backtestConfig.duration,
             totalTrades: backtestResults.stats.totalTrades,
@@ -1294,14 +1228,8 @@ function calculateBollingerBands(prices, period = 20, multiplier = 2) {
 }
 
 async function optimizeMACD() {
-    const grids = { fast: [8,12,16], slow: [20,26,32], signal: [6,9,12] };
-    let best = { sharpe: -Infinity, params: {} };
-    for (let f of grids.fast) for (let s of grids.slow) for (let sig of grids.signal) {
-        backtestConfig.macdParams = {fast: f, slow: s, signal: sig};
-        await runBacktestStrategy();
-        if (backtestResults.stats.sharpeRatio > best.sharpe) best = {sharpe: backtestResults.stats.sharpeRatio, params: {f,s,sig}};
-    }
-    log(`Best params: ${JSON.stringify(best)}`);
+    // This function is no longer needed as MACD params are hardcoded
+    log('Optimisation MACD désactivée - MACD params sont hardcodés.', 'INFO');
 }
 
 // Initialiser les événements
