@@ -485,6 +485,10 @@
                 }
             } catch (error) {
                 log(`❌ Erreur récupération paires backtesting: ${error.message}`, 'ERROR');
+                const chartSelect = document.getElementById('chartSymbol');
+                chartSelect.innerHTML = '<option>❌ Erreur de chargement - Vérifiez votre connexion</option>';
+                const updateIndicator = document.getElementById('lastVolumeUpdate');
+                if (updateIndicator) updateIndicator.textContent = 'Erreur';
             }
         }
         
