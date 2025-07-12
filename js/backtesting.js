@@ -1162,6 +1162,11 @@ function updateSelectedPair() {
         stopBacktest();
         log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
     }
+    
+    // Mise à jour du graphique
+    if (typeof window.updateBacktestChart === 'function') {
+        window.updateBacktestChart(symbol);
+    }
 }
 
 // Fonction pour activer/désactiver le Take Profit
@@ -1186,6 +1191,38 @@ window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
+
+// Nouvelle fonction pour mettre à jour le graphique TradingView avec MACD
+window.updateBacktestChart = function(symbol) {
+    console.log(`🚀 [CHART] Création graphique pour ${symbol}`);
+    const container = document.getElementById('backtestTradingViewChart');
+    if (!container) {
+        console.error('❌ [CHART] Conteneur non trouvé');
+        return;
+    }
+    const placeholder = document.getElementById('backtestChartPlaceholder');
+    if (placeholder) {
+        placeholder.style.display = 'none';
+    }
+    if (backtestTradingViewWidget) {
+        backtestTradingViewWidget.remove();
+        backtestTradingViewWidget = null;
+    }
+    backtestTradingViewWidget = new TradingView.widget({
+        "width": "100%",
+        "height": "100%",
+        "symbol": `BINANCE:${symbol}`,
+        "interval": "15",
+        "timezone": "Etc/UTC",
+        "theme": "light",
+        "style": "1",
+        "locale": "fr",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "studies": ["MACD@tv-basicstudies"],
+        "container": "backtestTradingViewChart"
+    });
+};
 
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
