@@ -713,7 +713,7 @@ function getTimeframeMinutes(timeframe) {
 }
 
 // Fonction pour récupérer les données klines depuis l'API Binance
--async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
+async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
     const maxRetries = 3;
     const baseDelay = 1000;
     let lastError = null;
