@@ -318,13 +318,10 @@
                                 <label style="font-weight: 600; color: #2d3748; margin-bottom: 8px; display: block;">🎯 Take Profit (%):</label>
                                 <div class="take-profit-container" style="background: linear-gradient(135deg, #f0fff4, #e6fffa); border: 2px solid #48bb78; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(72, 187, 120, 0.1); transition: all 0.3s ease;">
                                     <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
-                                        <!-- Toggle Switch personnalisé amélioré -->
+                                        <!-- Case à cocher carrée simple -->
                                         <div style="display: flex; align-items: center; gap: 8px;">
-                                            <div class="toggle-switch" style="position: relative; width: 50px; height: 24px; background: #48bb78; border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 6px rgba(72, 187, 120, 0.3);" onclick="toggleTakeProfit(event)">
-                                                <div id="takeProfitToggle" class="toggle-switch-ball" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateX(24px); box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                                            </div>
-                                            <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit(event)" style="display: none;">
-                                            <label for="enableTakeProfit" style="margin: 0; font-weight: 600; color: #2d3748; cursor: pointer; user-select: none;" onclick="toggleTakeProfit(event)">Activer</label>
+                                            <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit(event)" style="width: 18px; height: 18px; cursor: pointer; accent-color: #48bb78;">
+                                            <label for="enableTakeProfit" style="margin: 0; font-weight: 600; color: #2d3748; cursor: pointer; user-select: none;">Activer</label>
                                         </div>
                                         
                                         <!-- Input stylisé amélioré -->
