@@ -1300,8 +1300,12 @@ window.updateBacktestChart = function(symbol) {
     // Nettoyer le graphique existant
     if (lightweightChart) {
         try {
-            lightweightChart.remove();
-            console.log('✅ [CHART] Graphique précédent supprimé');
+            if (typeof lightweightChart.remove === 'function') {
+                lightweightChart.remove();
+                console.log('✅ [CHART] Graphique précédent supprimé');
+            } else {
+                console.warn('⚠️ [CHART] lightweightChart.remove n\'est pas une fonction, saut de la suppression');
+            }
         } catch (error) {
             console.warn('⚠️ [CHART] Erreur lors de la suppression du graphique précédent:', error);
         }
@@ -1415,17 +1419,21 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série de bougies avec gestion d'erreur
         let candleSeries;
         try {
-            // Use the correct API: chart.addSeries with the proper series type from LightweightCharts
             if (typeof chart.addSeries === 'function') {
                 // Access the series types from the global LightweightCharts object
-                console.log('🔍 [CHART] Accès à CandlestickSeries:', typeof LightweightChartsLib.CandlestickSeries);
+                console.log('🔍 [CHART] Type de CandlestickSeries:', typeof LightweightChartsLib.CandlestickSeries);
                 
-                if (!LightweightChartsLib.CandlestickSeries) {
+                let candlestickType = LightweightChartsLib.CandlestickSeries;
+                if (typeof candlestickType === 'function') {
+                    candlestickType = candlestickType();  // Call if it's a factory function
+                }
+                
+                if (!candlestickType) {
                     throw new Error('CandlestickSeries non disponible dans la bibliothèque');
                 }
                 
                 console.log('🔧 [CHART] Tentative de création de série candlestick...');
-                candleSeries = chart.addSeries(LightweightChartsLib.CandlestickSeries, {
+                candleSeries = chart.addSeries(candlestickType, {
                     upColor: '#26a69a',
                     downColor: '#ef5350',
                     borderVisible: false,
@@ -1448,9 +1456,13 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série MACD (histogramme) - optionnel
         let macdSeries = null;
         try {
-            console.log('🔍 [CHART] Accès à HistogramSeries:', typeof LightweightChartsLib.HistogramSeries);
-            if (LightweightChartsLib.HistogramSeries) {
-                macdSeries = chart.addSeries(LightweightChartsLib.HistogramSeries, {
+            console.log('🔍 [CHART] Type de HistogramSeries:', typeof LightweightChartsLib.HistogramSeries);
+            let histogramType = LightweightChartsLib.HistogramSeries;
+            if (typeof histogramType === 'function') {
+                histogramType = histogramType();
+            }
+            if (histogramType) {
+                macdSeries = chart.addSeries(histogramType, {
                     color: '#26a69a',
                     priceFormat: {
                         type: 'volume',
