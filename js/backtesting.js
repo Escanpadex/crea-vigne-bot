@@ -17,6 +17,10 @@
  * - Signaux 4H/1H forcés à BUY par défaut (jamais NEUTRAL ou null)
  * - Protection contre INSUFFICIENT_DATA et autres signaux inattendus
  * - Amélioration du logging pour diagnostiquer les problèmes
+ * - Système de timeout 24h pour les signaux baissiers (SELL/BEARISH)
+ * - Recherche améliorée post-SELL (50 itérations max, pas de 1)
+ * - Force BUY si pas de données post-SELL
+ * - Garantie sampleRate=1 si disableSampling=true
  * 
  * Stratégie optimisée : Multi-timeframe → BUY strict → LONG → Fermeture par trailing stop
  */
@@ -59,7 +63,8 @@ let backtestConfig = {
     // NOUVEAU: Options de debug
     debugMode: false, // Mode debug avec logs détaillés
     ignoreHigherTimeframes: false, // Ignorer 4H et 1H pour tester seulement 15M
-    forceDisableSampling: false // Force l'analyse de chaque bougie
+    forceDisableSampling: false, // Force l'analyse de chaque bougie
+    waitingTimeoutMs: 24 * 60 * 60 * 1000, // NEW: 24h timeout for waiting on bullish after SELL/BEARISH
 };
 
 // NOUVELLE FONCTION : Gardes d'initialisation pour les variables globales
@@ -333,6 +338,21 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                 timestamp: signalState.timestamp
             };
         } else if (signalState.signal === 'BEARISH' || signalState.signal === 'SELL') {
+            // NEW: Check if the SELL/BEARISH is too old; if so, default to BUY without waiting
+            const signalAgeMs = currentTime - (signalState.timestamp || 0);
+            if (signalAgeMs > backtestConfig.waitingTimeoutMs) {
+                signalState.signal = 'BUY';
+                signalState.timestamp = currentTime;
+                const reason = `Signal ${timeframe} baissier expiré après ${Math.round(signalAgeMs / (60*60*1000))}h - forcé à BUY`;
+                log(`⚠️ [PERSISTENT_DEBUG] ${timeframe} - TIMEOUT: ${reason}`, 'DEBUG');
+                return {
+                    isValidForTrading: true,
+                    reason: reason,
+                    signal: 'BUY',
+                    timestamp: signalState.timestamp
+                };
+            }
+
             // Implémenter le système de "waiting" pour les signaux baissiers (BEARISH et SELL)
             // Chercher un nouveau signal haussier depuis le dernier signal baissier
             const newBullishSignal = await checkForNewBullishSignal(symbol, timeframe, filteredData, signalState.index);
@@ -354,6 +374,18 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
             } else {
                 const reason = `En attente d'un signal haussier ${timeframe} (dernier signal: ${signalState.signal})`;
                 log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
+                // NEW: If no new bullish found and not timed out, force BUY as last resort (e.g., if data post-SELL is empty)
+                if (signalState.index >= filteredData.length - 1) { // No data after SELL
+                    signalState.signal = 'BUY';
+                    signalState.timestamp = currentTime;
+                    log(`⚠️ [PERSISTENT_DEBUG] ${timeframe} - Pas de données post-SELL - forcé à BUY`, 'DEBUG');
+                    return {
+                        isValidForTrading: true,
+                        reason: `Pas de données après SELL - forcé à BUY`,
+                        signal: 'BUY',
+                        timestamp: signalState.timestamp
+                    };
+                }
                 return {
                     isValidForTrading: false,
                     reason: reason,
@@ -634,7 +666,7 @@ async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex
     const startTime = Date.now();
     const maxExecutionTime = 30000; // 30 secondes maximum
     let iterationCount = 0;
-    const maxIterations = 30; // Maximum 30 itérations
+    const maxIterations = 50; // CHANGED: Increased from 30 to 50
     
     try {
         // Validation des entrées
@@ -661,8 +693,8 @@ async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex
             return null;
         }
         
-        // Chercher un nouveau signal haussier (optimisé avec pas de 3 et sécurisé)
-        for (let i = startSearch; i < endSearch; i += 3) {
+        // Chercher un nouveau signal haussier (optimisé avec pas de 1 et sécurisé)
+        for (let i = startSearch; i < endSearch; i += 1) { // CHANGED: Step from 3 to 1 (analyze every candle post-SELL)
             iterationCount++;
             
             // Protection contre les boucles infinies
@@ -1378,6 +1410,12 @@ async function runBacktestWithTradingLogic() {
         
         // Parcourir les données historiques (échantillonnage configurable)
         let sampleRate = backtestConfig.disableSampling ? 1 : Math.max(1, Math.floor(backtestData.length / 50));
+        
+        // Add a force to sampleRate=1 if disableSampling is true (ensure it always analyzes all)
+        if (backtestConfig.disableSampling) {
+            sampleRate = 1;
+            log(`🔧 [BACKTEST] Sampling forcé à 1 (disableSampling=true) - Analyse complète`, 'INFO');
+        }
         
         // MODE DEBUG : Forcer l'analyse de chaque bougie
         if (backtestConfig.forceDisableSampling || backtestConfig.debugMode) {
