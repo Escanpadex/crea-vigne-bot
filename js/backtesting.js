@@ -319,8 +319,8 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                 signal: signalState.signal,
                 timestamp: signalState.timestamp
             };
-        } else if (signalState.signal === 'BEARISH') {
-            // Implémenter le système de "waiting" pour les signaux baissiers
+        } else if (signalState.signal === 'BEARISH' || signalState.signal === 'SELL') {
+            // Implémenter le système de "waiting" pour les signaux baissiers (BEARISH et SELL)
             // Chercher un nouveau signal haussier depuis le dernier signal baissier
             const newBullishSignal = await checkForNewBullishSignal(symbol, timeframe, filteredData, signalState.index);
             
@@ -349,8 +349,8 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                 };
             }
         } else {
-            // Signal NEUTRAL ou autre
-            const reason = `Signal ${timeframe} neutre ou inconnu: ${signalState.signal}`;
+            // Signal NEUTRAL ou autre (ne devrait plus se produire pour 4H et 1H)
+            const reason = `Signal ${timeframe} inattendu: ${signalState.signal}`;
             log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
             return {
                 isValidForTrading: false,
@@ -565,8 +565,8 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
                     log(`🔍 [SIGNAL_DEBUG] ${timeframe} - Analyse ${analysisCount} à l'index ${i}: ${analysis?.signal || 'NULL'}`, 'DEBUG');
                 }
                 
-                // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
-                if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH')) {
+                // Si on trouve un signal clair (BUY, BULLISH, BEARISH, ou SELL), c'est le dernier signal
+                if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH' || analysis.signal === 'SELL')) {
                     lastSignal = analysis;
                     lastSignalIndex = i;
                     log(`✅ [SIGNAL_DEBUG] ${timeframe} - Signal détecté à l'index ${i}: ${analysis.signal}`, 'DEBUG');
@@ -660,6 +660,8 @@ async function checkForNewBullishSignal(symbol, timeframe, data, lastSignalIndex
                     analysis.signalIndex = i;
                     return analysis;
                 }
+                // Si on trouve un signal SELL après le dernier signal baissier, on continue à chercher plus loin
+                // (ne pas s'arrêter sur les signaux SELL car on cherche un signal haussier)
             } catch (analysisError) {
                 continue;
             }
@@ -697,7 +699,7 @@ async function getExtendedHistoricalData(symbol, timeframe, days = null, endTime
     }
 }
 
-// NOUVELLE FONCTION : Analyse MACD pour backtesting (identique au trading)
+// NOUVELLE FONCTION : Analyse MACD pour backtesting (basée sur les croisements d'histogramme)
 async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
     try {
         // Filtrer les données pour le timeframe
@@ -721,7 +723,44 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
         const previous = macdData[macdData.length - 2];
         const earlier = macdData[macdData.length - 3];
         
-        // Analyse identique au trading principal
+        // Pour 4H et 1H : Chercher le dernier croisement d'histogramme pour déterminer BUY/SELL
+        if (timeframe === '4h' || timeframe === '1h') {
+            let lastSignal = 'BUY'; // Par défaut BUY
+            let lastCrossoverIndex = -1;
+            
+            // Parcourir les données pour trouver le dernier croisement d'histogramme
+            for (let i = 1; i < macdData.length; i++) {
+                const curr = macdData[i];
+                const prev = macdData[i - 1];
+                
+                // Croisement haussier de l'histogramme (crossover delta > 0)
+                if (prev.histogram <= 0 && curr.histogram > 0) {
+                    lastSignal = 'BUY';
+                    lastCrossoverIndex = i;
+                }
+                // Croisement baissier de l'histogramme (crossunder delta < 0)
+                else if (prev.histogram >= 0 && curr.histogram < 0) {
+                    lastSignal = 'SELL';
+                    lastCrossoverIndex = i;
+                }
+            }
+            
+            const reason = `Dernier croisement histogramme ${lastSignal} à l'index ${lastCrossoverIndex} (${timeframe})`;
+            
+            return {
+                symbol,
+                timeframe,
+                signal: lastSignal,
+                crossover: lastSignal === 'BUY',
+                reason,
+                price: tfData[tfData.length - 1].close,
+                macd: latest.macd,
+                signalLine: latest.signal,
+                histogram: latest.histogram
+            };
+        }
+        
+        // Pour 15m : Logique détaillée comme avant
         const crossover = previous.macd <= previous.signal && latest.macd > latest.signal;
         const histogramImproving = latest.histogram > previous.histogram && previous.histogram > earlier.histogram;
         const macdAboveSignal = latest.macd > latest.signal;
