@@ -44,6 +44,7 @@ let backtestInterval = null;
 let equityChart = null;
 let extended4hData = null;
 let extended1hData = null;
+let backtestTradingViewWidget = null;
 
 // NOUVEAU: Variables pour le système de signaux persistants
 let persistentSignals = {
@@ -264,6 +265,16 @@ function cleanupBacktestingVariables() {
                 console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique:', chartError);
             }
             equityChart = null;
+        }
+        
+        // Nettoyer le graphique TradingView
+        if (backtestTradingViewWidget) {
+            try {
+                backtestTradingViewWidget.remove();
+            } catch (tvError) {
+                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', tvError);
+            }
+            backtestTradingViewWidget = null;
         }
         
         // Réinitialiser l'état
@@ -1962,6 +1973,14 @@ function displayBacktestResults() {
             plotEquityCurve(equity, timestamps);
         }
         
+        // Ajouter les signaux de trading au graphique TradingView
+        if (backtestTradingViewWidget && backtestResults.trades && backtestResults.trades.length > 0) {
+            // Attendre un peu que le graphique soit prêt
+            setTimeout(() => {
+                addBacktestSignalsToChart();
+            }, 1000);
+        }
+        
     } catch (error) {
         log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
     }
@@ -2314,6 +2333,19 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.log('✅ Tous les éléments HTML critiques sont présents');
     }
+    
+    // Initialiser le graphique TradingView après un délai pour que TradingView soit chargé
+    setTimeout(() => {
+        const chartSymbolElement = document.getElementById('chartSymbol');
+        if (chartSymbolElement && chartSymbolElement.value) {
+            const symbol = chartSymbolElement.value.includes(':') ? 
+                chartSymbolElement.value.split(':')[1] : 
+                chartSymbolElement.value;
+            if (symbol) {
+                updateBacktestChart(symbol);
+            }
+        }
+    }, 2000); // Attendre 2 secondes que TradingView soit prêt
 });
 
 // Fonction pour mettre à jour la paire sélectionnée
@@ -2328,6 +2360,9 @@ function updateSelectedPair() {
         stopBacktest();
         log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
     }
+    
+    // Mettre à jour le graphique TradingView pour la nouvelle crypto
+    updateBacktestChart(symbol);
 }
 
 // Fonction pour activer/désactiver le Take Profit
@@ -2472,6 +2507,153 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
     return null;
 }
 
+// NOUVELLES FONCTIONS : Gestion du graphique TradingView pour backtesting
+function createBacktestTradingViewChart(symbol) {
+    try {
+        const container = document.getElementById('backtestTradingViewChart');
+        const placeholder = document.getElementById('backtestChartPlaceholder');
+        
+        if (!container) {
+            log('❌ Container backtestTradingViewChart non trouvé', 'ERROR');
+            return;
+        }
+        
+        // Masquer le placeholder
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+        
+        // Nettoyer le widget existant
+        if (backtestTradingViewWidget) {
+            try {
+                backtestTradingViewWidget.remove();
+            } catch (e) {
+                log('⚠️ Erreur suppression widget TradingView existant', 'WARNING');
+            }
+            backtestTradingViewWidget = null;
+        }
+        
+        // Nettoyer le container
+        container.innerHTML = '';
+        
+        // Créer le nouveau widget TradingView
+        backtestTradingViewWidget = new TradingView.widget({
+            "autosize": true,
+            "symbol": `BINANCE:${symbol}`,
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "light",
+            "style": "1",
+            "locale": "fr",
+            "toolbar_bg": "#f1f3f6",
+            "enable_publishing": false,
+            "allow_symbol_change": false,
+            "container_id": "backtestTradingViewChart",
+            "studies": [
+                "MACD@tv-basicstudies"
+            ],
+            "hide_side_toolbar": false,
+            "hide_top_toolbar": false,
+            "save_image": false,
+            "overrides": {
+                "paneProperties.background": "#ffffff",
+                "paneProperties.vertGridProperties.color": "#e6e6e6",
+                "paneProperties.horzGridProperties.color": "#e6e6e6",
+                "symbolWatermarkProperties.transparency": 90,
+                "scalesProperties.textColor": "#333333",
+                "scalesProperties.lineColor": "#e6e6e6"
+            },
+            "studies_overrides": {
+                "MACD.macd.color": "#2196F3",
+                "MACD.signal.color": "#FF9800",
+                "MACD.histogram.color": "#4CAF50"
+            },
+            "loading_screen": {
+                "backgroundColor": "#f8f9fa",
+                "foregroundColor": "#333333"
+            },
+            "onChartReady": function() {
+                log(`✅ Graphique TradingView créé pour ${symbol}`, 'SUCCESS');
+                
+                // Ajouter les signaux de trading si disponibles
+                if (backtestResults && backtestResults.trades) {
+                    addBacktestSignalsToChart();
+                }
+            }
+        });
+        
+        log(`📊 Création graphique TradingView pour ${symbol}`, 'INFO');
+        
+    } catch (error) {
+        log(`❌ Erreur création graphique TradingView: ${error.message}`, 'ERROR');
+        
+        // Remettre le placeholder en cas d'erreur
+        const placeholder = document.getElementById('backtestChartPlaceholder');
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            placeholder.textContent = '❌ Erreur lors de la création du graphique';
+        }
+    }
+}
+
+function addBacktestSignalsToChart() {
+    try {
+        if (!backtestTradingViewWidget || !backtestResults || !backtestResults.trades) {
+            return;
+        }
+        
+        const chart = backtestTradingViewWidget.chart();
+        
+        // Ajouter les signaux d'entrée et de sortie
+        backtestResults.trades.forEach((trade, index) => {
+            try {
+                // Signal d'entrée (BUY)
+                chart.createShape({
+                    time: Math.floor(trade.entryTime / 1000),
+                    price: trade.entryPrice,
+                    shape: 'arrow_up',
+                    text: `📈 ENTRÉE #${index + 1}`,
+                    color: '#4CAF50',
+                    size: 'small'
+                });
+                
+                // Signal de sortie (SELL)
+                chart.createShape({
+                    time: Math.floor(trade.exitTime / 1000),
+                    price: trade.exitPrice,
+                    shape: 'arrow_down',
+                    text: `📉 SORTIE #${index + 1}\n${trade.exitReason}\nPnL: ${trade.pnl.toFixed(2)}$`,
+                    color: trade.pnl > 0 ? '#2196F3' : '#F44336',
+                    size: 'small'
+                });
+                
+            } catch (shapeError) {
+                log(`⚠️ Erreur ajout signal ${index + 1}: ${shapeError.message}`, 'WARNING');
+            }
+        });
+        
+        log(`✅ ${backtestResults.trades.length} signaux ajoutés au graphique`, 'SUCCESS');
+        
+    } catch (error) {
+        log(`❌ Erreur ajout signaux: ${error.message}`, 'ERROR');
+    }
+}
+
+function updateBacktestChart(symbol) {
+    if (!symbol) {
+        const chartSymbolElement = document.getElementById('chartSymbol');
+        if (chartSymbolElement && chartSymbolElement.value) {
+            symbol = chartSymbolElement.value.includes(':') ? 
+                chartSymbolElement.value.split(':')[1] : 
+                chartSymbolElement.value;
+        }
+    }
+    
+    if (symbol) {
+        createBacktestTradingViewChart(symbol);
+    }
+}
+
 // Rendre les fonctions accessibles globalement
 window.startBacktest = startBacktest;
 window.stopBacktest = stopBacktest;
@@ -2480,6 +2662,8 @@ window.updateChartTimeframe = updateChartTimeframe;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
 window.optimizeMACD = optimizeMACD;
+window.createBacktestTradingViewChart = createBacktestTradingViewChart;
+window.updateBacktestChart = updateBacktestChart;
 
 console.log('✅ Backtesting system loaded successfully');
 
