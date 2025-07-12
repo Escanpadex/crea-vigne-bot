@@ -33,6 +33,7 @@ let backtestInterval = null;
 let equityChart = null;
 let backtestTradingViewWidget = null;
 let precisionData = [];  // Nouvelle variable globale pour stocker toutes les bougies de précision (ex. 3m) pré-chargées
+let lightweightChart = null;  // Nouvelle variable globale pour le chart Lightweight Charts
 
 // Configuration du backtesting (simplifiée)
 let backtestConfig = {
@@ -185,6 +186,16 @@ function cleanupBacktestingVariables() {
                 console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique:', chartError);
             }
             equityChart = null;
+        }
+        
+        // Nettoyer le graphique Lightweight Charts
+        if (lightweightChart) {
+            try {
+                lightweightChart.remove();
+            } catch (chartError) {
+                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique Lightweight Charts:', chartError);
+            }
+            lightweightChart = null;
         }
         
         // Nettoyer le graphique TradingView
@@ -987,6 +998,9 @@ function displayBacktestResults() {
             plotEquityCurve(equity, timestamps);
         }
         
+        // Ajouter les marqueurs de trades sur le graphique
+        addTradeMarkersToChart();
+        
     } catch (error) {
         log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
     }
@@ -1226,9 +1240,9 @@ window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
 
-// Nouvelle fonction pour mettre à jour le graphique TradingView avec MACD
+// Nouvelle fonction pour mettre à jour le graphique avec Lightweight Charts
 window.updateBacktestChart = function(symbol) {
-    console.log(`🚀 [CHART] Création graphique pour ${symbol}`);
+    console.log(`🚀 [CHART] Création graphique Lightweight Charts pour ${symbol}`);
     
     const containerId = 'backtestTradingViewChart';
     const container = document.getElementById(containerId);
@@ -1252,93 +1266,214 @@ window.updateBacktestChart = function(symbol) {
         console.log('✅ [CHART] Placeholder masqué');
     }
     
-    // Nettoyer le widget existant
-    if (backtestTradingViewWidget) {
+    // Nettoyer le graphique existant
+    if (lightweightChart) {
         try {
-            backtestTradingViewWidget.remove();
-            console.log('✅ [CHART] Widget précédent supprimé');
+            lightweightChart.remove();
+            console.log('✅ [CHART] Graphique précédent supprimé');
         } catch (error) {
-            console.warn('⚠️ [CHART] Erreur lors de la suppression du widget précédent:', error);
+            console.warn('⚠️ [CHART] Erreur lors de la suppression du graphique précédent:', error);
         }
-        backtestTradingViewWidget = null;
+        lightweightChart = null;
     }
-    
-    // Créer un ID unique pour éviter les conflits
-    const uniqueId = 'tradingview_' + Date.now();
     
     // Vider le container pour éviter les conflits
     container.innerHTML = '';
     
-    try {
-        // Utiliser une approche plus simple avec TradingView Advanced Chart
-        const widgetContainer = document.createElement('div');
-        widgetContainer.id = uniqueId;
-        widgetContainer.style.width = '100%';
-        widgetContainer.style.height = '100%';
-        widgetContainer.style.minHeight = '500px';
-        
-        container.appendChild(widgetContainer);
-        
-        // Charger le script TradingView et créer le widget
+    // Charger Lightweight Charts si non chargé
+    if (typeof LightweightCharts === 'undefined') {
         const script = document.createElement('script');
-        script.src = 'https://s3.tradingview.com/tv.js';
-        script.onload = function() {
-            try {
-                if (typeof TradingView !== 'undefined') {
-                    new TradingView.widget({
-                        "width": "100%",
-                        "height": 500,
-                        "symbol": "BINANCE:" + symbol,
-                        "interval": "1D",
-                        "timezone": "Etc/UTC",
-                        "theme": "light",
-                        "style": "1",
-                        "locale": "fr",
-                        "toolbar_bg": "#f1f3f6",
-                        "enable_publishing": false,
-                        "hide_top_toolbar": false,
-                        "hide_legend": false,
-                        "save_image": false,
-                        "container_id": uniqueId,
-                        "autosize": false,
-                        "studies": [
-                            "MACD@tv-basicstudies"
-                        ]
-                    });
-                    console.log('✅ [CHART] TradingView Advanced Chart créé avec succès');
-                } else {
-                    console.error('❌ [CHART] TradingView library non disponible');
-                    // Fallback: afficher un message d'erreur
-                    widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de chargement du graphique TradingView</div>';
-                }
-            } catch (widgetError) {
-                console.error('❌ [CHART] Erreur lors de la création du widget:', widgetError);
-                widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de chargement du graphique</div>';
-            }
+        script.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
+        script.onload = () => createLightweightChart(symbol, container);
+        script.onerror = () => {
+            console.error('❌ [CHART] Erreur de chargement de Lightweight Charts');
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">Impossible de charger Lightweight Charts</div>';
         };
-        
-        script.onerror = function() {
-            console.error('❌ [CHART] Erreur de chargement du script TradingView');
-            widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Impossible de charger TradingView</div>';
-        };
-        
-        // Ajouter le script au head pour éviter les problèmes de contexte
         document.head.appendChild(script);
+    } else {
+        createLightweightChart(symbol, container);
+    }
+};
+
+// Nouvelle fonction pour créer le graphique Lightweight Charts
+async function createLightweightChart(symbol, container) {
+    try {
+        console.log(`🚀 [CHART] Création du graphique Lightweight Charts pour ${symbol}`);
+        
+        // Créer le graphique
+        const chart = LightweightCharts.createChart(container, {
+            width: container.clientWidth,
+            height: 500,
+            layout: {
+                backgroundColor: '#ffffff',
+                textColor: '#333',
+            },
+            grid: {
+                vertLines: {
+                    color: '#e1e1e1',
+                },
+                horzLines: {
+                    color: '#e1e1e1',
+                },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: '#cccccc',
+            },
+            timeScale: {
+                borderColor: '#cccccc',
+                timeVisible: true,
+                secondsVisible: false,
+            },
+        });
+        
+        lightweightChart = chart;
+        
+        // Ajouter la série de bougies
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderVisible: false,
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350',
+        });
+        
+        // Ajouter la série MACD (histogramme)
+        const macdSeries = chart.addHistogramSeries({
+            color: '#26a69a',
+            priceFormat: {
+                type: 'volume',
+            },
+            priceScaleId: 'left',
+            scaleMargins: {
+                top: 0.8,
+                bottom: 0,
+            },
+        });
+        
+        // Charger les données historiques
+        console.log('📊 [CHART] Chargement des données historiques...');
+        const data = await getBinanceKlineData(symbol, 500, '15m');
+        
+        if (data.length === 0) {
+            throw new Error('Aucune donnée historique disponible');
+        }
+        
+        // Convertir les données pour Lightweight Charts
+        const chartData = data.map(candle => ({
+            time: Math.floor(candle.timestamp / 1000),
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+        }));
+        
+        candleSeries.setData(chartData);
+        
+        // Calculer et ajouter le MACD
+        const prices = data.map(candle => candle.close);
+        const macd = calculateMACD(prices);
+        
+        if (macd && macd.delta) {
+            const macdData = macd.delta.map((delta, index) => {
+                if (index < data.length && delta !== null && delta !== undefined) {
+                    return {
+                        time: Math.floor(data[index].timestamp / 1000),
+                        value: delta,
+                        color: delta > 0 ? '#26a69a' : '#ef5350',
+                    };
+                }
+                return null;
+            }).filter(item => item !== null);
+            
+            macdSeries.setData(macdData);
+            console.log(`✅ [CHART] MACD ajouté avec ${macdData.length} points`);
+        }
+        
+        // Ajuster la vue
+        chart.timeScale().fitContent();
+        
+        console.log(`✅ [CHART] Graphique créé avec ${chartData.length} bougies`);
         
     } catch (error) {
-        console.error('❌ [CHART] Erreur lors de la création du widget:', error);
-        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de création du graphique</div>';
+        console.error('❌ [CHART] Erreur lors de la création du graphique:', error);
+        container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">Erreur: ${error.message}</div>`;
     }
-    
-    console.log('✅ [CHART] Widget Symbol Overview créé avec succès');
-    
-    // Marquer comme créé pour le nettoyage futur
-    backtestTradingViewWidget = { 
-        remove: function() {
-            container.innerHTML = '';
+}
+
+// Nouvelle fonction pour ajouter les marqueurs de trades
+function addTradeMarkersToChart() {
+    try {
+        console.log('🎯 [CHART] Ajout des marqueurs de trades...');
+        
+        if (!lightweightChart) {
+            console.warn('⚠️ [CHART] Graphique non disponible pour les marqueurs');
+            return;
         }
-    };
-};
+        
+        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('📊 [CHART] Aucun trade à afficher');
+            return;
+        }
+        
+        // Récupérer la série de bougies (première série)
+        const series = lightweightChart.series();
+        if (series.length === 0) {
+            console.warn('⚠️ [CHART] Aucune série disponible pour les marqueurs');
+            return;
+        }
+        
+        const candleSeries = series[0];
+        const trades = backtestResults.trades;
+        
+        // Limiter à 100 marqueurs max pour éviter la surcharge
+        const maxMarkers = 100;
+        const tradesToShow = trades.length > maxMarkers ? trades.slice(0, maxMarkers) : trades;
+        
+        console.log(`📊 [CHART] Ajout de ${tradesToShow.length} trades (sur ${trades.length} total)`);
+        
+        const markers = [];
+        
+        tradesToShow.forEach((trade, index) => {
+            // Marqueur d'entrée (flèche verte vers le haut)
+            markers.push({
+                time: Math.floor(trade.entryTime / 1000),
+                position: 'belowBar',
+                color: '#26a69a',
+                shape: 'arrowUp',
+                text: `📈 LONG @ ${trade.entryPrice.toFixed(4)}`,
+                size: 1,
+            });
+            
+            // Marqueur de sortie (flèche rouge vers le bas)
+            const pnlColor = trade.pnl > 0 ? '#26a69a' : '#ef5350';
+            const pnlSign = trade.pnl > 0 ? '+' : '';
+            
+            markers.push({
+                time: Math.floor(trade.exitTime / 1000),
+                position: 'aboveBar',
+                color: pnlColor,
+                shape: 'arrowDown',
+                text: `📉 ${trade.exitReason} @ ${trade.exitPrice.toFixed(4)} (${pnlSign}${trade.pnlPercent.toFixed(2)}%)`,
+                size: 1,
+            });
+        });
+        
+        // Ajouter tous les marqueurs à la série
+        candleSeries.setMarkers(markers);
+        
+        console.log(`✅ [CHART] ${markers.length} marqueurs ajoutés avec succès`);
+        
+        if (trades.length > maxMarkers) {
+            console.log(`ℹ️ [CHART] ${trades.length - maxMarkers} trades supplémentaires non affichés (limite: ${maxMarkers})`);
+        }
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur lors de l\'ajout des marqueurs:', error);
+    }
+}
 
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
