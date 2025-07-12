@@ -62,7 +62,7 @@ let backtestConfig = {
     disableSampling: true, // CHANGED: Set to true to analyze all candles (fixes fixed signal count)
     
     // NOUVEAU: Options de debug
-    debugMode: false, // Mode debug avec logs détaillés
+    debugMode: true, // Mode debug avec logs détaillés (enabled for better visibility during testing)
     ignoreHigherTimeframes: false, // Ignorer 4H et 1H pour tester seulement 15M
     forceDisableSampling: false, // Force l'analyse de chaque bougie
     waitingTimeoutMs: 24 * 60 * 60 * 1000, // NEW: 24h timeout for waiting on bullish after SELL/BEARISH
@@ -1184,6 +1184,17 @@ async function startBacktest() {
         
         updateBacktestStatus('Données étendues prêtes', 50);
         
+        // Validate extended data quality
+        if (!extended4hData || extended4hData.length < 50) {
+            throw new Error(`Données 4H insuffisantes: ${extended4hData?.length || 0} bougies (minimum 50 requis)`);
+        }
+        
+        if (!extended1hData || extended1hData.length < 50) {
+            throw new Error(`Données 1H insuffisantes: ${extended1hData?.length || 0} bougies (minimum 50 requis)`);
+        }
+        
+        log(`✅ [VALIDATION] Données étendues validées: 4H=${extended4hData.length}, 1H=${extended1hData.length}`, 'SUCCESS');
+        
         // FIXED: Reset persistent signals to ensure clean state
         persistentSignals = {
             '4h': { signal: null, timestamp: null, index: null, lastChecked: null },
@@ -1275,7 +1286,7 @@ async function updateBacktestConfig() {
         // Paramètres fixes (plus de configuration avancée)
         const extendedDays = 90; // Fixé à 90 jours
         const allowBullishTrades = true; // Toujours activé
-        const disableSampling = false; // Échantillonnage activé par défaut
+        const disableSampling = true; // CHANGED: Set to true to disable sampling and analyze all candles (fixes fixed signal count issue)
         
         log('🔍 [DEBUG] Valeurs récupérées:', 'DEBUG');
         log(`  - Duration: ${duration} (type: ${typeof duration})`, 'DEBUG');
@@ -1458,6 +1469,11 @@ async function runBacktestWithTradingLogic() {
         }
         
         log(`📊 [BACKTEST] Début analyse de l'index 50 à ${backtestData.length} avec pas de ${sampleRate}`, 'INFO');
+        
+        // Check for sufficient data for analysis
+        if (backtestData.length < 100) {
+            log(`⚠️ [BACKTEST] Attention: Données limitées (${backtestData.length} bougies) - Résultats peuvent être peu fiables`, 'WARNING');
+        }
         
         for (let i = 50; i < backtestData.length; i += sampleRate) {
             try {
