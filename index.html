@@ -10,38 +10,50 @@
 <body>
     <div class="container my-4">
         <h1 class="text-center mb-4">🚀 Bot Trading Bitget Futures</h1>
-        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">⚙️ Settings</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">📊 Analysis</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions" type="button" role="tab">💼 Positions</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting" type="button" role="tab">🧪 Backtesting</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">📝 Logs</button>
-            </li>
-        </ul>
+        
+        <!-- Navigation avec balance et connexion -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+            <ul class="nav nav-tabs" id="mainTabs" role="tablist" style="margin-bottom: 0;">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">⚙️ Settings</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button" role="tab">📊 Analysis & Positions</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting" type="button" role="tab">🧪 Backtesting</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">📝 Logs</button>
+                </li>
+            </ul>
+            
+            <!-- Balance et Connexion -->
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <!-- Balance -->
+                <div style="background: #f0f8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 8px 12px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; color: #2b6cb0;">💳 Balance:</span>
+                    <span style="font-weight: bold; color: #2d3748; font-size: 13px;" id="usdtBalance">--</span>
+                    <span style="font-size: 11px; color: #666;">USDT</span>
+                </div>
+                
+                <!-- Connexion API -->
+                <div style="display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #48bb78, #38a169); padding: 8px 12px; border-radius: 6px;">
+                    <div class="status">
+                        <div class="status-dot" id="connectionStatus"></div>
+                        <span id="connectionText" style="font-size: 12px; color: #ffffff; font-weight: 600;">Déconnecté</span>
+                    </div>
+                    <button class="btn" onclick="testConnection()" style="font-size: 11px; padding: 4px 8px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; font-weight: bold;">Connecter</button>
+                </div>
+            </div>
+        </div>
+        
         <div class="tab-content">
             <div class="tab-pane fade show active" id="settings" role="tabpanel">
                 <div class="card">
-                    <!-- En-tête avec titre et statut API -->
+                    <!-- En-tête avec titre -->
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0;">
                         <h3 style="margin: 0; color: #2d3748; font-size: 24px;">⚙️ Configuration du Bot</h3>
-                        <!-- Section Connexion API compacte -->
-                        <div style="display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #48bb78, #38a169); padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);">
-                            <div class="status">
-                                <div class="status-dot" id="connectionStatus"></div>
-                                <span id="connectionText" style="font-size: 13px; color: #ffffff; font-weight: 700;">Déconnecté</span>
-                            </div>
-                            <div style="font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 600;">API Bitget Futures</div>
-                            <button class="btn" onclick="testConnection()" style="font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; font-weight: bold;">🔗 Tester</button>
-                        </div>
                     </div>
                     
                     <!-- Contenu principal organisé en sections -->
@@ -49,28 +61,11 @@
                         <!-- Section Stratégie -->
                         <div>
                             <h4 style="margin: 0 0 15px 0; color: #4a5568; font-size: 16px; border-left: 4px solid #48bb78; padding-left: 12px;">📊 Stratégie de Trading</h4>
+                            
                             <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                                 <div style="text-align: center; margin-bottom: 10px;">
-                                    <strong style="color: #2d5a2d; font-size: 14px;">Multi-Timeframes OPTIMISÉE</strong><br>
-                                    <span style="color: #666; font-size: 12px;">4H → 1H → 15M (Filtrage progressif)</span>
-                                </div>
-                                <div style="font-size: 11px; color: #666; text-align: center;">
-                                    Stratégie fixe avec paramètres MACD adaptatifs
-                                </div>
-                            </div>
-                            
-                            <!-- Balance -->
-                            <div style="background: #f0f8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 15px;">
-                                <h5 style="margin: 0 0 10px 0; color: #2b6cb0; font-size: 14px;">💳 Balance du Compte</h5>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                    <div>
-                                        <div style="font-size: 11px; color: #666;">USDT Disponible</div>
-                                        <div style="font-weight: bold; color: #2d3748; font-size: 14px;" id="usdtBalance">--</div>
-                                    </div>
-                                    <div>
-                                        <div style="font-size: 11px; color: #666;">Équité Totale</div>
-                                        <div style="font-weight: bold; color: #2d3748; font-size: 14px;" id="totalEquity">--</div>
-                                    </div>
+                                    <strong style="color: #2d5a2d; font-size: 14px;">MACD Multi-Timeframes</strong><br>
+                                    <span style="color: #666; font-size: 12px;">Stratégie fixe optimisée</span>
                                 </div>
                             </div>
                         </div>
@@ -161,86 +156,91 @@
             </div>
             <div class="tab-pane fade" id="analysis" role="tabpanel">
                 <div class="card">
-                    <h3>📊 Analyse MACD Multi-Timeframes</h3>
-                    <div style="margin-bottom: 10px;">
-                        <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
-                    </div>
-                    <div id="macdAnalysisContainer">
-                        <div class="macd-timeframe-stats">
-                            <div class="timeframe-stat">
-                                <h4>4 Heures</h4>
-                                <div class="stat-numbers">
-                                    <span class="bullish">-- haussiers</span>
-                                    <span class="bearish">-- baissiers</span>
-                                </div>
-                            </div>
-                            <div class="timeframe-stat">
-                                <h4>1 Heure</h4>
-                                <div class="stat-numbers">
-                                    <span class="bullish">-- haussiers</span>
-                                    <span class="bearish">-- baissiers</span>
-                                </div>
-                            </div>
-                            <div class="timeframe-stat">
-                                <h4>15 Minutes</h4>
-                                <div class="stat-numbers">
-                                    <span class="bullish">-- haussiers</span>
-                                    <span class="bearish">-- baissiers</span>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                    <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 4px; font-size: 12px;">
-                        <strong style="color: #2d5a2d;">🎯 STRATÉGIE OPTIMISÉE:</strong> 
-                        <span style="color: #666;">Filtrage progressif</span><br>
-                        <span style="color: #2c5aa0; font-weight: bold;">🥇 4H (FILTRE 1) → 🥈 1H (FILTRE 2) → 🥉 15M (SIGNAL FINAL)</span>
-                    </div>
-                </div>
-            </div>
-            <div class="tab-pane fade" id="positions" role="tabpanel">
-                <div class="card">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                        <h3 style="margin: 0;">💼 Positions & Statistiques</h3>
-                        <button class="btn" onclick="manageTrailingStops()" style="padding: 8px 15px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
-                        <button class="btn" onclick="window.importExistingPositions()" style="padding: 8px 15px; font-size: 13px;">📥 Importer Positions</button>
-                    </div>
+                    <h3>📊 Analyse MACD Multi-Timeframes & Positions</h3>
                     
-                    <!-- Statistiques compactes en haut -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 11px; color: #666;">Signaux</div>
-                            <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
+                    <!-- Section Analyse -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="margin-bottom: 10px;">
+                            <strong>Paire en cours d'analyse:</strong> <span id="currentScanPair">--</span>
                         </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 11px; color: #666;">Ouvertes</div>
-                            <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
+                        <div id="macdAnalysisContainer">
+                            <div class="macd-timeframe-stats">
+                                <div class="timeframe-stat">
+                                    <h4>4 Heures</h4>
+                                    <div class="stat-numbers">
+                                        <span class="bullish">-- haussiers</span>
+                                        <span class="bearish">-- baissiers</span>
+                                    </div>
+                                </div>
+                                <div class="timeframe-stat">
+                                    <h4>1 Heure</h4>
+                                    <div class="stat-numbers">
+                                        <span class="bullish">-- haussiers</span>
+                                        <span class="bearish">-- baissiers</span>
+                                    </div>
+                                </div>
+                                <div class="timeframe-stat">
+                                    <h4>15 Minutes</h4>
+                                    <div class="stat-numbers">
+                                        <span class="bullish">-- haussiers</span>
+                                        <span class="bearish">-- baissiers</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 11px; color: #666;">Fermées</div>
-                            <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 11px; color: #666;">🟢 Gains</div>
-                            <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
-                            <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
+                        <div style="margin-top: 10px; padding: 8px; background: #f0f8ff; border: 1px solid #b8e6b8; border-radius: 4px; font-size: 12px;">
+                            <strong style="color: #2d5a2d;">🎯 STRATÉGIE OPTIMISÉE:</strong> 
+                            <span style="color: #666;">Filtrage progressif</span><br>
+                            <span style="color: #2c5aa0; font-weight: bold;">🥇 4H (FILTRE 1) → 🥈 1H (FILTRE 2) → 🥉 15M (SIGNAL FINAL)</span>
                         </div>
                     </div>
                     
-                    <!-- Positions ouvertes -->
-                    <div id="positionsContainer">
-                        <div style="text-align: center; color: #666; padding: 20px;">
-                            Aucune position ouverte
+                    <!-- Section Positions -->
+                    <div style="border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">💼 Positions & Statistiques</h4>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn" onclick="manageTrailingStops()" style="padding: 8px 15px; font-size: 13px;">🔄 Vérifier Stop Loss</button>
+                                <button class="btn" onclick="window.importExistingPositions()" style="padding: 8px 15px; font-size: 13px;">📥 Importer Positions</button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Capital en bas -->
-                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
-                        <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
-                        <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
+                        
+                        <!-- Statistiques compactes -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 11px; color: #666;">Signaux</div>
+                                <div style="font-weight: bold; color: #2d3748;" id="totalSignals">0</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 11px; color: #666;">Ouvertes</div>
+                                <div style="font-weight: bold; color: #2d3748;" id="totalOpenPositions">0</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 11px; color: #666;">Fermées</div>
+                                <div style="font-weight: bold; color: #2d3748;" id="totalClosedPositions">0</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 11px; color: #666;">🟢 Gains</div>
+                                <div style="font-weight: bold; color: #48bb78;" id="winningPositions">0 (+0$)</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 11px; color: #666;">🔴 Pertes</div>
+                                <div style="font-weight: bold; color: #f56565;" id="losingPositions">0 (-0$)</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Positions ouvertes -->
+                        <div id="positionsContainer">
+                            <div style="text-align: center; color: #666; padding: 20px;">
+                                Aucune position ouverte
+                            </div>
+                        </div>
+                        
+                        <!-- Capital en bas -->
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 12px;">
+                            <strong>Capital utilisé:</strong> <span id="usedCapital">0 USDT</span> / 
+                            <strong>Disponible:</strong> <span id="availableCapital">-- USDT</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -264,7 +264,7 @@
                     <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; text-align: center;">
                         <h4 style="margin-bottom: 10px;">🚀 Stratégie Utilisée</h4>
                         <div style="background: #e8f5e8; border: 1px solid #48bb78; border-radius: 4px; padding: 10px; font-size: 14px;">
-                            <strong>Multi-Timeframes OPTIMISÉE (identique au trading principal)</strong><br>
+                            <strong>MACD Multi-Timeframes (identique au trading principal)</strong><br>
                             <span style="color: #2d5a2d;">4H → 1H → 15M avec filtrage progressif</span>
                         </div>
                         <small style="color: #666; margin-top: 5px; display: block;">Stratégie unique et fixe - Paramètres MACD non modifiables</small>
@@ -315,37 +315,7 @@
                                 <small>Objectif de profit en % avant fermeture automatique. Décochez pour utiliser uniquement le trailing stop loss.</small>
                             </div>
                             
-                            <!-- 🆕 Nouvelles options avancées -->
-                            <div style="background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
-                                <h5 style="margin: 0 0 10px 0; color: #2d3748; font-size: 14px;">🔧 Configuration Avancée</h5>
-                                
-                                <div class="form-group">
-                                    <label>Données Étendues (jours):</label>
-                                    <select id="backtestExtendedDays">
-                                        <option value="30">30 jours (Rapide)</option>
-                                        <option value="60">60 jours (Équilibré)</option>
-                                        <option value="90" selected>90 jours (Recommandé)</option>
-                                        <option value="120">120 jours (Complet)</option>
-                                    </select>
-                                    <small>Période pour capturer les signaux 4H/1H avant le backtesting</small>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <input type="checkbox" id="allowBullishTrades" checked>
-                                        <label for="allowBullishTrades" style="margin: 0;">Permettre les trades BULLISH</label>
-                                    </div>
-                                    <small>Activer les trades sur signaux BULLISH en plus des signaux BUY stricts</small>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <input type="checkbox" id="disableSampling">
-                                        <label for="disableSampling" style="margin: 0;">Analyser chaque bougie</label>
-                                    </div>
-                                    <small>Désactiver l'échantillonnage pour une analyse complète (plus lent mais plus précis)</small>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
                     
@@ -436,7 +406,7 @@
             <div class="tab-pane fade" id="logs" role="tabpanel">
                 <div class="card">
                     <h3>📝 Logs de Trading</h3>
-                    <div class="logs" id="logs">
+                    <div class="logs" id="logs" style="max-height: 400px; overflow-y: auto; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; font-family: monospace; font-size: 13px; line-height: 1.4;">
                         [INFO] Bot de trading MACD TOP 20 initialisé...<br>
                         [INFO] Stratégie: 5% capital × 2x levier × 1% trailing stop<br>
                         [INFO] TRAILING STOP CORRIGÉ - moving_plan au lieu de track_plan<br>
@@ -444,13 +414,7 @@
                     </div>
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button class="btn" onclick="clearLogs()" style="flex: 1;">🗑️ Effacer logs</button>
-                        <button class="btn" onclick="toggleLogs()" style="flex: 1;">👁️ Masquer logs</button>
                     </div>
-                </div>
-                <!-- Bouton pour afficher les logs -->
-                <div class="card" id="logsToggleCard" style="text-align: center; padding: 15px;">
-                    <button class="btn" onclick="toggleLogs()" style="width: 200px;">👁️ Afficher logs de trading</button>
-                    <small style="display: block; margin-top: 5px; color: #666;">Les logs sont masqués pour une interface plus propre</small>
                 </div>
             </div>
         </div>
@@ -540,19 +504,7 @@
             loadBacktestPairs();
         };
         
-        // Fonction pour basculer l'affichage des logs
-        function toggleLogs() {
-            const logsSection = document.getElementById('logsSection');
-            const toggleCard = document.getElementById('logsToggleCard');
-            
-            if (logsSection.style.display === 'none' || logsSection.style.display === '') {
-                logsSection.style.display = 'block';
-                toggleCard.style.display = 'none';
-            } else {
-                logsSection.style.display = 'none';
-                toggleCard.style.display = 'block';
-            }
-        }
+
         
         // Fonction pour activer/désactiver le Take Profit
         function toggleTakeProfit() {
