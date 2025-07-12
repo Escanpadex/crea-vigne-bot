@@ -1235,71 +1235,64 @@ window.updateBacktestChart = function(symbol) {
     // Vider le container pour éviter les conflits
     container.innerHTML = '';
     
-    // Créer la structure de div dynamiquement
-    const widgetContainer = document.createElement('div');
-    widgetContainer.id = uniqueId;
-    widgetContainer.style.width = '100%';
-    widgetContainer.style.height = '100%';
-    
-    const innerContainer = document.createElement('div');
-    innerContainer.className = 'tradingview-widget-container';
-    innerContainer.style.height = '100%';
-    innerContainer.style.width = '100%';
-    
-    const widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container__widget';
-    widgetDiv.style.height = 'calc(100% - 32px)';
-    widgetDiv.style.width = '100%';
-    
-    innerContainer.appendChild(widgetDiv);
-    widgetContainer.appendChild(innerContainer);
-    container.appendChild(widgetContainer);
-    
-    // Créer et append le script dynamiquement
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-        "symbols": [
-            ["BINANCE:" + symbol + "|1D"]
-        ],
-        "chartOnly": false,
-        "width": "100%",
-        "height": "100%",
-        "locale": "fr",
-        "colorTheme": "light",
-        "autosize": true,
-        "showVolume": false,
-        "showMA": false,
-        "hideDateRanges": false,
-        "hideMarketStatus": false,
-        "hideSymbolLogo": false,
-        "scalePosition": "right",
-        "scaleMode": "Normal",
-        "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-        "fontSize": "10",
-        "noTimeScale": false,
-        "valuesTracking": "1",
-        "changeMode": "price-and-percent",
-        "chartType": "area",
-        "maLineColor": "#2962FF",
-        "maLineWidth": 1,
-        "maLength": 9,
-        "lineWidth": 2,
-        "lineType": 0,
-        "dateRanges": [
-            "1d|1",
-            "1m|30",
-            "3m|60",
-            "12m|1D",
-            "60m|1W",
-            "all|1M"
-        ]
-    });
-    
-    // Append le script au container intérieur (ou au body si besoin)
-    innerContainer.appendChild(script);
+    try {
+        // Utiliser une approche plus simple avec TradingView Advanced Chart
+        const widgetContainer = document.createElement('div');
+        widgetContainer.id = uniqueId;
+        widgetContainer.style.width = '100%';
+        widgetContainer.style.height = '100%';
+        
+        container.appendChild(widgetContainer);
+        
+        // Charger le script TradingView et créer le widget
+        const script = document.createElement('script');
+        script.src = 'https://s3.tradingview.com/tv.js';
+        script.onload = function() {
+            try {
+                if (typeof TradingView !== 'undefined') {
+                    new TradingView.widget({
+                        "width": "100%",
+                        "height": "100%",
+                        "symbol": "BINANCE:" + symbol,
+                        "interval": "1D",
+                        "timezone": "Etc/UTC",
+                        "theme": "light",
+                        "style": "1",
+                        "locale": "fr",
+                        "toolbar_bg": "#f1f3f6",
+                        "enable_publishing": false,
+                        "hide_top_toolbar": false,
+                        "hide_legend": false,
+                        "save_image": false,
+                        "container_id": uniqueId,
+                        "studies": [
+                            "MACD@tv-basicstudies"
+                        ]
+                    });
+                    console.log('✅ [CHART] TradingView Advanced Chart créé avec succès');
+                } else {
+                    console.error('❌ [CHART] TradingView library non disponible');
+                    // Fallback: afficher un message d'erreur
+                    widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de chargement du graphique TradingView</div>';
+                }
+            } catch (widgetError) {
+                console.error('❌ [CHART] Erreur lors de la création du widget:', widgetError);
+                widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de chargement du graphique</div>';
+            }
+        };
+        
+        script.onerror = function() {
+            console.error('❌ [CHART] Erreur de chargement du script TradingView');
+            widgetContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Impossible de charger TradingView</div>';
+        };
+        
+        // Ajouter le script au head pour éviter les problèmes de contexte
+        document.head.appendChild(script);
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur lors de la création du widget:', error);
+        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px;">Erreur de création du graphique</div>';
+    }
     
     console.log('✅ [CHART] Widget Symbol Overview créé avec succès');
     
