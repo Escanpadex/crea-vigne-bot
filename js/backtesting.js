@@ -1375,6 +1375,11 @@ async function createLightweightChart(symbol, container) {
         console.log('✅ [CHART] LightweightCharts détecté:', typeof LightweightChartsLib);
         console.log('🔍 [CHART] Méthodes disponibles:', Object.getOwnPropertyNames(LightweightChartsLib));
         
+        // Debug: Vérifier les types de séries disponibles
+        console.log('🔍 [CHART] CandlestickSeries disponible:', !!LightweightChartsLib.CandlestickSeries);
+        console.log('🔍 [CHART] HistogramSeries disponible:', !!LightweightChartsLib.HistogramSeries);
+        console.log('🔍 [CHART] createChart disponible:', !!LightweightChartsLib.createChart);
+        
         // Créer le graphique avec la bonne API
         const chart = LightweightChartsLib.createChart(container, {
             width: container.clientWidth,
@@ -1412,13 +1417,15 @@ async function createLightweightChart(symbol, container) {
         try {
             // Use the correct API: chart.addSeries with the proper series type from LightweightCharts
             if (typeof chart.addSeries === 'function') {
-                // Access the series types from the LightweightCharts library
-                const { CandlestickSeries } = LightweightChartsLib;
-                if (!CandlestickSeries) {
+                // Access the series types from the global LightweightCharts object
+                console.log('🔍 [CHART] Accès à CandlestickSeries:', typeof LightweightChartsLib.CandlestickSeries);
+                
+                if (!LightweightChartsLib.CandlestickSeries) {
                     throw new Error('CandlestickSeries non disponible dans la bibliothèque');
                 }
                 
-                candleSeries = chart.addSeries(CandlestickSeries, {
+                console.log('🔧 [CHART] Tentative de création de série candlestick...');
+                candleSeries = chart.addSeries(LightweightChartsLib.CandlestickSeries, {
                     upColor: '#26a69a',
                     downColor: '#ef5350',
                     borderVisible: false,
@@ -1441,9 +1448,9 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série MACD (histogramme) - optionnel
         let macdSeries = null;
         try {
-            const { HistogramSeries } = LightweightChartsLib;
-            if (HistogramSeries) {
-                macdSeries = chart.addSeries(HistogramSeries, {
+            console.log('🔍 [CHART] Accès à HistogramSeries:', typeof LightweightChartsLib.HistogramSeries);
+            if (LightweightChartsLib.HistogramSeries) {
+                macdSeries = chart.addSeries(LightweightChartsLib.HistogramSeries, {
                     color: '#26a69a',
                     priceFormat: {
                         type: 'volume',
