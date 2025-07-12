@@ -1195,33 +1195,69 @@ window.toggleTakeProfit = toggleTakeProfit;
 // Nouvelle fonction pour mettre à jour le graphique TradingView avec MACD
 window.updateBacktestChart = function(symbol) {
     console.log(`🚀 [CHART] Création graphique pour ${symbol}`);
-    const container = document.getElementById('backtestTradingViewChart');
-    if (!container) {
-        console.error('❌ [CHART] Conteneur non trouvé');
+    
+    // Vérifier la disponibilité de TradingView
+    if (typeof TradingView === 'undefined') {
+        console.error('❌ [CHART] TradingView n\'est pas disponible');
         return;
     }
+    
+    const container = document.getElementById('backtestTradingViewChart');
+    if (!container) {
+        console.error('❌ [CHART] Conteneur backtestTradingViewChart non trouvé');
+        return;
+    }
+    
+    console.log('✅ [CHART] Conteneur trouvé, dimensions:', container.offsetWidth, 'x', container.offsetHeight);
+    
     const placeholder = document.getElementById('backtestChartPlaceholder');
     if (placeholder) {
         placeholder.style.display = 'none';
+        console.log('✅ [CHART] Placeholder masqué');
     }
+    
+    // Nettoyer le widget existant
     if (backtestTradingViewWidget) {
-        backtestTradingViewWidget.remove();
+        try {
+            backtestTradingViewWidget.remove();
+            console.log('✅ [CHART] Widget précédent supprimé');
+        } catch (error) {
+            console.warn('⚠️ [CHART] Erreur lors de la suppression du widget précédent:', error);
+        }
         backtestTradingViewWidget = null;
     }
-    backtestTradingViewWidget = new TradingView.widget({
-        "width": "100%",
-        "height": "100%",
-        "symbol": `BINANCE:${symbol}`,
-        "interval": "15",
-        "timezone": "Etc/UTC",
-        "theme": "light",
-        "style": "1",
-        "locale": "fr",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "studies": ["MACD@tv-basicstudies"],
-        "container": "backtestTradingViewChart"
-    });
+    
+    // Vider le conteneur
+    container.innerHTML = '';
+    
+    try {
+        console.log('🔄 [CHART] Création du widget TradingView...');
+        backtestTradingViewWidget = new TradingView.widget({
+            "width": "100%",
+            "height": "100%",
+            "symbol": `BINANCE:${symbol}`,
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "light",
+            "style": "1",
+            "locale": "fr",
+            "enable_publishing": false,
+            "allow_symbol_change": true,
+            "studies": ["MACD@tv-basicstudies"],
+            "container_id": "backtestTradingViewChart"
+        });
+        
+        console.log('✅ [CHART] Widget TradingView créé avec succès');
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur lors de la création du widget:', error);
+        
+        // Réafficher le placeholder en cas d'erreur
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            placeholder.innerHTML = '❌ Erreur lors du chargement du graphique<br><small>Vérifiez votre connexion internet</small>';
+        }
+    }
 };
 
 // Initialiser les événements
