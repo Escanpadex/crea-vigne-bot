@@ -151,14 +151,16 @@ input:focus, select:focus {
 }
 
 .logs {
-    background: #1a1a1a;
-    color: #00ff00;
+    background: #f8f9fa;
+    color: #333;
     padding: 15px;
     border-radius: 8px;
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1.4;
     max-height: 400px;
     overflow-y: auto;
+    border: 1px solid #e2e8f0;
 }
 
 .balance-item {
