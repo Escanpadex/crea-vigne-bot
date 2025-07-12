@@ -1208,6 +1208,13 @@ window.updateBacktestChart = function(symbol) {
         return;
     }
     
+    // Vérifier que le conteneur est visible et a des dimensions
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        console.warn('⚠️ [CHART] Conteneur non visible, tentative dans 1 seconde...');
+        setTimeout(() => window.updateBacktestChart(symbol), 1000);
+        return;
+    }
+    
     console.log('✅ [CHART] Conteneur trouvé, dimensions:', container.offsetWidth, 'x', container.offsetHeight);
     
     const placeholder = document.getElementById('backtestChartPlaceholder');
@@ -1230,34 +1237,38 @@ window.updateBacktestChart = function(symbol) {
     // Vider le conteneur
     container.innerHTML = '';
     
-    try {
-        console.log('🔄 [CHART] Création du widget TradingView...');
-        backtestTradingViewWidget = new TradingView.widget({
-            "width": "100%",
-            "height": "100%",
-            "symbol": `BINANCE:${symbol}`,
-            "interval": "15",
-            "timezone": "Etc/UTC",
-            "theme": "light",
-            "style": "1",
-            "locale": "fr",
-            "enable_publishing": false,
-            "allow_symbol_change": true,
-            "studies": ["MACD@tv-basicstudies"],
-            "container_id": "backtestTradingViewChart"
-        });
-        
-        console.log('✅ [CHART] Widget TradingView créé avec succès');
-        
-    } catch (error) {
-        console.error('❌ [CHART] Erreur lors de la création du widget:', error);
-        
-        // Réafficher le placeholder en cas d'erreur
-        if (placeholder) {
-            placeholder.style.display = 'block';
-            placeholder.innerHTML = '❌ Erreur lors du chargement du graphique<br><small>Vérifiez votre connexion internet</small>';
+    // Attendre que le DOM soit stable
+    setTimeout(() => {
+        try {
+            console.log('🔄 [CHART] Création du widget TradingView...');
+            backtestTradingViewWidget = new TradingView.widget({
+                width: "100%",
+                height: "100%",
+                symbol: `BINANCE:${symbol}`,
+                interval: "15",
+                timezone: "Etc/UTC",
+                theme: "light",
+                style: "1",
+                locale: "fr",
+                enable_publishing: false,
+                allow_symbol_change: true,
+                studies: ["MACD@tv-basicstudies"],
+                container: container,
+                autosize: true
+            });
+            
+            console.log('✅ [CHART] Widget TradingView créé avec succès');
+            
+        } catch (error) {
+            console.error('❌ [CHART] Erreur lors de la création du widget:', error);
+            
+            // Réafficher le placeholder en cas d'erreur
+            if (placeholder) {
+                placeholder.style.display = 'block';
+                placeholder.innerHTML = '❌ Erreur lors du chargement du graphique<br><small>Vérifiez votre connexion internet</small>';
+            }
         }
-    }
+    }, 100);
 };
 
 // Initialiser les événements
