@@ -191,7 +191,11 @@ function cleanupBacktestingVariables() {
         // Nettoyer le graphique TradingView
         if (backtestTradingViewWidget) {
             try {
-                backtestTradingViewWidget.remove();
+                if (typeof backtestTradingViewWidget.remove === 'function') {
+                    backtestTradingViewWidget.remove();
+                } else {
+                    console.log('⚠️ [CLEANUP] Méthode remove non disponible pour le widget TradingView');
+                }
             } catch (chartError) {
                 console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', chartError);
             }
@@ -1200,14 +1204,18 @@ function updateSelectedPair() {
     }
     
     // Nettoyer le graphique existant avant de créer le nouveau
-    if (lightweightChart) {
+    if (backtestTradingViewWidget) {
         try {
-            lightweightChart.remove();
-            console.log('✅ [UPDATE] Graphique précédent nettoyé');
+            if (typeof backtestTradingViewWidget.remove === 'function') {
+                backtestTradingViewWidget.remove();
+                console.log('✅ [UPDATE] Widget TradingView précédent nettoyé');
+            } else {
+                console.log('⚠️ [UPDATE] Méthode remove non disponible');
+            }
         } catch (error) {
-            console.warn('⚠️ [UPDATE] Erreur nettoyage graphique:', error);
+            console.warn('⚠️ [UPDATE] Erreur nettoyage widget TradingView:', error);
         }
-        lightweightChart = null;
+        backtestTradingViewWidget = null;
     }
     
     // Mise à jour du graphique avec un délai pour s'assurer que le nettoyage est terminé
@@ -1290,8 +1298,12 @@ window.updateBacktestChart = function(symbol) {
     // Nettoyer le graphique existant
     if (backtestTradingViewWidget) {
         try {
-            backtestTradingViewWidget.remove();
-            console.log('✅ [CHART] Widget TradingView précédent supprimé');
+            if (typeof backtestTradingViewWidget.remove === 'function') {
+                backtestTradingViewWidget.remove();
+                console.log('✅ [CHART] Widget TradingView précédent supprimé');
+            } else {
+                console.log('⚠️ [CHART] Méthode remove non disponible, nettoyage du conteneur');
+            }
         } catch (error) {
             console.warn('⚠️ [CHART] Erreur lors de la suppression du widget TradingView:', error);
         }
@@ -1301,8 +1313,10 @@ window.updateBacktestChart = function(symbol) {
     // Vider le container pour éviter les conflits
     container.innerHTML = '';
     
-    // Créer le widget TradingView simple
-    createSimpleTradingViewChart(symbol, container);
+    // Attendre un peu pour s'assurer que le nettoyage est terminé
+    setTimeout(() => {
+        createSimpleTradingViewChart(symbol, container);
+    }, 100);
 };
 
 // Fonction simple pour créer un graphique TradingView de base
@@ -1362,10 +1376,14 @@ function createSimpleTradingViewChart(symbol, container) {
         
         console.log('✅ [CHART] Widget TradingView créé avec succès');
         
-        // Attendre que le widget soit chargé
-        backtestTradingViewWidget.onChartReady(() => {
-            console.log('✅ [CHART] Graphique TradingView prêt');
-        });
+        // Attendre que le widget soit chargé (avec vérification)
+        if (typeof backtestTradingViewWidget.onChartReady === 'function') {
+            backtestTradingViewWidget.onChartReady(() => {
+                console.log('✅ [CHART] Graphique TradingView prêt');
+            });
+        } else {
+            console.log('ℹ️ [CHART] onChartReady non disponible, widget créé sans callback');
+        }
         
     } catch (error) {
         console.error('❌ [CHART] Erreur lors de la création du graphique TradingView:', error);
