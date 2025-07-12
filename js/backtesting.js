@@ -32,6 +32,7 @@ let backtestResults = null;
 let backtestInterval = null;
 let equityChart = null;
 let backtestTradingViewWidget = null;
+let precisionData = [];  // Nouvelle variable globale pour stocker toutes les bougies de précision (ex. 3m) pré-chargées
 
 // Configuration du backtesting (simplifiée)
 let backtestConfig = {
@@ -172,6 +173,9 @@ function cleanupBacktestingVariables() {
             clearInterval(backtestInterval);
             backtestInterval = null;
         }
+        
+        // Nouveau: Nettoyer les données de précision
+        precisionData = [];
         
         // Nettoyer les graphiques
         if (equityChart) {
@@ -659,6 +663,15 @@ async function fetchHistoricalData(symbol) {
         
         backtestData = data;
         
+        // Nouveau: Pré-charger les données de précision si activé
+        const precisionTimeframe = getPrecisionTimeframe(backtestConfig.timeframe);
+        if (backtestConfig.enablePrecisionTrailingStop && backtestData.length > 0) {
+            updateBacktestStatus('Pré-chargement des données de précision pour trailing stop...', 20);
+            const startTime = backtestData[0].timestamp;
+            const endTime = backtestData[backtestData.length - 1].timestamp + (getTimeframeMinutes(backtestConfig.timeframe) * 60 * 1000);  // Couvrir jusqu'à la fin
+            precisionData = await fetchAllPrecisionData(symbol, startTime, endTime, precisionTimeframe);
+        }
+        
         updateBacktestStatus('Données historiques récupérées avec succès', 30);
         log(`✅ ${backtestData.length} bougies récupérées pour le backtesting`, 'SUCCESS');
         
@@ -795,6 +808,24 @@ async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startT
     return [];
 }
 
+// Nouvelle fonction pour pré-charger toutes les données de précision en chunks
+async function fetchAllPrecisionData(symbol, startTime, endTime, interval) {
+    let allData = [];
+    let currentStart = startTime;
+    const chunkLimit = 1000;  // Limite max par requête Binance
+
+    while (currentStart < endTime) {
+        const chunk = await getBinanceKlineData(symbol, chunkLimit, interval, currentStart, endTime);
+        if (chunk.length === 0) break;
+
+        allData = allData.concat(chunk);
+        currentStart = chunk[chunk.length - 1].timestamp + 1;  // Commencer après la dernière bougie du chunk
+    }
+
+    log(`✅ Pré-chargement précision: ${allData.length} bougies ${interval} récupérées pour ${symbol}`, 'SUCCESS');
+    return allData;
+}
+
 // Calculer EMA
 function calculateEMA(prices, period) {
     if (prices.length < period) return new Array(prices.length).fill(null);
@@ -868,13 +899,16 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
     const symbol = trade.symbol;
     const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (getTimeframeMinutes(analysisTimeframe) * 60 * 1000);
     
-    const precisionData = await getPrecisionDataForTrailing(symbol, currentCandle.timestamp, endTime, analysisTimeframe);
+    // Modification: Utiliser les données pré-chargées au lieu de fetch
+    const filteredPrecisionData = precisionData.filter(k => k.timestamp >= currentCandle.timestamp && k.timestamp <= endTime);
     
-    if (precisionData.length === 0) {
+    if (filteredPrecisionData.length === 0) {
+        log(`⚠️ Aucune donnée de précision disponible pour [${currentCandle.timestamp}, ${endTime}]`, 'WARNING');
         return null;
     }
     
-    for (const precisionCandle of precisionData) {
+    // Utiliser filteredPrecisionData au lieu de precisionData
+    for (const precisionCandle of filteredPrecisionData) {
         // Gestion LONG uniquement
         // Mettre à jour le prix le plus haut
         if (precisionCandle.high > trade.highestPrice) {
