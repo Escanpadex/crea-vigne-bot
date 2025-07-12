@@ -713,7 +713,7 @@ function getTimeframeMinutes(timeframe) {
 }
 
 // Fonction pour récupérer les données klines depuis l'API Binance
-async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
+-async function getBinanceKlineData(symbol, limit = 500, interval = '15m', startTime, endTime) {
     const maxRetries = 3;
     const baseDelay = 1000;
     let lastError = null;
@@ -1407,35 +1407,14 @@ async function createLightweightChart(symbol, container) {
         console.log('✅ [CHART] Graphique créé:', chart);
         lightweightChart = chart;
         
-        // Vérifier que les méthodes existent
-        if (typeof chart.addCandlestickSeries !== 'function') {
-            console.error('❌ [CHART] addCandlestickSeries n\'est pas une fonction');
-            console.log('📊 [CHART] Méthodes disponibles sur chart:', Object.getOwnPropertyNames(chart));
-            console.log('📊 [CHART] Prototype du chart:', Object.getOwnPropertyNames(Object.getPrototypeOf(chart)));
-            
-            // Essayer différentes approches
-            if (typeof chart.addCandleSeries === 'function') {
-                console.log('🔄 [CHART] Tentative avec addCandleSeries...');
-            } else if (typeof chart.addSeries === 'function') {
-                console.log('🔄 [CHART] Tentative avec addSeries...');
-            } else {
-                throw new Error('Aucune méthode pour ajouter des séries trouvée');
-            }
-        }
-        
         // Ajouter la série de bougies avec gestion d'erreur
         let candleSeries;
         try {
-            if (typeof chart.addCandlestickSeries === 'function') {
-                candleSeries = chart.addCandlestickSeries({
-                    upColor: '#26a69a',
-                    downColor: '#ef5350',
-                    borderVisible: false,
-                    wickUpColor: '#26a69a',
-                    wickDownColor: '#ef5350',
-                });
-            } else if (typeof chart.addCandleSeries === 'function') {
-                candleSeries = chart.addCandleSeries({
+            // Use the correct API: chart.addSeries with CandlestickSeries type
+            // Ensure 'CandlestickSeries' is imported at the top of the file (add if missing):
+            // import { ..., CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+            if (typeof chart.addSeries === 'function') {
+                candleSeries = chart.addSeries('candlestick', {  // 'candlestick' is the series type string
                     upColor: '#26a69a',
                     downColor: '#ef5350',
                     borderVisible: false,
@@ -1443,7 +1422,7 @@ async function createLightweightChart(symbol, container) {
                     wickDownColor: '#ef5350',
                 });
             } else {
-                throw new Error('Aucune méthode candlestick disponible');
+                throw new Error('Méthode addSeries non disponible. Vérifiez le chargement de la bibliothèque.');
             }
         } catch (seriesError) {
             console.error('❌ [CHART] Erreur création série de bougies:', seriesError);
@@ -1458,7 +1437,7 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série MACD (histogramme) - optionnel
         let macdSeries = null;
         try {
-            macdSeries = chart.addHistogramSeries({
+            macdSeries = chart.addSeries('histogram', {  // Use 'histogram' type
                 color: '#26a69a',
                 priceFormat: {
                     type: 'volume',
