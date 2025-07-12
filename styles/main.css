@@ -166,14 +166,9 @@ input:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1) !important;
 }
 
-/* Transition smooth pour les toggle switches */
-.toggle-switch {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.toggle-switch-ball {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+/* Styles pour les cases à cocher Take Profit */
+input[type="checkbox"] {
+    transition: all 0.3s ease;
 }
 
 /* Effet hover pour les containers Take Profit */
