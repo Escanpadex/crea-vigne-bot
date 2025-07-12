@@ -292,6 +292,12 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
             signalState.timestamp = lastSignalData.timestamp || currentTime;
             signalState.index = lastSignalData.signalIndex;
             signalState.lastChecked = currentTime;
+            
+            // Debug: Log du signal trouvé
+            log(`🔍 [PERSISTENT] ${timeframe} - Signal trouvé: ${lastSignalData.signal} (index: ${lastSignalData.signalIndex})`, 'DEBUG');
+        } else {
+            // Debug: Log du signal en cache
+            log(`🔍 [PERSISTENT] ${timeframe} - Signal en cache: ${signalState.signal}`, 'DEBUG');
         }
         
         // Logique de décision basée sur le signal persistant
@@ -473,6 +479,8 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
                 if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH')) {
                     lastSignal = analysis;
                     lastSignalIndex = i;
+                    // Debug: Log du signal détecté
+                    log(`🔍 [SIGNAL_SEARCH] ${timeframe} - Signal détecté à l'index ${i}: ${analysis.signal}`, 'DEBUG');
                     break;
                 }
             } catch (analysisError) {
@@ -638,6 +646,16 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
         } else if (latest.macd < latest.signal) {
             signal = 'BEARISH';
             reason = `MACD<Signal (${timeframe})`;
+        }
+        
+        // Debug: Log détaillé des conditions MACD pour 15m
+        if (timeframe === '15m') {
+            log(`🔍 [MACD_DEBUG] ${timeframe} - Conditions:`, 'DEBUG');
+            log(`  - crossover: ${crossover} (prev: ${previous.macd.toFixed(6)} <= ${previous.signal.toFixed(6)}, curr: ${latest.macd.toFixed(6)} > ${latest.signal.toFixed(6)})`, 'DEBUG');
+            log(`  - histogramPositive: ${histogramPositive} (${latest.histogram.toFixed(6)})`, 'DEBUG');
+            log(`  - histogramImproving: ${histogramImproving} (${earlier.histogram.toFixed(6)} -> ${previous.histogram.toFixed(6)} -> ${latest.histogram.toFixed(6)})`, 'DEBUG');
+            log(`  - macdAboveSignal: ${macdAboveSignal} (${latest.macd.toFixed(6)} > ${latest.signal.toFixed(6)})`, 'DEBUG');
+            log(`  - Signal final: ${signal} - ${reason}`, 'DEBUG');
         }
         
         return {
@@ -1207,20 +1225,31 @@ async function runBacktestWithTradingLogic() {
                     continue;
                 }
                 
-                // Compter les signaux
+                // Compter les signaux avec logging détaillé
                 if (analysis.finalDecision === 'BUY') {
                     buySignals++;
                     log(`✅ [BACKTEST] 🚀 SIGNAL BUY DÉTECTÉ ! Total: ${buySignals}`, 'SUCCESS');
                     log(`✅ [BACKTEST] Prix: ${currentCandle.close.toFixed(4)}, Raison: ${analysis.finalReason}`, 'SUCCESS');
                 } else if (analysis.finalDecision === 'FILTERED') {
                     filteredSignals++;
-                    if (filteredSignals % 50 === 0) { // Log périodique pour éviter le spam
-                        log(`❌ [BACKTEST] ${filteredSignals} signaux filtrés (dernier: ${analysis.filterReason})`, 'WARNING');
+                    // Log détaillé pour comprendre pourquoi les signaux sont filtrés
+                    if (filteredSignals <= 10 || filteredSignals % 10 === 0) { // Plus de logs au début
+                        log(`❌ [BACKTEST] Signal ${filteredSignals} filtré à l'index ${i}: ${analysis.filterReason}`, 'WARNING');
+                        // Afficher les détails des timeframes pour debug
+                        if (analysis['4h']) {
+                            log(`  - 4H: ${analysis['4h'].isValidForTrading ? 'VALID' : 'INVALID'} - ${analysis['4h'].reason}`, 'DEBUG');
+                        }
+                        if (analysis['1h']) {
+                            log(`  - 1H: ${analysis['1h'].isValidForTrading ? 'VALID' : 'INVALID'} - ${analysis['1h'].reason}`, 'DEBUG');
+                        }
+                        if (analysis['15m']) {
+                            log(`  - 15M: Signal=${analysis['15m'].signal}, Crossover=${analysis['15m'].crossover}`, 'DEBUG');
+                        }
                     }
                 } else if (analysis.finalDecision === 'WAIT') {
                     waitSignals++;
-                    if (waitSignals % 50 === 0) { // Log périodique pour éviter le spam
-                        log(`⏳ [BACKTEST] ${waitSignals} signaux en attente (dernier: ${analysis.finalReason})`, 'INFO');
+                    if (waitSignals <= 5 || waitSignals % 10 === 0) { // Plus de logs au début
+                        log(`⏳ [BACKTEST] Signal ${waitSignals} en attente à l'index ${i}: ${analysis.finalReason}`, 'INFO');
                     }
                 }
                 
@@ -1336,6 +1365,12 @@ async function runBacktestWithTradingLogic() {
         log(`📊 [BACKTEST] Signaux FILTERED: ${filteredSignals} (${totalSignals > 0 ? ((filteredSignals/totalSignals)*100).toFixed(2) : 0}%)`, 'INFO');
         log(`📊 [BACKTEST] Positions exécutées: ${closedTrades.length}`, 'INFO');
         log(`📊 [BACKTEST] Capital final: ${equity.toFixed(2)}$ (${((equity-backtestConfig.capital)/backtestConfig.capital*100).toFixed(2)}%)`, 'INFO');
+        
+        // Diagnostic: Afficher l'état final des signaux persistants
+        log(`\n🔍 [BACKTEST] === DIAGNOSTIC SIGNAUX PERSISTANTS ===`, 'INFO');
+        log(`🔍 [BACKTEST] Signal 4H final: ${persistentSignals['4h'].signal} (timestamp: ${persistentSignals['4h'].timestamp})`, 'INFO');
+        log(`🔍 [BACKTEST] Signal 1H final: ${persistentSignals['1h'].signal} (timestamp: ${persistentSignals['1h'].timestamp})`, 'INFO');
+        log(`🔍 [BACKTEST] Si tous les signaux sont filtrés, vérifiez que les timeframes 4H et 1H ont des signaux haussiers`, 'INFO');
         
         // Calculer les résultats finaux
         backtestResults = {
