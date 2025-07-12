@@ -22,8 +22,15 @@
  * - Force BUY si pas de données post-SELL
  * - Garantie sampleRate=1 si disableSampling=true
  * - FIXED: Utilisation données étendues 4H/1H au lieu d'agrégation 15M (résout INSUFFICIENT_DATA)
+ * - NEW: Precision Trailing Stop - Utilise des bougies 3m pour vérifier le TSL sur timeframe 15m
  * 
- * Stratégie optimisée : Multi-timeframe → BUY strict → LONG → Fermeture par trailing stop
+ * 🎯 PRECISION TRAILING STOP:
+ * - Analyse intra-15m avec bougies 3m pour détecter les stops déclenchés dans la bougie
+ * - Améliore la précision des backtests en évitant les stops "manqués"
+ * - Configurable via backtestConfig.enablePrecisionTrailingStop
+ * - Fonctions: enablePrecisionTrailingStop(), disablePrecisionTrailingStop()
+ * 
+ * Stratégie optimisée : Multi-timeframe → BUY strict → LONG → Fermeture par trailing stop précis
  */
 
 // Backtesting System for Trading Strategies
@@ -66,6 +73,10 @@ let backtestConfig = {
     ignoreHigherTimeframes: false, // Ignorer 4H et 1H pour tester seulement 15M
     forceDisableSampling: false, // Force l'analyse de chaque bougie
     waitingTimeoutMs: 24 * 60 * 60 * 1000, // NEW: 24h timeout for waiting on bullish after SELL/BEARISH
+    
+    // NOUVEAU: Options de précision pour trailing stop
+    enablePrecisionTrailingStop: true, // Activer la vérification précision pour trailing stop (3m pour 15m, 1m pour 5m, etc.)
+    precisionTrailingStopDebug: false, // Logs détaillés pour le trailing stop précision
 };
 
 // NOUVELLE FONCTION : Gardes d'initialisation pour les variables globales
@@ -1566,7 +1577,40 @@ async function runBacktestWithTradingLogic() {
                 for (let j = openTrades.length - 1; j >= 0; j--) {
                     const trade = openTrades[j];
                     
-                    // Mettre à jour le trailing stop
+                    // NEW: Check for precision trailing stop first (finer-grained candles)
+                    // This improves accuracy by checking intra-15m movements. Only call if position is open and we have a next candle.
+                    let precisionClose = null;
+                    if (backtestConfig.enablePrecisionTrailingStop && i + 1 < backtestData.length) {  // Ensure there's a next candle for endTime
+                        try {
+                            precisionClose = await checkTrailingStopPrecision(trade, currentCandle, backtestData[i + 1]);
+                        } catch (precisionError) {
+                            log(`⚠️ [BACKTEST] Erreur vérification précision: ${precisionError.message}`, 'WARNING');
+                        }
+                    }
+                    
+                    if (precisionClose) {
+                        // Close using precision data if triggered
+                        const pnl = (precisionClose.exitPrice - trade.entryPrice) * trade.quantity;
+                        const pnlPercent = (pnl / trade.positionSize) * 100;
+                        
+                        trade.exitPrice = precisionClose.exitPrice;
+                        trade.exitTime = precisionClose.exitTime;
+                        trade.exitReason = precisionClose.reason;
+                        trade.pnl = pnl;
+                        trade.pnlPercent = pnlPercent;
+                        
+                        equity += pnl;
+                        closedTrades.push(trade);
+                        openTrades.splice(j, 1);
+                        
+                        log(`📊 [BACKTEST] 💸 POSITION FERMÉE (PRECISION): ${precisionClose.reason}, PnL=${pnl.toFixed(2)}$`, 'INFO');
+                        log(`📊 Position fermée (précision): ${precisionClose.reason} - PnL: ${pnl.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 
+                            pnl > 0 ? 'SUCCESS' : 'WARNING');
+                        continue;  // Skip standard check if precision already closed it
+                    }
+                    
+                    // Standard trailing stop update (existing code)
+                    // DOCUMENTATION: Update trailing stop if new high is reached (trails the stop upward to protect profits)
                     if (currentCandle.high > trade.highestPrice) {
                         trade.highestPrice = currentCandle.high;
                         trade.stopLossPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
@@ -1575,7 +1619,7 @@ async function runBacktestWithTradingLogic() {
                     let closeReason = null;
                     let closePrice = null;
                     
-                    // Vérifier stop loss
+                    // DOCUMENTATION: Check if stop-loss is breached (closes position to limit losses)
                     if (currentCandle.low <= trade.stopLossPrice) {
                         closeReason = 'Stop Loss';
                         closePrice = trade.stopLossPrice;
@@ -2362,31 +2406,41 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
     const symbol = trade.symbol;
     const endTime = nextCandle ? nextCandle.timestamp : currentCandle.timestamp + (getTimeframeMinutes(analysisTimeframe) * 60 * 1000);
     
-    log(`🔍 Vérification précision trailing stop: ${analysisTimeframe} → ${precisionTimeframe}`, 'DEBUG');
+    if (backtestConfig.precisionTrailingStopDebug) {
+        log(`🔍 Vérification précision trailing stop: ${analysisTimeframe} → ${precisionTimeframe}`, 'DEBUG');
+    }
     
     const precisionData = await getPrecisionDataForTrailing(symbol, currentCandle.timestamp, endTime, analysisTimeframe);
     
     if (precisionData.length === 0) {
-        log(`⚠️ Pas de données précision, utilisation logique standard`, 'WARNING');
+        if (backtestConfig.precisionTrailingStopDebug) {
+            log(`⚠️ Pas de données précision, utilisation logique standard`, 'WARNING');
+        }
         return null; // Pas de données, utiliser la logique standard
     }
     
-    log(`📊 Analyse ${precisionData.length} bougies ${precisionTimeframe} pour trailing stop`, 'DEBUG');
+    if (backtestConfig.precisionTrailingStopDebug) {
+        log(`📊 Analyse ${precisionData.length} bougies ${precisionTimeframe} pour trailing stop`, 'DEBUG');
+    }
     
     for (const precisionCandle of precisionData) {
         if (trade.side === 'LONG') { // Changed from trade.direction to trade.side
             // Mettre à jour le prix le plus haut
             if (precisionCandle.high > trade.highestPrice) {
                 trade.highestPrice = precisionCandle.high;
-                trade.trailingStopPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
-                log(`🔍 LONG - Nouveau high précision: ${trade.highestPrice.toFixed(4)}, Stop: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                trade.stopLossPrice = trade.highestPrice * (1 - backtestConfig.trailingStop / 100);
+                if (backtestConfig.precisionTrailingStopDebug) {
+                    log(`🔍 LONG - Nouveau high précision: ${trade.highestPrice.toFixed(4)}, Stop: ${trade.stopLossPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
             
             // Vérifier si le trailing stop est touché
-            if (precisionCandle.low <= trade.trailingStopPrice) {
-                log(`🎯 LONG - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.low.toFixed(4)} <= ${trade.trailingStopPrice.toFixed(4)}`, 'SUCCESS');
+            if (precisionCandle.low <= trade.stopLossPrice) {
+                if (backtestConfig.precisionTrailingStopDebug) {
+                    log(`🎯 LONG - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.low.toFixed(4)} <= ${trade.stopLossPrice.toFixed(4)}`, 'SUCCESS');
+                }
                 return {
-                    exitPrice: trade.trailingStopPrice,
+                    exitPrice: trade.stopLossPrice,
                     exitTime: precisionCandle.timestamp,
                     reason: `Trailing Stop Loss (${precisionTimeframe} precision)`
                 };
@@ -2395,15 +2449,19 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
             // Mettre à jour le prix le plus bas
             if (precisionCandle.low < trade.lowestPrice) {
                 trade.lowestPrice = precisionCandle.low;
-                trade.trailingStopPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
-                log(`🔍 SHORT - Nouveau low précision: ${trade.lowestPrice.toFixed(4)}, Stop: ${trade.trailingStopPrice.toFixed(4)}`, 'DEBUG');
+                trade.stopLossPrice = trade.lowestPrice * (1 + backtestConfig.trailingStop / 100);
+                if (backtestConfig.precisionTrailingStopDebug) {
+                    log(`🔍 SHORT - Nouveau low précision: ${trade.lowestPrice.toFixed(4)}, Stop: ${trade.stopLossPrice.toFixed(4)}`, 'DEBUG');
+                }
             }
             
             // Vérifier si le trailing stop est touché
-            if (precisionCandle.high >= trade.trailingStopPrice) {
-                log(`🎯 SHORT - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.high.toFixed(4)} >= ${trade.trailingStopPrice.toFixed(4)}`, 'SUCCESS');
+            if (precisionCandle.high >= trade.stopLossPrice) {
+                if (backtestConfig.precisionTrailingStopDebug) {
+                    log(`🎯 SHORT - Stop déclenché précision ${precisionTimeframe}: ${precisionCandle.high.toFixed(4)} >= ${trade.stopLossPrice.toFixed(4)}`, 'SUCCESS');
+                }
                 return {
-                    exitPrice: trade.trailingStopPrice,
+                    exitPrice: trade.stopLossPrice,
                     exitTime: precisionCandle.timestamp,
                     reason: `Trailing Stop Loss (${precisionTimeframe} precision)`
                 };
@@ -2560,8 +2618,30 @@ async function analyzeTimeframeData(symbol, timeframe) {
     log(`🔍 [TIMEFRAME_DEBUG] === FIN ANALYSE ${timeframe} ===`, 'INFO');
 }
 
+// NOUVELLES FONCTIONS : Gestion de la précision trailing stop
+function enablePrecisionTrailingStop(enableDebug = false) {
+    backtestConfig.enablePrecisionTrailingStop = true;
+    backtestConfig.precisionTrailingStopDebug = enableDebug;
+    log(`✅ [PRECISION_TSL] Trailing stop précision activé (debug: ${enableDebug})`, 'SUCCESS');
+    log(`📊 [PRECISION_TSL] Utilisation de bougies 3m pour analyse 15m (améliore la précision)`, 'INFO');
+}
+
+function disablePrecisionTrailingStop() {
+    backtestConfig.enablePrecisionTrailingStop = false;
+    backtestConfig.precisionTrailingStopDebug = false;
+    log(`❌ [PRECISION_TSL] Trailing stop précision désactivé - Utilisation logique standard 15m`, 'INFO');
+}
+
+function togglePrecisionTrailingStopDebug() {
+    backtestConfig.precisionTrailingStopDebug = !backtestConfig.precisionTrailingStopDebug;
+    log(`🔧 [PRECISION_TSL] Debug trailing stop précision: ${backtestConfig.precisionTrailingStopDebug ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`, 'INFO');
+}
+
 // Rendre les fonctions de debug accessibles globalement
 window.enableDebugMode = enableDebugMode;
 window.enableDebugMode15mOnly = enableDebugMode15mOnly;
 window.diagnoseBacktestIssues = diagnoseBacktestIssues;
 window.analyzeTimeframeData = analyzeTimeframeData;
+window.enablePrecisionTrailingStop = enablePrecisionTrailingStop;
+window.disablePrecisionTrailingStop = disablePrecisionTrailingStop;
+window.togglePrecisionTrailingStopDebug = togglePrecisionTrailingStopDebug;
