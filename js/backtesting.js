@@ -49,6 +49,11 @@ let backtestConfig = {
     extendedDataDays: 90, // Augmenté de 30 à 90 jours pour capturer plus de signaux
     allowBullishTrades: true, // Permettre les trades sur signaux BULLISH en plus de BUY
     disableSampling: false, // Désactiver l'échantillonnage pour les runs de production
+    
+    // NOUVEAU: Options de debug
+    debugMode: false, // Mode debug avec logs détaillés
+    ignoreHigherTimeframes: false, // Ignorer 4H et 1H pour tester seulement 15M
+    forceDisableSampling: false // Force l'analyse de chaque bougie
 };
 
 // NOUVELLE FONCTION : Gardes d'initialisation pour les variables globales
@@ -261,9 +266,11 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
         const signalState = persistentSignals[timeframe];
         
         if (!extendedData || extendedData.length === 0) {
+            const reason = `Données étendues ${timeframe} manquantes`;
+            log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
             return { 
                 isValidForTrading: false, 
-                reason: `Données étendues ${timeframe} manquantes`,
+                reason: reason,
                 signal: null 
             };
         }
@@ -271,9 +278,11 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
         const filteredData = extendedData.filter(c => c && c.timestamp && c.timestamp <= currentTime);
         
         if (filteredData.length < 50) {
+            const reason = `Données ${timeframe} insuffisantes (${filteredData.length}/50)`;
+            log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
             return { 
                 isValidForTrading: false, 
-                reason: `Données ${timeframe} insuffisantes`,
+                reason: reason,
                 signal: null 
             };
         }
@@ -294,17 +303,19 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
             signalState.lastChecked = currentTime;
             
             // Debug: Log du signal trouvé
-            log(`🔍 [PERSISTENT] ${timeframe} - Signal trouvé: ${lastSignalData.signal} (index: ${lastSignalData.signalIndex})`, 'DEBUG');
+            log(`🔍 [PERSISTENT_DEBUG] ${timeframe} - Signal trouvé: ${lastSignalData.signal} (index: ${lastSignalData.signalIndex})`, 'DEBUG');
         } else {
             // Debug: Log du signal en cache
-            log(`🔍 [PERSISTENT] ${timeframe} - Signal en cache: ${signalState.signal}`, 'DEBUG');
+            log(`🔍 [PERSISTENT_DEBUG] ${timeframe} - Signal en cache: ${signalState.signal}`, 'DEBUG');
         }
         
         // Logique de décision basée sur le signal persistant
         if (signalState.signal === 'BUY' || signalState.signal === 'BULLISH') {
+            const reason = `Signal ${timeframe} haussier: ${signalState.signal}`;
+            log(`✅ [PERSISTENT_DEBUG] ${timeframe} - VALID: ${reason}`, 'DEBUG');
             return {
                 isValidForTrading: true,
-                reason: `Signal ${timeframe} haussier: ${signalState.signal}`,
+                reason: reason,
                 signal: signalState.signal,
                 timestamp: signalState.timestamp
             };
@@ -319,35 +330,42 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                 signalState.timestamp = newBullishSignal.timestamp || currentTime;
                 signalState.index = newBullishSignal.signalIndex;
                 
+                const reason = `Nouveau signal ${timeframe} haussier après signal baissier: ${newBullishSignal.signal}`;
+                log(`✅ [PERSISTENT_DEBUG] ${timeframe} - VALID: ${reason}`, 'DEBUG');
                 return {
                     isValidForTrading: true,
-                    reason: `Nouveau signal ${timeframe} haussier après signal baissier: ${newBullishSignal.signal}`,
+                    reason: reason,
                     signal: newBullishSignal.signal,
                     timestamp: signalState.timestamp
                 };
             } else {
+                const reason = `En attente d'un signal haussier ${timeframe} (dernier signal: ${signalState.signal})`;
+                log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
                 return {
                     isValidForTrading: false,
-                    reason: `En attente d'un signal haussier ${timeframe} (dernier signal: ${signalState.signal})`,
+                    reason: reason,
                     signal: signalState.signal,
                     timestamp: signalState.timestamp
                 };
             }
         } else {
             // Signal NEUTRAL ou autre
+            const reason = `Signal ${timeframe} neutre ou inconnu: ${signalState.signal}`;
+            log(`❌ [PERSISTENT_DEBUG] ${timeframe} - INVALID: ${reason}`, 'DEBUG');
             return {
                 isValidForTrading: false,
-                reason: `Signal ${timeframe} neutre ou inconnu: ${signalState.signal}`,
+                reason: reason,
                 signal: signalState.signal,
                 timestamp: signalState.timestamp
             };
         }
         
     } catch (error) {
-        log(`❌ [PERSISTENT] Erreur gestion signal persistant ${timeframe}: ${error.message}`, 'ERROR');
+        const reason = `Erreur: ${error.message}`;
+        log(`❌ [PERSISTENT_DEBUG] ${timeframe} - ERROR: ${reason}`, 'ERROR');
         return {
             isValidForTrading: false,
-            reason: `Erreur: ${error.message}`,
+            reason: reason,
             signal: null
         };
     }
@@ -363,13 +381,62 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         // Mettre à jour le temps de backtesting courant
         persistentSignals.currentBacktestTime = currentTime;
         
+        log(`🔍 [MULTI_TF_DEBUG] === DÉBUT ANALYSE ${symbol} à l'index ${candleIndex} ===`, 'DEBUG');
+        
+        // MODE DEBUG : Ignorer les timeframes supérieurs pour tester seulement 15M
+        if (backtestConfig.ignoreHigherTimeframes) {
+            log(`🔧 [DEBUG_MODE] Ignorant les timeframes 4H et 1H - Test 15M seulement`, 'DEBUG');
+            
+            // ÉTAPE UNIQUE : Analyse 15M seulement
+            const data15m = historicalData.slice(0, candleIndex + 1);
+            
+            if (data15m.length < 50) {
+                results.finalDecision = 'FILTERED';
+                results.filterReason = 'Données 15M insuffisantes';
+                log(`❌ [DEBUG_MODE] FILTERED par 15M: ${results.filterReason}`, 'DEBUG');
+                return results;
+            }
+            
+            const analysis15m = await analyzePairMACDForBacktest(symbol, '15m', data15m);
+            results['15m'] = analysis15m;
+            
+            log(`🔍 [DEBUG_MODE] 15M - Signal: ${analysis15m.signal}, Crossover: ${analysis15m.crossover}`, 'DEBUG');
+            
+            // Décision basée uniquement sur 15M
+            if (analysis15m.signal === 'BUY' && analysis15m.crossover) {
+                results.finalDecision = 'BUY';
+                results.finalReason = `Signal BUY 15M avec croisement (mode debug)`;
+                log(`✅ [DEBUG_MODE] BUY: ${results.finalReason}`, 'DEBUG');
+            } else if (backtestConfig.allowBullishTrades && (analysis15m.signal === 'BULLISH' || analysis15m.signal === 'BUY')) {
+                results.finalDecision = 'BUY';
+                results.finalReason = `Signal 15M haussier (mode debug assoupli)`;
+                log(`✅ [DEBUG_MODE] BUY (assoupli): ${results.finalReason}`, 'DEBUG');
+            } else if (analysis15m.signal === 'BULLISH') {
+                results.finalDecision = 'WAIT';
+                results.finalReason = `15M haussier mais pas de croisement (mode debug)`;
+                log(`⏳ [DEBUG_MODE] WAIT: ${results.finalReason}`, 'DEBUG');
+            } else {
+                results.finalDecision = 'FILTERED';
+                results.filterReason = `15M non haussier: ${analysis15m.signal} (mode debug)`;
+                log(`❌ [DEBUG_MODE] FILTERED par 15M: ${results.filterReason}`, 'DEBUG');
+            }
+            
+            log(`🔍 [DEBUG_MODE] === FIN ANALYSE - DÉCISION: ${results.finalDecision} ===`, 'DEBUG');
+            return results;
+        }
+        
+        // MODE NORMAL : Analyse multi-timeframe complète
+        
         // ÉTAPE 1 : Gestion des signaux 4H avec système persistant
         const signal4hResult = await managePersistentSignal(symbol, '4h', currentTime);
         results['4h'] = signal4hResult;
         
+        log(`🔍 [MULTI_TF_DEBUG] 4H - ${signal4hResult.isValidForTrading ? 'VALID' : 'INVALID'}: ${signal4hResult.reason}`, 'DEBUG');
+        
         if (!signal4hResult.isValidForTrading) {
             results.finalDecision = 'FILTERED';
             results.filterReason = `4H: ${signal4hResult.reason}`;
+            log(`❌ [MULTI_TF_DEBUG] FILTERED par 4H: ${results.filterReason}`, 'DEBUG');
             return results;
         }
         
@@ -377,9 +444,12 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         const signal1hResult = await managePersistentSignal(symbol, '1h', currentTime);
         results['1h'] = signal1hResult;
         
+        log(`🔍 [MULTI_TF_DEBUG] 1H - ${signal1hResult.isValidForTrading ? 'VALID' : 'INVALID'}: ${signal1hResult.reason}`, 'DEBUG');
+        
         if (!signal1hResult.isValidForTrading) {
             results.finalDecision = 'FILTERED';
             results.filterReason = `1H: ${signal1hResult.reason}`;
+            log(`❌ [MULTI_TF_DEBUG] FILTERED par 1H: ${results.filterReason}`, 'DEBUG');
             return results;
         }
         
@@ -389,31 +459,39 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         if (data15m.length < 50) {
             results.finalDecision = 'FILTERED';
             results.filterReason = 'Données 15M insuffisantes';
+            log(`❌ [MULTI_TF_DEBUG] FILTERED par 15M: ${results.filterReason}`, 'DEBUG');
             return results;
         }
         
         const analysis15m = await analyzePairMACDForBacktest(symbol, '15m', data15m);
         results['15m'] = analysis15m;
         
+        log(`🔍 [MULTI_TF_DEBUG] 15M - Signal: ${analysis15m.signal}, Crossover: ${analysis15m.crossover}`, 'DEBUG');
+        
         // DÉCISION FINALE : Critères assouplis pour permettre plus de trades
         if (analysis15m.signal === 'BUY' && analysis15m.crossover) {
             results.finalDecision = 'BUY';
             results.finalReason = `4H et 1H haussiers + signal BUY 15M avec croisement détecté`;
+            log(`✅ [MULTI_TF_DEBUG] BUY: ${results.finalReason}`, 'DEBUG');
         } else if (backtestConfig.allowBullishTrades && (analysis15m.signal === 'BULLISH' || analysis15m.signal === 'BUY')) {
             results.finalDecision = 'BUY';
             results.finalReason = `4H et 1H haussiers + signal 15M haussier (critères assouplis)`;
+            log(`✅ [MULTI_TF_DEBUG] BUY (assoupli): ${results.finalReason}`, 'DEBUG');
         } else if (analysis15m.signal === 'BULLISH') {
             results.finalDecision = 'WAIT';
             results.finalReason = `4H et 1H haussiers, 15M haussier mais pas de croisement`;
+            log(`⏳ [MULTI_TF_DEBUG] WAIT: ${results.finalReason}`, 'DEBUG');
         } else {
             results.finalDecision = 'FILTERED';
             results.filterReason = `15M non haussier: ${analysis15m.signal}`;
+            log(`❌ [MULTI_TF_DEBUG] FILTERED par 15M: ${results.filterReason}`, 'DEBUG');
         }
         
+        log(`🔍 [MULTI_TF_DEBUG] === FIN ANALYSE - DÉCISION: ${results.finalDecision} ===`, 'DEBUG');
         return results;
         
     } catch (error) {
-        log(`❌ [STATEFUL] Erreur analyse multi-timeframe ${symbol}: ${error.message}`, 'ERROR');
+        log(`❌ [MULTI_TF_DEBUG] Erreur analyse multi-timeframe ${symbol}: ${error.message}`, 'ERROR');
         return { finalDecision: 'FILTERED', filterReason: `Erreur: ${error.message}` };
     }
 }
@@ -434,17 +512,21 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
             throw new Error('Timeframe invalide');
         }
         if (!data || !Array.isArray(data) || data.length === 0) {
-            console.log(`⚠️ [SIGNAL_DEBUG] Données vides pour ${timeframe}`);
+            log(`⚠️ [SIGNAL_DEBUG] ${timeframe} - Données vides pour ${symbol}`, 'DEBUG');
             return { signal: 'NEUTRAL', reason: 'Données vides', signalIndex: -1 };
         }
+        
+        log(`🔍 [SIGNAL_DEBUG] ${timeframe} - Recherche signal dans ${data.length} bougies pour ${symbol}`, 'DEBUG');
         
         // Optimisation : analyser seulement les 100 dernières bougies pour éviter les boucles infinies
         const startIndex = Math.max(50, data.length - 100);
         let lastSignal = null;
         let lastSignalIndex = -1;
+        let analysisCount = 0;
         
         // Validation des indices
         if (startIndex >= data.length) {
+            log(`⚠️ [SIGNAL_DEBUG] ${timeframe} - Index invalide: ${startIndex} >= ${data.length}`, 'DEBUG');
             return { signal: 'NEUTRAL', reason: 'Index invalide', signalIndex: -1 };
         }
         
@@ -454,11 +536,13 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
             
             // Protection contre les boucles infinies
             if (iterationCount > maxIterations) {
+                log(`⚠️ [SIGNAL_DEBUG] ${timeframe} - Arrêt par limite d'itérations (${maxIterations})`, 'DEBUG');
                 break;
             }
             
             // Protection contre l'exécution trop longue
             if (Date.now() - startTime > maxExecutionTime) {
+                log(`⚠️ [SIGNAL_DEBUG] ${timeframe} - Arrêt par timeout (${maxExecutionTime}ms)`, 'DEBUG');
                 break;
             }
             
@@ -473,17 +557,25 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
             }
             
             try {
+                analysisCount++;
                 const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
+                
+                // Log pour les premières analyses
+                if (analysisCount <= 3) {
+                    log(`🔍 [SIGNAL_DEBUG] ${timeframe} - Analyse ${analysisCount} à l'index ${i}: ${analysis?.signal || 'NULL'}`, 'DEBUG');
+                }
                 
                 // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
                 if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH')) {
                     lastSignal = analysis;
                     lastSignalIndex = i;
-                    // Debug: Log du signal détecté
-                    log(`🔍 [SIGNAL_SEARCH] ${timeframe} - Signal détecté à l'index ${i}: ${analysis.signal}`, 'DEBUG');
+                    log(`✅ [SIGNAL_DEBUG] ${timeframe} - Signal détecté à l'index ${i}: ${analysis.signal}`, 'DEBUG');
                     break;
                 }
             } catch (analysisError) {
+                if (analysisCount <= 3) {
+                    log(`❌ [SIGNAL_DEBUG] ${timeframe} - Erreur analyse à l'index ${i}: ${analysisError.message}`, 'DEBUG');
+                }
                 continue;
             }
         }
@@ -492,12 +584,16 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         if (!lastSignal) {
             lastSignal = { signal: 'NEUTRAL', reason: 'Aucun signal clair trouvé' };
             lastSignalIndex = data.length - 1;
+            log(`⚠️ [SIGNAL_DEBUG] ${timeframe} - Aucun signal trouvé après ${analysisCount} analyses`, 'DEBUG');
+        } else {
+            log(`✅ [SIGNAL_DEBUG] ${timeframe} - Signal final: ${lastSignal.signal} (${analysisCount} analyses)`, 'DEBUG');
         }
         
         lastSignal.signalIndex = lastSignalIndex;
         return lastSignal;
         
     } catch (error) {
+        log(`❌ [SIGNAL_DEBUG] ${timeframe} - Erreur findLastSignalInTimeframe: ${error.message}`, 'ERROR');
         return { signal: 'NEUTRAL', reason: `Erreur: ${error.message}`, signalIndex: -1 };
     }
 }
@@ -1179,15 +1275,24 @@ async function runBacktestWithTradingLogic() {
         log(`📊 [BACKTEST] Symbole utilisé: ${symbol}`, 'INFO');
         
         // Parcourir les données historiques (échantillonnage configurable)
-        const sampleRate = backtestConfig.disableSampling ? 1 : Math.max(1, Math.floor(backtestData.length / 50));
+        let sampleRate = backtestConfig.disableSampling ? 1 : Math.max(1, Math.floor(backtestData.length / 50));
+        
+        // MODE DEBUG : Forcer l'analyse de chaque bougie
+        if (backtestConfig.forceDisableSampling || backtestConfig.debugMode) {
+            sampleRate = 1;
+            log(`🔧 [DEBUG_MODE] Échantillonnage forcé à 1 - Analyse de chaque bougie`, 'INFO');
+        }
         
         log(`📊 [BACKTEST] Configuration de l'échantillonnage:`, 'INFO');
         log(`📊 [BACKTEST] - disableSampling: ${backtestConfig.disableSampling}`, 'INFO');
+        log(`📊 [BACKTEST] - forceDisableSampling: ${backtestConfig.forceDisableSampling}`, 'INFO');
+        log(`📊 [BACKTEST] - debugMode: ${backtestConfig.debugMode}`, 'INFO');
+        log(`📊 [BACKTEST] - ignoreHigherTimeframes: ${backtestConfig.ignoreHigherTimeframes}`, 'INFO');
         log(`📊 [BACKTEST] - backtestData.length: ${backtestData.length}`, 'INFO');
         log(`📊 [BACKTEST] - sampleRate calculé: ${sampleRate}`, 'INFO');
         
-        if (backtestConfig.disableSampling) {
-            log(`📊 [BACKTEST] Échantillonnage DÉSACTIVÉ: analyse de chaque bougie`, 'INFO');
+        if (sampleRate === 1) {
+            log(`📊 [BACKTEST] Mode complet: analyse de chaque bougie`, 'INFO');
         } else {
             log(`📊 [BACKTEST] Échantillonnage: 1 analyse tous les ${sampleRate} bougies`, 'INFO');
         }
@@ -2143,3 +2248,100 @@ window.toggleTakeProfit = toggleTakeProfit;
 window.optimizeMACD = optimizeMACD;
 
 console.log('✅ Backtesting system loaded successfully');
+
+// NOUVELLES FONCTIONS DE DEBUG
+
+// Fonction pour activer le mode debug avec analyse complète
+function enableDebugMode() {
+    backtestConfig.debugMode = true;
+    backtestConfig.forceDisableSampling = true;
+    backtestConfig.ignoreHigherTimeframes = false;
+    log(`🔧 [DEBUG] Mode debug activé - Analyse complète avec logs détaillés`, 'INFO');
+}
+
+// Fonction pour activer le mode debug 15M seulement
+function enableDebugMode15mOnly() {
+    backtestConfig.debugMode = true;
+    backtestConfig.forceDisableSampling = true;
+    backtestConfig.ignoreHigherTimeframes = true;
+    log(`🔧 [DEBUG] Mode debug 15M seulement activé`, 'INFO');
+}
+
+// Fonction pour analyser les données MACD des timeframes supérieurs
+async function analyzeMACDData(symbol, timeframe, data, maxCandles = 10) {
+    if (!data || data.length === 0) {
+        log(`❌ [MACD_DEBUG] Pas de données pour ${timeframe}`, 'DEBUG');
+        return;
+    }
+    
+    log(`🔍 [MACD_DEBUG] === ANALYSE MACD ${timeframe} (${data.length} bougies) ===`, 'DEBUG');
+    
+    const sampleData = data.slice(-maxCandles); // Prendre les dernières bougies
+    let signalCounts = { BUY: 0, BULLISH: 0, BEARISH: 0, NEUTRAL: 0 };
+    
+    for (let i = 0; i < sampleData.length; i++) {
+        const testData = data.slice(0, data.length - sampleData.length + i + 1);
+        
+        if (testData.length < 50) continue;
+        
+        try {
+            const analysis = await analyzePairMACDForBacktest(symbol, timeframe, testData);
+            if (analysis && analysis.signal) {
+                signalCounts[analysis.signal] = (signalCounts[analysis.signal] || 0) + 1;
+                
+                if (i < 3) { // Log les 3 premiers
+                    log(`📊 [MACD_DEBUG] ${timeframe} échantillon ${i+1}: ${analysis.signal} (MACD: ${analysis.macd?.toFixed(4)}, Signal: ${analysis.signalLine?.toFixed(4)})`, 'DEBUG');
+                }
+            }
+        } catch (error) {
+            log(`❌ [MACD_DEBUG] Erreur analyse ${timeframe}: ${error.message}`, 'DEBUG');
+        }
+    }
+    
+    log(`📊 [MACD_DEBUG] ${timeframe} - Répartition des signaux:`, 'DEBUG');
+    Object.entries(signalCounts).forEach(([signal, count]) => {
+        if (count > 0) {
+            log(`  - ${signal}: ${count} (${((count/maxCandles)*100).toFixed(1)}%)`, 'DEBUG');
+        }
+    });
+    
+    const hasHaussier = signalCounts.BUY > 0 || signalCounts.BULLISH > 0;
+    log(`📊 [MACD_DEBUG] ${timeframe} - Signaux haussiers trouvés: ${hasHaussier ? 'OUI' : 'NON'}`, hasHaussier ? 'SUCCESS' : 'WARNING');
+}
+
+// Fonction pour diagnostiquer pourquoi le backtesting ne trouve pas de trades
+async function diagnoseBacktestIssues(symbol) {
+    log(`🔍 [DIAGNOSTIC] === DIAGNOSTIC BACKTESTING ${symbol} ===`, 'INFO');
+    
+    if (!backtestData || backtestData.length === 0) {
+        log(`❌ [DIAGNOSTIC] Pas de données de backtesting disponibles`, 'ERROR');
+        return;
+    }
+    
+    if (!extended4hData || extended4hData.length === 0) {
+        log(`❌ [DIAGNOSTIC] Pas de données 4H étendues`, 'ERROR');
+        return;
+    }
+    
+    if (!extended1hData || extended1hData.length === 0) {
+        log(`❌ [DIAGNOSTIC] Pas de données 1H étendues`, 'ERROR');
+        return;
+    }
+    
+    log(`📊 [DIAGNOSTIC] Données disponibles:`, 'INFO');
+    log(`  - 15M: ${backtestData.length} bougies`, 'INFO');
+    log(`  - 4H: ${extended4hData.length} bougies`, 'INFO');
+    log(`  - 1H: ${extended1hData.length} bougies`, 'INFO');
+    
+    // Analyser les MACD des timeframes supérieurs
+    await analyzeMACDData(symbol, '4h', extended4hData);
+    await analyzeMACDData(symbol, '1h', extended1hData);
+    await analyzeMACDData(symbol, '15m', backtestData);
+    
+    log(`🔍 [DIAGNOSTIC] === FIN DIAGNOSTIC ===`, 'INFO');
+}
+
+// Rendre les fonctions de debug accessibles globalement
+window.enableDebugMode = enableDebugMode;
+window.enableDebugMode15mOnly = enableDebugMode15mOnly;
+window.diagnoseBacktestIssues = diagnoseBacktestIssues;
