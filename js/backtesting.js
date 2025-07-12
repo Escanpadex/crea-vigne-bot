@@ -1232,56 +1232,74 @@ window.updateBacktestChart = function(symbol) {
     // Créer un ID unique pour éviter les conflits
     const uniqueId = 'tradingview_' + Date.now();
     
-    // Méthode alternative : utiliser le widget Symbol Overview avec graphique intégré
-    const widgetHtml = `
-        <div id="${uniqueId}" style="width: 100%; height: 100%;">
-            <div class="tradingview-widget-container" style="height: 100%; width: 100%;">
-                <div class="tradingview-widget-container__widget" style="height: calc(100% - 32px); width: 100%;"></div>
-                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-                {
-                    "symbols": [
-                        ["BINANCE:${symbol}|1D"]
-                    ],
-                    "chartOnly": false,
-                    "width": "100%",
-                    "height": "100%",
-                    "locale": "fr",
-                    "colorTheme": "light",
-                    "autosize": true,
-                    "showVolume": false,
-                    "showMA": false,
-                    "hideDateRanges": false,
-                    "hideMarketStatus": false,
-                    "hideSymbolLogo": false,
-                    "scalePosition": "right",
-                    "scaleMode": "Normal",
-                    "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-                    "fontSize": "10",
-                    "noTimeScale": false,
-                    "valuesTracking": "1",
-                    "changeMode": "price-and-percent",
-                    "chartType": "area",
-                    "maLineColor": "#2962FF",
-                    "maLineWidth": 1,
-                    "maLength": 9,
-                    "lineWidth": 2,
-                    "lineType": 0,
-                    "dateRanges": [
-                        "1d|1",
-                        "1m|30",
-                        "3m|60",
-                        "12m|1D",
-                        "60m|1W",
-                        "all|1M"
-                    ]
-                }
-                </script>
-            </div>
-        </div>
-    `;
+    // Vider le container pour éviter les conflits
+    container.innerHTML = '';
     
-    // Injecter le widget HTML
-    container.innerHTML = widgetHtml;
+    // Créer la structure de div dynamiquement
+    const widgetContainer = document.createElement('div');
+    widgetContainer.id = uniqueId;
+    widgetContainer.style.width = '100%';
+    widgetContainer.style.height = '100%';
+    
+    const innerContainer = document.createElement('div');
+    innerContainer.className = 'tradingview-widget-container';
+    innerContainer.style.height = '100%';
+    innerContainer.style.width = '100%';
+    
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container__widget';
+    widgetDiv.style.height = 'calc(100% - 32px)';
+    widgetDiv.style.width = '100%';
+    
+    innerContainer.appendChild(widgetDiv);
+    widgetContainer.appendChild(innerContainer);
+    container.appendChild(widgetContainer);
+    
+    // Créer et append le script dynamiquement
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+        "symbols": [
+            ["BINANCE:" + symbol + "|1D"]
+        ],
+        "chartOnly": false,
+        "width": "100%",
+        "height": "100%",
+        "locale": "fr",
+        "colorTheme": "light",
+        "autosize": true,
+        "showVolume": false,
+        "showMA": false,
+        "hideDateRanges": false,
+        "hideMarketStatus": false,
+        "hideSymbolLogo": false,
+        "scalePosition": "right",
+        "scaleMode": "Normal",
+        "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+        "fontSize": "10",
+        "noTimeScale": false,
+        "valuesTracking": "1",
+        "changeMode": "price-and-percent",
+        "chartType": "area",
+        "maLineColor": "#2962FF",
+        "maLineWidth": 1,
+        "maLength": 9,
+        "lineWidth": 2,
+        "lineType": 0,
+        "dateRanges": [
+            "1d|1",
+            "1m|30",
+            "3m|60",
+            "12m|1D",
+            "60m|1W",
+            "all|1M"
+        ]
+    });
+    
+    // Append le script au container intérieur (ou au body si besoin)
+    innerContainer.appendChild(script);
     
     console.log('✅ [CHART] Widget Symbol Overview créé avec succès');
     
