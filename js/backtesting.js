@@ -33,7 +33,7 @@ let backtestInterval = null;
 let equityChart = null;
 let backtestTradingViewWidget = null;
 let precisionData = [];  // Nouvelle variable globale pour stocker toutes les bougies de précision (ex. 3m) pré-chargées
-let lightweightChart = null;  // Nouvelle variable globale pour le chart Lightweight Charts
+// Variable supprimée : lightweightChart (plus nécessaire avec TradingView)
 
 // Configuration du backtesting (simplifiée)
 let backtestConfig = {
@@ -188,22 +188,12 @@ function cleanupBacktestingVariables() {
             equityChart = null;
         }
         
-        // Nettoyer le graphique Lightweight Charts
-        if (lightweightChart) {
-            try {
-                lightweightChart.remove();
-            } catch (chartError) {
-                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique Lightweight Charts:', chartError);
-            }
-            lightweightChart = null;
-        }
-        
         // Nettoyer le graphique TradingView
         if (backtestTradingViewWidget) {
             try {
                 backtestTradingViewWidget.remove();
-            } catch (tvError) {
-                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', tvError);
+            } catch (chartError) {
+                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', chartError);
             }
             backtestTradingViewWidget = null;
         }
@@ -1271,9 +1261,9 @@ window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
 
-// Nouvelle fonction pour mettre à jour le graphique avec Lightweight Charts
+// Fonction simple pour créer un graphique TradingView de base
 window.updateBacktestChart = function(symbol) {
-    console.log(`🚀 [CHART] Création graphique Lightweight Charts pour ${symbol}`);
+    console.log(`🚀 [CHART] Création graphique TradingView simple pour ${symbol}`);
     
     const containerId = 'backtestTradingViewChart';
     const container = document.getElementById(containerId);
@@ -1298,259 +1288,98 @@ window.updateBacktestChart = function(symbol) {
     }
     
     // Nettoyer le graphique existant
-    if (lightweightChart) {
+    if (backtestTradingViewWidget) {
         try {
-            if (typeof lightweightChart.remove === 'function') {
-                lightweightChart.remove();
-                console.log('✅ [CHART] Graphique précédent supprimé');
-            } else {
-                console.warn('⚠️ [CHART] lightweightChart.remove n\'est pas une fonction, saut de la suppression');
-            }
+            backtestTradingViewWidget.remove();
+            console.log('✅ [CHART] Widget TradingView précédent supprimé');
         } catch (error) {
-            console.warn('⚠️ [CHART] Erreur lors de la suppression du graphique précédent:', error);
+            console.warn('⚠️ [CHART] Erreur lors de la suppression du widget TradingView:', error);
         }
-        lightweightChart = null;
+        backtestTradingViewWidget = null;
     }
     
     // Vider le container pour éviter les conflits
     container.innerHTML = '';
     
-    // Vérifier et charger Lightweight Charts
-    console.log('🔍 [CHART] Vérification de LightweightCharts:', typeof LightweightCharts);
-    console.log('🔍 [CHART] window.LightweightCharts:', typeof window.LightweightCharts);
-    
-    // Vérifier si Lightweight Charts est disponible
-    const LightweightChartsLib = window.LightweightCharts || LightweightCharts;
-    
-    if (typeof LightweightChartsLib === 'undefined') {
-        console.log('📦 [CHART] Chargement dynamique de Lightweight Charts...');
-        
-        // Supprimer les anciens scripts pour éviter les conflits
-        const existingScripts = document.querySelectorAll('script[src*="lightweight-charts"]');
-        existingScripts.forEach(script => script.remove());
-        
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
-        script.onload = () => {
-            console.log('✅ [CHART] Lightweight Charts chargé dynamiquement');
-            // Attendre que la bibliothèque soit vraiment disponible
-            setTimeout(() => {
-                if (typeof window.LightweightCharts !== 'undefined') {
-                    createLightweightChart(symbol, container);
-                } else {
-                    console.error('❌ [CHART] Lightweight Charts non disponible après chargement');
-                    container.innerHTML = `<div style="text-align: center; padding: 50px;">
-                        <div>❌ Impossible de charger Lightweight Charts</div>
-                        <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            🔄 Réessayer
-                        </button>
-                    </div>`;
-                }
-            }, 500);
-        };
-        script.onerror = () => {
-            console.error('❌ [CHART] Erreur de chargement dynamique');
-            container.innerHTML = `<div style="text-align: center; padding: 50px;">
-                <div>❌ Erreur de chargement du CDN Lightweight Charts</div>
-                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    🔄 Réessayer
-                </button>
-            </div>`;
-        };
-        document.head.appendChild(script);
-    } else {
-        console.log('✅ [CHART] Lightweight Charts déjà disponible');
-        createLightweightChart(symbol, container);
-    }
+    // Créer le widget TradingView simple
+    createSimpleTradingViewChart(symbol, container);
 };
 
-// Nouvelle fonction pour créer le graphique Lightweight Charts
-async function createLightweightChart(symbol, container) {
+// Fonction simple pour créer un graphique TradingView de base
+function createSimpleTradingViewChart(symbol, container) {
     try {
-        console.log(`🚀 [CHART] Création du graphique Lightweight Charts pour ${symbol}`);
+        console.log(`🚀 [CHART] Création du graphique TradingView simple pour ${symbol}`);
         
-        // Vérifier que la bibliothèque est chargée
-        const LightweightChartsLib = window.LightweightCharts || LightweightCharts;
-        
-        if (typeof LightweightChartsLib === 'undefined') {
-            throw new Error('Lightweight Charts library not loaded');
+        // Vérifier que TradingView est disponible
+        if (typeof TradingView === 'undefined') {
+            console.error('❌ [CHART] TradingView non disponible');
+            container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
+                    <div>TradingView non disponible</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Veuillez vérifier la connexion internet</div>
+                </div>
+            </div>`;
+            return;
         }
         
-        console.log('✅ [CHART] LightweightCharts détecté:', typeof LightweightChartsLib);
-        console.log('🔍 [CHART] Méthodes disponibles:', Object.getOwnPropertyNames(LightweightChartsLib));
+        // Créer un ID unique pour le widget
+        const widgetId = `tradingview_${Date.now()}`;
+        container.innerHTML = `<div id="${widgetId}" style="width: 100%; height: 500px;"></div>`;
         
-        // Debug: Vérifier les types de séries disponibles
-        console.log('🔍 [CHART] CandlestickSeries disponible:', !!LightweightChartsLib.CandlestickSeries);
-        console.log('🔍 [CHART] HistogramSeries disponible:', !!LightweightChartsLib.HistogramSeries);
-        console.log('🔍 [CHART] createChart disponible:', !!LightweightChartsLib.createChart);
+        // Configuration du widget TradingView
+        const widgetConfig = {
+            autosize: true,
+            symbol: `BINANCE:${symbol}`,
+            interval: "15",
+            timezone: "Etc/UTC",
+            theme: "light",
+            style: "1",
+            locale: "fr",
+            toolbar_bg: "#f1f3f6",
+            enable_publishing: false,
+            allow_symbol_change: true,
+            container_id: widgetId,
+            hide_side_toolbar: true,
+            hide_top_toolbar: false,
+            hide_legend: false,
+            save_image: false,
+            studies: [
+                "MACD@tv-basicstudies"
+            ],
+            backgroundColor: "#ffffff",
+            gridColor: "#e1e1e1",
+            upColor: "#26a69a",
+            downColor: "#ef5350",
+            borderUpColor: "#26a69a",
+            borderDownColor: "#ef5350",
+            wickUpColor: "#26a69a",
+            wickDownColor: "#ef5350"
+        };
         
-        // Créer le graphique avec la bonne API
-        const chart = LightweightChartsLib.createChart(container, {
-            width: container.clientWidth,
-            height: 500,
-            layout: {
-                backgroundColor: '#ffffff',
-                textColor: '#333',
-            },
-            grid: {
-                vertLines: {
-                    color: '#e1e1e1',
-                },
-                horzLines: {
-                    color: '#e1e1e1',
-                },
-            },
-            crosshair: {
-                mode: LightweightChartsLib.CrosshairMode.Normal,
-            },
-            rightPriceScale: {
-                borderColor: '#cccccc',
-            },
-            timeScale: {
-                borderColor: '#cccccc',
-                timeVisible: true,
-                secondsVisible: false,
-            },
+        // Créer le widget
+        backtestTradingViewWidget = new TradingView.widget(widgetConfig);
+        
+        console.log('✅ [CHART] Widget TradingView créé avec succès');
+        
+        // Attendre que le widget soit chargé
+        backtestTradingViewWidget.onChartReady(() => {
+            console.log('✅ [CHART] Graphique TradingView prêt');
         });
         
-        console.log('✅ [CHART] Graphique créé:', chart);
-        lightweightChart = chart;
-        
-        // Ajouter la série de bougies avec gestion d'erreur
-        let candleSeries;
-        try {
-            if (typeof chart.addSeries === 'function') {
-                // Access the series types from the global LightweightCharts object
-                console.log('🔍 [CHART] Type de CandlestickSeries:', typeof LightweightChartsLib.CandlestickSeries);
-                
-                let candlestickType = LightweightChartsLib.CandlestickSeries;
-                if (typeof candlestickType === 'function') {
-                    candlestickType = candlestickType();  // Call if it's a factory function
-                }
-                
-                if (!candlestickType) {
-                    throw new Error('CandlestickSeries non disponible dans la bibliothèque');
-                }
-                
-                console.log('🔧 [CHART] Tentative de création de série candlestick...');
-                candleSeries = chart.addSeries(candlestickType, {
-                    upColor: '#26a69a',
-                    downColor: '#ef5350',
-                    borderVisible: false,
-                    wickUpColor: '#26a69a',
-                    wickDownColor: '#ef5350',
-                });
-            } else {
-                throw new Error('Méthode addSeries non disponible. Vérifiez le chargement de la bibliothèque.');
-            }
-        } catch (seriesError) {
-            console.error('❌ [CHART] Erreur création série de bougies:', seriesError);
-            throw seriesError;
-        }
-        
-        // Stocker la référence pour les marqueurs
-        chart.candleSeries = candleSeries;
-        
-        console.log('✅ [CHART] Série de bougies ajoutée');
-        
-        // Ajouter la série MACD (histogramme) - optionnel
-        let macdSeries = null;
-        try {
-            console.log('🔍 [CHART] Type de HistogramSeries:', typeof LightweightChartsLib.HistogramSeries);
-            let histogramType = LightweightChartsLib.HistogramSeries;
-            if (typeof histogramType === 'function') {
-                histogramType = histogramType();
-            }
-            if (histogramType) {
-                macdSeries = chart.addSeries(histogramType, {
-                    color: '#26a69a',
-                    priceFormat: {
-                        type: 'volume',
-                    },
-                    priceScaleId: 'left',
-                    scaleMargins: {
-                        top: 0.8,
-                        bottom: 0,
-                    },
-                });
-                console.log('✅ [CHART] Série MACD ajoutée');
-            }
-        } catch (macdError) {
-            console.warn('⚠️ [CHART] Impossible d\'ajouter la série MACD:', macdError);
-        }
-        
-        // Charger les données historiques
-        console.log('📊 [CHART] Chargement des données historiques...');
-        const data = await getBinanceKlineData(symbol, 500, '15m');
-        
-        if (data.length === 0) {
-            throw new Error('Aucune donnée historique disponible');
-        }
-        
-        // Convertir les données pour Lightweight Charts
-        const chartData = data.map(candle => ({
-            time: Math.floor(candle.timestamp / 1000),
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-        }));
-        
-        candleSeries.setData(chartData);
-        
-        // Calculer et ajouter le MACD si la série existe
-        if (macdSeries) {
-            const prices = data.map(candle => candle.close);
-            const macd = calculateMACD(prices);
-            
-            if (macd && macd.delta) {
-                const macdData = macd.delta.map((delta, index) => {
-                    if (index < data.length && delta !== null && delta !== undefined) {
-                        return {
-                            time: Math.floor(data[index].timestamp / 1000),
-                            value: delta,
-                            color: delta > 0 ? '#26a69a' : '#ef5350',
-                        };
-                    }
-                    return null;
-                }).filter(item => item !== null);
-                
-                macdSeries.setData(macdData);
-                console.log(`✅ [CHART] MACD ajouté avec ${macdData.length} points`);
-            }
-        }
-        
-        // Ajuster la vue
-        chart.timeScale().fitContent();
-        
-        console.log(`✅ [CHART] Graphique créé avec ${chartData.length} bougies`);
-        
     } catch (error) {
-        console.error('❌ [CHART] Erreur lors de la création du graphique:', error);
+        console.error('❌ [CHART] Erreur lors de la création du graphique TradingView:', error);
         
-        // Afficher l'erreur mais ne pas utiliser le fallback simplifié
         container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
             <div style="text-align: center;">
                 <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
-                <div>Erreur de chargement du graphique Lightweight Charts</div>
+                <div>Erreur de chargement du graphique TradingView</div>
                 <div style="font-size: 12px; color: #999; margin-top: 5px;">Erreur: ${error.message}</div>
-                <button onclick="testLightweightCharts()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    🧪 Tester Lightweight Charts
-                </button>
-                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; margin-left: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
                     🔄 Réessayer
                 </button>
             </div>
         </div>`;
-        
-        // Créer un objet minimal pour éviter les erreurs
-        lightweightChart = {
-            candleSeries: {
-                setMarkers: function(markers) {
-                    console.log(`📊 [CHART] ${markers.length} marqueurs ignorés (graphique en erreur)`);
-                }
-            }
-        };
     }
 }
 
@@ -1558,13 +1387,13 @@ async function createLightweightChart(symbol, container) {
 
 // Fonction addSimpleMarkers supprimée - plus nécessaire
 
-// Nouvelle fonction pour ajouter les marqueurs de trades
+// Fonction simplifiée pour ajouter les marqueurs de trades (TradingView)
 function addTradeMarkersToChart() {
     try {
-        console.log('🎯 [CHART] Ajout des marqueurs de trades...');
+        console.log('🎯 [CHART] Ajout des marqueurs de trades sur TradingView...');
         
-        if (!lightweightChart) {
-            console.warn('⚠️ [CHART] Graphique non disponible pour les marqueurs');
+        if (!backtestTradingViewWidget) {
+            console.warn('⚠️ [CHART] Widget TradingView non disponible pour les marqueurs');
             return;
         }
         
@@ -1573,136 +1402,41 @@ function addTradeMarkersToChart() {
             return;
         }
         
-        // Récupérer la série de bougies - nouvelle approche
-        // Stocker la référence à la série de bougies lors de sa création
-        if (!lightweightChart.candleSeries) {
-            console.warn('⚠️ [CHART] Série de bougies non disponible pour les marqueurs');
-            return;
-        }
-        
-        const candleSeries = lightweightChart.candleSeries;
-        const trades = backtestResults.trades;
-        
-        // Limiter à 100 marqueurs max pour éviter la surcharge
-        const maxMarkers = 100;
-        const tradesToShow = trades.length > maxMarkers ? trades.slice(0, maxMarkers) : trades;
-        
-        console.log(`📊 [CHART] Ajout de ${tradesToShow.length} trades (sur ${trades.length} total)`);
-        
-        const markers = [];
-        
-        tradesToShow.forEach((trade, index) => {
-            // Marqueur d'entrée (flèche verte vers le haut)
-            markers.push({
-                time: Math.floor(trade.entryTime / 1000),
-                position: 'belowBar',
-                color: '#26a69a',
-                shape: 'arrowUp',
-                text: `📈 LONG @ ${trade.entryPrice.toFixed(4)}`,
-                size: 1,
-            });
-            
-            // Marqueur de sortie (flèche rouge vers le bas)
-            const pnlColor = trade.pnl > 0 ? '#26a69a' : '#ef5350';
-            const pnlSign = trade.pnl > 0 ? '+' : '';
-            
-            markers.push({
-                time: Math.floor(trade.exitTime / 1000),
-                position: 'aboveBar',
-                color: pnlColor,
-                shape: 'arrowDown',
-                text: `📉 ${trade.exitReason} @ ${trade.exitPrice.toFixed(4)} (${pnlSign}${trade.pnlPercent.toFixed(2)}%)`,
-                size: 1,
-            });
-        });
-        
-        // Ajouter tous les marqueurs à la série
-        candleSeries.setMarkers(markers);
-        
-        console.log(`✅ [CHART] ${markers.length} marqueurs ajoutés avec succès`);
-        
-        if (trades.length > maxMarkers) {
-            console.log(`ℹ️ [CHART] ${trades.length - maxMarkers} trades supplémentaires non affichés (limite: ${maxMarkers})`);
-        }
+        // Note: TradingView ne permet pas d'ajouter des marqueurs personnalisés 
+        // via l'API publique du widget. Les marqueurs sont gérés par le backtesting.
+        console.log(`📊 [CHART] ${backtestResults.trades.length} trades disponibles dans les résultats`);
         
     } catch (error) {
         console.error('❌ [CHART] Erreur lors de l\'ajout des marqueurs:', error);
     }
 }
 
-// Fonction de test pour diagnostiquer les problèmes Lightweight Charts
-function testLightweightCharts() {
-    console.log('🧪 [TEST] === DIAGNOSTIC LIGHTWEIGHT CHARTS ===');
-    console.log('🔍 [TEST] typeof LightweightCharts:', typeof LightweightCharts);
-    console.log('🔍 [TEST] typeof window.LightweightCharts:', typeof window.LightweightCharts);
+// Fonction de test simplifiée pour TradingView
+function testTradingViewWidget() {
+    console.log('🧪 [TEST] === DIAGNOSTIC TRADINGVIEW ===');
+    console.log('🔍 [TEST] typeof TradingView:', typeof TradingView);
     
-    const lib = window.LightweightCharts || LightweightCharts;
-    if (lib) {
-        console.log('✅ [TEST] Bibliothèque trouvée');
-        console.log('📊 [TEST] Méthodes disponibles:', Object.getOwnPropertyNames(lib));
+    if (typeof TradingView !== 'undefined') {
+        console.log('✅ [TEST] TradingView disponible');
+        console.log('📊 [TEST] Version:', TradingView.version || 'Non disponible');
         
-        // Test de création d'un graphique simple
-        const testContainer = document.createElement('div');
-        testContainer.style.width = '400px';
-        testContainer.style.height = '300px';
-        
-        try {
-            const testChart = lib.createChart(testContainer, { width: 400, height: 300 });
-            console.log('✅ [TEST] Graphique créé avec succès');
-            console.log('📊 [TEST] Méthodes du graphique:', Object.getOwnPropertyNames(testChart));
-            
-            if (typeof testChart.addCandlestickSeries === 'function') {
-                console.log('✅ [TEST] addCandlestickSeries disponible');
-                
-                // Test d'ajout de série
-                const series = testChart.addCandlestickSeries();
-                console.log('✅ [TEST] Série créée avec succès');
-                console.log('📊 [TEST] Méthodes de la série:', Object.getOwnPropertyNames(series));
-                
-                if (typeof series.setMarkers === 'function') {
-                    console.log('✅ [TEST] setMarkers disponible');
-                } else {
-                    console.log('❌ [TEST] setMarkers non disponible');
-                }
-                
-            } else {
-                console.log('❌ [TEST] addCandlestickSeries non disponible');
-            }
-            
-            // Nettoyer
-            testChart.remove();
-            
-            // Forcer la recréation du graphique actuel
-            const chartSymbol = document.getElementById('chartSymbol');
-            if (chartSymbol && chartSymbol.value) {
-                const symbol = chartSymbol.value.includes(':') ? 
-                    chartSymbol.value.split(':')[1] : 
-                    chartSymbol.value;
-                console.log('🔄 [TEST] Recréation du graphique pour', symbol);
-                setTimeout(() => window.updateBacktestChart(symbol), 1000);
-            }
-            
-        } catch (error) {
-            console.error('❌ [TEST] Erreur création graphique:', error);
+        // Test de recréation du graphique
+        const chartSymbol = document.getElementById('chartSymbol');
+        if (chartSymbol && chartSymbol.value) {
+            const symbol = chartSymbol.value.includes(':') ? 
+                chartSymbol.value.split(':')[1] : 
+                chartSymbol.value;
+            console.log('🔄 [TEST] Recréation du graphique pour', symbol);
+            setTimeout(() => window.updateBacktestChart(symbol), 1000);
         }
     } else {
-        console.error('❌ [TEST] Bibliothèque non trouvée');
-        console.log('🔄 [TEST] Tentative de rechargement...');
-        
-        // Forcer le rechargement de la bibliothèque
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
-        script.onload = () => {
-            console.log('✅ [TEST] Bibliothèque rechargée');
-            setTimeout(testLightweightCharts, 500);
-        };
-        document.head.appendChild(script);
+        console.error('❌ [TEST] TradingView non disponible');
     }
     console.log('🧪 [TEST] === FIN DIAGNOSTIC ===');
 }
 
 // Rendre la fonction de test accessible globalement
-window.testLightweightCharts = testLightweightCharts;
+window.testTradingViewWidget = testTradingViewWidget;
 
 // Fonction pour initialiser la case à cocher Take Profit
 function initializeTakeProfitToggle() {
