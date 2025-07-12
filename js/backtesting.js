@@ -288,11 +288,18 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                                        !signalState.lastChecked || 
                                        (currentTime - signalState.lastChecked) > getTimeframeMinutes(timeframe) * 60 * 1000;
         
+        console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: shouldCheckForNewSignal = ${shouldCheckForNewSignal}`);
+        console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: signalState.signal = ${signalState.signal}`);
+        console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: signalState.lastChecked = ${signalState.lastChecked ? new Date(signalState.lastChecked).toISOString() : 'null'}`);
+        console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: currentTime = ${new Date(currentTime).toISOString()}`);
+        
         if (shouldCheckForNewSignal) {
             console.log(`🔍 [PERSISTENT_DEBUG] Recherche de nouveau signal ${timeframe} (dernière vérification: ${signalState.lastChecked ? new Date(signalState.lastChecked).toISOString() : 'jamais'})`);
             
             // Chercher le dernier signal dans les données étendues
             const lastSignalData = await findLastSignalInTimeframe(symbol, timeframe, filteredData);
+            
+            console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: lastSignalData reçu:`, lastSignalData);
             
             // Mettre à jour l'état persistant
             signalState.signal = lastSignalData.signal;
@@ -301,25 +308,33 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
             signalState.lastChecked = currentTime;
             
             console.log(`📊 [PERSISTENT_DEBUG] ${timeframe}: Signal trouvé = ${signalState.signal}, Index = ${signalState.index}`);
+            console.log(`📊 [PERSISTENT_DEBUG] ${timeframe}: État persistant mis à jour:`, signalState);
         } else {
             console.log(`📊 [PERSISTENT_DEBUG] ${timeframe}: Utilisation du signal en mémoire = ${signalState.signal}`);
         }
         
         // Logique de décision basée sur le signal persistant
+        console.log(`🔍 [PERSISTENT_DEBUG] ${timeframe}: Évaluation du signal: ${signalState.signal}`);
+        
         if (signalState.signal === 'BUY' || signalState.signal === 'BULLISH') {
             console.log(`✅ [PERSISTENT_DEBUG] ${timeframe}: Signal haussier valide (${signalState.signal})`);
-            return {
+            const result = {
                 isValidForTrading: true,
                 reason: `Signal ${timeframe} haussier: ${signalState.signal}`,
                 signal: signalState.signal,
                 timestamp: signalState.timestamp
             };
+            console.log(`✅ [PERSISTENT_DEBUG] ${timeframe}: Retour de résultat haussier:`, result);
+            return result;
         } else if (signalState.signal === 'BEARISH') {
             // Implémenter le système de "waiting" pour les signaux baissiers
             console.log(`⏳ [PERSISTENT_DEBUG] ${timeframe}: Signal baissier détecté, recherche d'un nouveau signal haussier`);
+            console.log(`⏳ [PERSISTENT_DEBUG] ${timeframe}: Recherche depuis l'index ${signalState.index} dans ${filteredData.length} bougies`);
             
             // Chercher un nouveau signal haussier depuis le dernier signal baissier
             const newBullishSignal = await checkForNewBullishSignal(symbol, timeframe, filteredData, signalState.index);
+            
+            console.log(`⏳ [PERSISTENT_DEBUG] ${timeframe}: newBullishSignal reçu:`, newBullishSignal);
             
             if (newBullishSignal) {
                 console.log(`✅ [PERSISTENT_DEBUG] ${timeframe}: Nouveau signal haussier trouvé après signal baissier`);
@@ -328,30 +343,36 @@ async function managePersistentSignal(symbol, timeframe, currentTime) {
                 signalState.timestamp = newBullishSignal.timestamp || currentTime;
                 signalState.index = newBullishSignal.signalIndex;
                 
-                return {
+                const result = {
                     isValidForTrading: true,
                     reason: `Nouveau signal ${timeframe} haussier après signal baissier: ${newBullishSignal.signal}`,
                     signal: newBullishSignal.signal,
                     timestamp: signalState.timestamp
                 };
+                console.log(`✅ [PERSISTENT_DEBUG] ${timeframe}: Retour de nouveau signal haussier:`, result);
+                return result;
             } else {
                 console.log(`❌ [PERSISTENT_DEBUG] ${timeframe}: En attente d'un signal haussier (dernier signal: ${signalState.signal})`);
-                return {
+                const result = {
                     isValidForTrading: false,
                     reason: `En attente d'un signal haussier ${timeframe} (dernier signal: ${signalState.signal})`,
                     signal: signalState.signal,
                     timestamp: signalState.timestamp
                 };
+                console.log(`❌ [PERSISTENT_DEBUG] ${timeframe}: Retour d'attente:`, result);
+                return result;
             }
         } else {
             // Signal NEUTRAL ou autre
             console.log(`⚠️ [PERSISTENT_DEBUG] ${timeframe}: Signal neutre ou inconnu (${signalState.signal})`);
-            return {
+            const result = {
                 isValidForTrading: false,
                 reason: `Signal ${timeframe} neutre ou inconnu: ${signalState.signal}`,
                 signal: signalState.signal,
                 timestamp: signalState.timestamp
             };
+            console.log(`⚠️ [PERSISTENT_DEBUG] ${timeframe}: Retour de signal neutre:`, result);
+            return result;
         }
         
     } catch (error) {
@@ -415,10 +436,13 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
         console.log(`📊 [STATEFUL_DEBUG] 15M: Signal = ${analysis15m.signal}, Crossover = ${analysis15m.crossover}`);
         
         // DÉCISION FINALE : Critères assouplis pour permettre plus de trades
+        console.log(`🔍 [STATEFUL_DEBUG] DÉCISION FINALE - Configuration allowBullishTrades: ${backtestConfig.allowBullishTrades}`);
+        console.log(`🔍 [STATEFUL_DEBUG] DÉCISION FINALE - Signal 15M: ${analysis15m.signal}, Crossover: ${analysis15m.crossover}`);
+        
         if (analysis15m.signal === 'BUY' && analysis15m.crossover) {
             results.finalDecision = 'BUY';
             results.finalReason = `4H et 1H haussiers + signal BUY 15M avec croisement détecté`;
-            console.log(`✅ [STATEFUL_DEBUG] Signal BUY validé: ${results.finalReason}`);
+            console.log(`✅ [STATEFUL_DEBUG] Signal BUY validé (strict): ${results.finalReason}`);
         } else if (backtestConfig.allowBullishTrades && (analysis15m.signal === 'BULLISH' || analysis15m.signal === 'BUY')) {
             results.finalDecision = 'BUY';
             results.finalReason = `4H et 1H haussiers + signal 15M haussier (critères assouplis)`;
@@ -432,6 +456,9 @@ async function analyzeMultiTimeframeForBacktest(symbol, historicalData, candleIn
             results.filterReason = `15M non haussier: ${analysis15m.signal}`;
             console.log(`❌ [STATEFUL_DEBUG] Filtré au 15M: ${analysis15m.signal}`);
         }
+        
+        console.log(`🔍 [STATEFUL_DEBUG] RÉSULTAT FINAL: ${results.finalDecision} - ${results.finalReason || results.filterReason}`);
+        console.log(`🔍 [STATEFUL_DEBUG] RÉSULTATS COMPLETS:`, results);
         
         return results;
         
@@ -469,6 +496,8 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         let lastSignal = null;
         let lastSignalIndex = -1;
         
+        console.log(`🔍 [SIGNAL_DEBUG] ${timeframe}: Recherche du dernier signal de l'index ${startIndex} à ${data.length - 1}`);
+        
         // Validation des indices
         if (startIndex >= data.length) {
             console.log(`⚠️ [SIGNAL_DEBUG] Index de départ invalide pour ${timeframe}`);
@@ -478,6 +507,8 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
         // Parcourir les données de la fin vers le début (optimisé et sécurisé)
         for (let i = data.length - 1; i >= startIndex; i -= 5) { // Pas de 5 pour optimiser
             iterationCount++;
+            
+            console.log(`🔍 [SIGNAL_DEBUG] ${timeframe}: Analyse à l'index ${i} (itération ${iterationCount})`);
             
             // Protection contre les boucles infinies
             if (iterationCount > maxIterations) {
@@ -498,16 +529,22 @@ async function findLastSignalInTimeframe(symbol, timeframe, data) {
             }
             
             const subData = data.slice(0, i + 1);
-            if (subData.length < 50) continue;
+            if (subData.length < 50) {
+                console.log(`⚠️ [SIGNAL_DEBUG] ${timeframe}: Données insuffisantes à l'index ${i} (${subData.length} bougies)`);
+                continue;
+            }
             
             try {
                 const analysis = await analyzePairMACDForBacktest(symbol, timeframe, subData);
+                
+                console.log(`🔍 [SIGNAL_DEBUG] ${timeframe}: Analyse à l'index ${i} = ${analysis?.signal || 'NULL'}`);
                 
                 // Si on trouve un signal clair (BUY, BULLISH, ou BEARISH), c'est le dernier signal
                 if (analysis && analysis.signal && (analysis.signal === 'BUY' || analysis.signal === 'BULLISH' || analysis.signal === 'BEARISH')) {
                     lastSignal = analysis;
                     lastSignalIndex = i;
                     console.log(`✅ [SIGNAL_DEBUG] Dernier signal ${timeframe} trouvé: ${analysis.signal} à l'index ${i} (${iterationCount} itérations)`);
+                    console.log(`✅ [SIGNAL_DEBUG] ${timeframe}: Détails du signal:`, analysis);
                     break;
                 }
             } catch (analysisError) {
@@ -681,22 +718,36 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
         const macdAboveSignal = latest.macd > latest.signal;
         const histogramPositive = latest.histogram > 0;
         
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: MACD Analysis`);
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: latest.macd=${latest.macd.toFixed(6)}, latest.signal=${latest.signal.toFixed(6)}, latest.histogram=${latest.histogram.toFixed(6)}`);
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: previous.macd=${previous.macd.toFixed(6)}, previous.signal=${previous.signal.toFixed(6)}, previous.histogram=${previous.histogram.toFixed(6)}`);
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: earlier.histogram=${earlier.histogram.toFixed(6)}`);
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: crossover=${crossover}, histogramImproving=${histogramImproving}, macdAboveSignal=${macdAboveSignal}, histogramPositive=${histogramPositive}`);
+        
         let signal = 'NEUTRAL';
         let reason = '';
         
         if (crossover && histogramPositive && histogramImproving) {
             signal = 'BUY';
             reason = `Croisement MACD + Histogram>0 + Tendance IMPROVING (${timeframe})`;
+            console.log(`✅ [MACD_DEBUG] ${symbol} ${timeframe}: BUY signal detected!`);
         } else if (macdAboveSignal && histogramPositive && histogramImproving) {
             signal = 'BULLISH';
             reason = `MACD>Signal + Histogram>0 + Tendance IMPROVING (${timeframe})`;
+            console.log(`📈 [MACD_DEBUG] ${symbol} ${timeframe}: BULLISH signal detected (improving)`);
         } else if (macdAboveSignal && histogramPositive) {
             signal = 'BULLISH';
             reason = `MACD>Signal + Histogram>0 (${timeframe})`;
+            console.log(`📈 [MACD_DEBUG] ${symbol} ${timeframe}: BULLISH signal detected (basic)`);
         } else if (latest.macd < latest.signal) {
             signal = 'BEARISH';
             reason = `MACD<Signal (${timeframe})`;
+            console.log(`📉 [MACD_DEBUG] ${symbol} ${timeframe}: BEARISH signal detected`);
+        } else {
+            console.log(`⚪ [MACD_DEBUG] ${symbol} ${timeframe}: NEUTRAL signal - no clear trend`);
         }
+        
+        console.log(`🔍 [MACD_DEBUG] ${symbol} ${timeframe}: Final signal = ${signal}, reason = ${reason}`);
         
         return {
             symbol,
@@ -718,24 +769,30 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
 
 // FONCTION CORRIGÉE : Extraire et agréger les données pour un timeframe spécifique
 function getTimeframeData(historicalData, targetTimeframe) {
+    console.log(`🔍 [TIMEFRAME_DEBUG] getTimeframeData appelé: ${targetTimeframe}`);
+    
     if (!historicalData || historicalData.length === 0) {
-        console.log(`❌ [DEBUG] Données historiques vides pour ${targetTimeframe}`);
+        console.log(`❌ [TIMEFRAME_DEBUG] Données historiques vides pour ${targetTimeframe}`);
         return [];
     }
+    
+    console.log(`🔍 [TIMEFRAME_DEBUG] Données d'entrée: ${historicalData.length} bougies`);
     
     const baseTimeframe = '15m'; // Timeframe de base des données
     const baseMinutes = getTimeframeMinutes(baseTimeframe);
     const targetMinutes = getTimeframeMinutes(targetTimeframe);
     
+    console.log(`🔍 [TIMEFRAME_DEBUG] baseMinutes: ${baseMinutes}, targetMinutes: ${targetMinutes}`);
+    
     // Si le timeframe cible est le même que la base, retourner directement
     if (targetMinutes === baseMinutes) {
-        console.log(`✅ [DEBUG] Même timeframe (${targetTimeframe}), ${historicalData.length} bougies`);
+        console.log(`✅ [TIMEFRAME_DEBUG] Même timeframe (${targetTimeframe}), ${historicalData.length} bougies`);
         return historicalData;
     }
     
     // Si le timeframe cible est plus petit que la base, on ne peut pas agréger
     if (targetMinutes < baseMinutes) {
-        console.log(`⚠️ [DEBUG] Timeframe ${targetTimeframe} plus petit que la base ${baseTimeframe}, utilisation des données de base`);
+        console.log(`⚠️ [TIMEFRAME_DEBUG] Timeframe ${targetTimeframe} plus petit que la base ${baseTimeframe}, utilisation des données de base`);
         return historicalData;
     }
     
@@ -743,9 +800,18 @@ function getTimeframeData(historicalData, targetTimeframe) {
     const ratio = targetMinutes / baseMinutes;
     const aggregatedData = [];
     
+    console.log(`🔍 [TIMEFRAME_DEBUG] Ratio d'agrégation: ${ratio} (${targetMinutes}/${baseMinutes})`);
+    
     for (let i = 0; i < historicalData.length; i += ratio) {
         const chunk = historicalData.slice(i, i + ratio);
-        if (chunk.length === 0) continue;
+        if (chunk.length === 0) {
+            console.log(`⚠️ [TIMEFRAME_DEBUG] Chunk vide à l'index ${i}`);
+            continue;
+        }
+        
+        if (chunk.length < ratio) {
+            console.log(`⚠️ [TIMEFRAME_DEBUG] Chunk incomplet à l'index ${i}: ${chunk.length}/${ratio} bougies`);
+        }
         
         const aggregated = {
             timestamp: chunk[0].timestamp,
@@ -757,9 +823,13 @@ function getTimeframeData(historicalData, targetTimeframe) {
         };
         
         aggregatedData.push(aggregated);
+        
+        if (aggregatedData.length <= 3) {
+            console.log(`🔍 [TIMEFRAME_DEBUG] Bougie agrégée ${aggregatedData.length}: ${new Date(aggregated.timestamp).toISOString()}, O:${aggregated.open}, H:${aggregated.high}, L:${aggregated.low}, C:${aggregated.close}`);
+        }
     }
     
-    console.log(`✅ [DEBUG] Agrégation ${baseTimeframe} → ${targetTimeframe}: ${historicalData.length} → ${aggregatedData.length} bougies`);
+    console.log(`✅ [TIMEFRAME_DEBUG] Agrégation ${baseTimeframe} → ${targetTimeframe}: ${historicalData.length} → ${aggregatedData.length} bougies`);
     return aggregatedData;
 }
 
@@ -1262,6 +1332,11 @@ async function runBacktestWithTradingLogic() {
         // Parcourir les données historiques (échantillonnage configurable)
         const sampleRate = backtestConfig.disableSampling ? 1 : Math.max(1, Math.floor(backtestData.length / 50));
         
+        console.log(`📊 [BACKTEST_DEBUG] Configuration de l'échantillonnage:`);
+        console.log(`📊 [BACKTEST_DEBUG] - disableSampling: ${backtestConfig.disableSampling}`);
+        console.log(`📊 [BACKTEST_DEBUG] - backtestData.length: ${backtestData.length}`);
+        console.log(`📊 [BACKTEST_DEBUG] - sampleRate calculé: ${sampleRate}`);
+        
         if (backtestConfig.disableSampling) {
             console.log(`📊 [BACKTEST_DEBUG] Échantillonnage DÉSACTIVÉ: analyse de chaque bougie`);
         } else {
@@ -1284,6 +1359,7 @@ async function runBacktestWithTradingLogic() {
                 if (i % (sampleRate * 5) === 0) { // Plus fréquent pour debug
                     updateBacktestStatus(`Analyse bougie ${i}/${backtestData.length} (${progress}%)`, 55 + (progress * 0.4));
                     console.log(`📊 [BACKTEST_DEBUG] Progression: ${i}/${backtestData.length} (${progress}%)`);
+                    console.log(`📊 [BACKTEST_DEBUG] Stats actuelles: BUY=${buySignals}, WAIT=${waitSignals}, FILTERED=${filteredSignals}, TOTAL=${totalSignals}`);
                 }
                 
                 // Analyser le signal multi-timeframe
@@ -1313,10 +1389,15 @@ async function runBacktestWithTradingLogic() {
                 if (analysis.finalDecision === 'BUY') {
                     buySignals++;
                     console.log(`✅ [BACKTEST_DEBUG] 🚀 SIGNAL BUY DÉTECTÉ ! Total: ${buySignals}`);
+                    console.log(`✅ [BACKTEST_DEBUG] 🚀 DÉTAILS DU SIGNAL BUY:`, analysis);
                 } else if (analysis.finalDecision === 'FILTERED') {
                     filteredSignals++;
+                    console.log(`❌ [BACKTEST_DEBUG] Signal filtré: ${analysis.filterReason}`);
                 } else if (analysis.finalDecision === 'WAIT') {
                     waitSignals++;
+                    console.log(`⏳ [BACKTEST_DEBUG] Signal en attente: ${analysis.finalReason}`);
+                } else {
+                    console.log(`⚪ [BACKTEST_DEBUG] Signal inconnu: ${analysis.finalDecision}`);
                 }
                 
                 // Ouvrir une position si signal BUY et pas de position ouverte
