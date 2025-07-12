@@ -314,6 +314,38 @@
                                 </div>
                                 <small>Objectif de profit en % avant fermeture automatique. Décochez pour utiliser uniquement le trailing stop loss.</small>
                             </div>
+                            
+                            <!-- 🆕 Nouvelles options avancées -->
+                            <div style="background: #f0f4f8; border: 1px solid #cbd5e0; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                                <h5 style="margin: 0 0 10px 0; color: #2d3748; font-size: 14px;">🔧 Configuration Avancée</h5>
+                                
+                                <div class="form-group">
+                                    <label>Données Étendues (jours):</label>
+                                    <select id="backtestExtendedDays">
+                                        <option value="30">30 jours (Rapide)</option>
+                                        <option value="60">60 jours (Équilibré)</option>
+                                        <option value="90" selected>90 jours (Recommandé)</option>
+                                        <option value="120">120 jours (Complet)</option>
+                                    </select>
+                                    <small>Période pour capturer les signaux 4H/1H avant le backtesting</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="checkbox" id="allowBullishTrades" checked>
+                                        <label for="allowBullishTrades" style="margin: 0;">Permettre les trades BULLISH</label>
+                                    </div>
+                                    <small>Activer les trades sur signaux BULLISH en plus des signaux BUY stricts</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="checkbox" id="disableSampling">
+                                        <label for="disableSampling" style="margin: 0;">Analyser chaque bougie</label>
+                                    </div>
+                                    <small>Désactiver l'échantillonnage pour une analyse complète (plus lent mais plus précis)</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
