@@ -1241,7 +1241,7 @@ window.updateBacktestChart = function(symbol) {
         widgetContainer.id = uniqueId;
         widgetContainer.style.width = '100%';
         widgetContainer.style.height = '100%';
-        widgetContainer.style.minHeight = '1500px';
+        widgetContainer.style.minHeight = '500px';
         
         container.appendChild(widgetContainer);
         
@@ -1253,7 +1253,7 @@ window.updateBacktestChart = function(symbol) {
                 if (typeof TradingView !== 'undefined') {
                     new TradingView.widget({
                         "width": "100%",
-                        "height": 1500,
+                        "height": 500,
                         "symbol": "BINANCE:" + symbol,
                         "interval": "1D",
                         "timezone": "Etc/UTC",
