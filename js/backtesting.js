@@ -1196,13 +1196,8 @@ window.toggleTakeProfit = toggleTakeProfit;
 window.updateBacktestChart = function(symbol) {
     console.log(`🚀 [CHART] Création graphique pour ${symbol}`);
     
-    // Vérifier la disponibilité de TradingView
-    if (typeof TradingView === 'undefined') {
-        console.error('❌ [CHART] TradingView n\'est pas disponible');
-        return;
-    }
-    
-    const container = document.getElementById('backtestTradingViewChart');
+    const containerId = 'backtestTradingViewChart';
+    const container = document.getElementById(containerId);
     if (!container) {
         console.error('❌ [CHART] Conteneur backtestTradingViewChart non trouvé');
         return;
@@ -1234,41 +1229,68 @@ window.updateBacktestChart = function(symbol) {
         backtestTradingViewWidget = null;
     }
     
-    // Vider le conteneur
-    container.innerHTML = '';
+    // Créer un ID unique pour éviter les conflits
+    const uniqueId = 'tradingview_' + Date.now();
     
-    // Attendre que le DOM soit stable
-    setTimeout(() => {
-        try {
-            console.log('🔄 [CHART] Création du widget TradingView...');
-            backtestTradingViewWidget = new TradingView.widget({
-                width: "100%",
-                height: "100%",
-                symbol: `BINANCE:${symbol}`,
-                interval: "15",
-                timezone: "Etc/UTC",
-                theme: "light",
-                style: "1",
-                locale: "fr",
-                enable_publishing: false,
-                allow_symbol_change: true,
-                studies: ["MACD@tv-basicstudies"],
-                container: container,
-                autosize: true
-            });
-            
-            console.log('✅ [CHART] Widget TradingView créé avec succès');
-            
-        } catch (error) {
-            console.error('❌ [CHART] Erreur lors de la création du widget:', error);
-            
-            // Réafficher le placeholder en cas d'erreur
-            if (placeholder) {
-                placeholder.style.display = 'block';
-                placeholder.innerHTML = '❌ Erreur lors du chargement du graphique<br><small>Vérifiez votre connexion internet</small>';
-            }
+    // Méthode alternative : utiliser le widget Symbol Overview avec graphique intégré
+    const widgetHtml = `
+        <div id="${uniqueId}" style="width: 100%; height: 100%;">
+            <div class="tradingview-widget-container" style="height: 100%; width: 100%;">
+                <div class="tradingview-widget-container__widget" style="height: calc(100% - 32px); width: 100%;"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+                {
+                    "symbols": [
+                        ["BINANCE:${symbol}|1D"]
+                    ],
+                    "chartOnly": false,
+                    "width": "100%",
+                    "height": "100%",
+                    "locale": "fr",
+                    "colorTheme": "light",
+                    "autosize": true,
+                    "showVolume": false,
+                    "showMA": false,
+                    "hideDateRanges": false,
+                    "hideMarketStatus": false,
+                    "hideSymbolLogo": false,
+                    "scalePosition": "right",
+                    "scaleMode": "Normal",
+                    "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+                    "fontSize": "10",
+                    "noTimeScale": false,
+                    "valuesTracking": "1",
+                    "changeMode": "price-and-percent",
+                    "chartType": "area",
+                    "maLineColor": "#2962FF",
+                    "maLineWidth": 1,
+                    "maLength": 9,
+                    "lineWidth": 2,
+                    "lineType": 0,
+                    "dateRanges": [
+                        "1d|1",
+                        "1m|30",
+                        "3m|60",
+                        "12m|1D",
+                        "60m|1W",
+                        "all|1M"
+                    ]
+                }
+                </script>
+            </div>
+        </div>
+    `;
+    
+    // Injecter le widget HTML
+    container.innerHTML = widgetHtml;
+    
+    console.log('✅ [CHART] Widget Symbol Overview créé avec succès');
+    
+    // Marquer comme créé pour le nettoyage futur
+    backtestTradingViewWidget = { 
+        remove: function() {
+            container.innerHTML = '';
         }
-    }, 100);
+    };
 };
 
 // Initialiser les événements
