@@ -529,6 +529,26 @@
                 console.error('❌ [TEST] Aucun symbole sélectionné');
             }
         };
+        
+        // Fonction pour initialiser le graphique quand une paire est sélectionnée
+        window.initChartOnSelection = function() {
+            const chartSymbol = document.getElementById('chartSymbol');
+            if (chartSymbol) {
+                chartSymbol.addEventListener('change', function() {
+                    const symbol = this.value.includes(':') ? 
+                        this.value.split(':')[1] : 
+                        this.value;
+                    if (symbol && typeof window.updateBacktestChart === 'function') {
+                        console.log(`🔄 [SELECTION] Nouvelle paire sélectionnée: ${symbol}`);
+                        // Attendre que l'onglet soit visible avant de créer le graphique
+                        const backtestingTab = document.getElementById('backtesting');
+                        if (backtestingTab && backtestingTab.classList.contains('active')) {
+                            setTimeout(() => window.updateBacktestChart(symbol), 500);
+                        }
+                    }
+                });
+            }
+        };
 
         
         // Fonction pour activer/désactiver le Take Profit
@@ -557,26 +577,16 @@
             
             // Initialiser le sélecteur de backtesting
             setTimeout(() => {
-                updateChartSelector(); // Changed from initializeChartSelector to updateChartSelector
+                updateChartSelector();
+                // Initialiser l'événement de sélection de paire
+                initChartOnSelection();
             }, 1000);
             
             // Initialiser le graphique TradingView quand l'onglet backtesting est activé
             const backtestingTab = document.getElementById('backtesting-tab');
             if (backtestingTab) {
                 backtestingTab.addEventListener('shown.bs.tab', function() {
-                    console.log('🔍 [INIT] Onglet backtesting activé');
-                    setTimeout(() => {
-                        const chartSymbol = document.getElementById('chartSymbol');
-                        if (chartSymbol && chartSymbol.value && typeof window.updateBacktestChart === 'function') {
-                            const symbol = chartSymbol.value.includes(':') ? 
-                                chartSymbol.value.split(':')[1] : 
-                                chartSymbol.value;
-                            if (symbol && symbol !== 'BTCUSDT') {
-                                console.log(`🚀 [INIT] Initialisation du graphique pour ${symbol}`);
-                                window.updateBacktestChart(symbol);
-                            }
-                        }
-                    }, 500);
+                    console.log('🔍 [INIT] Onglet backtesting activé - Graphique sera créé lors de la sélection d\'une paire');
                 });
             }
         });
