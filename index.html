@@ -286,27 +286,32 @@
                             <h4>📅 Configuration du Test</h4>
 
                             
-                            <div class="form-group">
-                                <label>Durée du Test:</label>
-                                <select id="backtestDuration">
-                                    <option value="1">24 heures</option>
-                                    <option value="2">48 heures</option>
-                                    <option value="7" selected>7 jours</option>
-                                    <option value="30">30 jours</option>
-                                    <option value="90">90 jours</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>Taille Position (%):</label>
-                                <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1">
-                                <small>Pourcentage du capital (1000 USDT) à utiliser par trade</small>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>Trailing Stop Loss (%):</label>
-                                <input type="number" id="backtestTrailingStop" value="1.5" min="0.1" max="5" step="0.1">
-                                <small>Distance de trailing en % (calculé sur données 1min pour précision)</small>
+                            <!-- Sélecteurs côte à côte pour gagner de la place -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 13px; font-weight: 600; color: #2d3748;">📅 Durée du Test:</label>
+                                    <select id="backtestDuration" style="padding: 10px; font-size: 13px; border: 2px solid #e2e8f0; border-radius: 6px;">
+                                        <option value="1">24 heures</option>
+                                        <option value="2">48 heures</option>
+                                        <option value="7" selected>7 jours</option>
+                                        <option value="30">30 jours</option>
+                                        <option value="90">90 jours</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 13px; font-weight: 600; color: #2d3748;">💰 Taille Position (%):</label>
+                                    <input type="number" id="backtestPositionSize" value="10" min="1" max="100" step="1" 
+                                           style="padding: 10px; font-size: 13px; border: 2px solid #e2e8f0; border-radius: 6px;">
+                                    <small style="font-size: 10px; color: #666;">% du capital (1000 USDT)</small>
+                                </div>
+                                
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 13px; font-weight: 600; color: #2d3748;">🛡️ Trailing Stop (%):</label>
+                                    <input type="number" id="backtestTrailingStop" value="1.5" min="0.1" max="5" step="0.1" 
+                                           style="padding: 10px; font-size: 13px; border: 2px solid #e2e8f0; border-radius: 6px;">
+                                    <small style="font-size: 10px; color: #666;">Distance de trailing</small>
+                                </div>
                             </div>
                             
                             <div class="form-group">
@@ -315,11 +320,11 @@
                                     <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px;">
                                         <!-- Toggle Switch personnalisé amélioré -->
                                         <div style="display: flex; align-items: center; gap: 8px;">
-                                            <div class="toggle-switch" style="position: relative; width: 50px; height: 24px; background: #48bb78; border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 6px rgba(72, 187, 120, 0.3);" onclick="toggleTakeProfit()">
+                                            <div class="toggle-switch" style="position: relative; width: 50px; height: 24px; background: #48bb78; border-radius: 12px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 6px rgba(72, 187, 120, 0.3);" onclick="toggleTakeProfit(event)">
                                                 <div id="takeProfitToggle" class="toggle-switch-ball" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateX(24px); box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                                                <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit()" style="display: none;">
                                             </div>
-                                            <label for="enableTakeProfit" style="margin: 0; font-weight: 600; color: #2d3748; cursor: pointer; user-select: none;">Activer</label>
+                                            <input type="checkbox" id="enableTakeProfit" checked onchange="toggleTakeProfit(event)" style="display: none;">
+                                            <label for="enableTakeProfit" style="margin: 0; font-weight: 600; color: #2d3748; cursor: pointer; user-select: none;" onclick="toggleTakeProfit(event)">Activer</label>
                                         </div>
                                         
                                         <!-- Input stylisé amélioré -->
@@ -390,11 +395,7 @@
                                 <div class="stat-value" id="backtestDrawdown">0.00%</div>
                                 <small>Perte Maximum</small>
                             </div>
-                            <div class="stat-card">
-                                <h5>⏱️ Durée Moyenne</h5>
-                                <div class="stat-value" id="backtestAvgDuration">0h</div>
-                                <small>Durée des Trades</small>
-                            </div>
+
                         </div>
                         
                         <!-- Graphique des Résultats -->
@@ -572,21 +573,7 @@
         };
 
         
-        // Fonction pour activer/désactiver le Take Profit
-        function toggleTakeProfit() {
-            const enableCheckbox = document.getElementById('enableTakeProfit');
-            const takeProfitInput = document.getElementById('backtestTakeProfit');
-            
-            if (enableCheckbox.checked) {
-                takeProfitInput.disabled = false;
-                takeProfitInput.style.opacity = '1';
-                log('✅ Take Profit activé', 'INFO');
-            } else {
-                takeProfitInput.disabled = true;
-                takeProfitInput.style.opacity = '0.5';
-                log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
-            }
-        }
+        // Fonction toggleTakeProfit supprimée - maintenant gérée dans backtesting.js
 
         // Initialisation au chargement de la page
         document.addEventListener('DOMContentLoaded', function() {
