@@ -1253,7 +1253,7 @@ window.updateBacktestChart = function(symbol) {
                 if (typeof TradingView !== 'undefined') {
                     new TradingView.widget({
                         "width": "100%",
-                        "height": "100%",
+                        "height": 1500,
                         "symbol": "BINANCE:" + symbol,
                         "interval": "1D",
                         "timezone": "Etc/UTC",
@@ -1266,6 +1266,7 @@ window.updateBacktestChart = function(symbol) {
                         "hide_legend": false,
                         "save_image": false,
                         "container_id": uniqueId,
+                        "autosize": false,
                         "studies": [
                             "MACD@tv-basicstudies"
                         ]
