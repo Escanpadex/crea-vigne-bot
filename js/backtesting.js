@@ -1209,26 +1209,28 @@ function updateSelectedPair() {
         log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
     }
     
-    // Mise à jour du graphique
+    // Nettoyer le graphique existant avant de créer le nouveau
+    if (lightweightChart) {
+        try {
+            lightweightChart.remove();
+            console.log('✅ [UPDATE] Graphique précédent nettoyé');
+        } catch (error) {
+            console.warn('⚠️ [UPDATE] Erreur nettoyage graphique:', error);
+        }
+        lightweightChart = null;
+    }
+    
+    // Mise à jour du graphique avec un délai pour s'assurer que le nettoyage est terminé
     if (typeof window.updateBacktestChart === 'function') {
-        window.updateBacktestChart(symbol);
+        setTimeout(() => window.updateBacktestChart(symbol), 100);
     }
 }
 
-// Fonction pour activer/désactiver le Take Profit avec nouveau design
+// Fonction pour activer/désactiver le Take Profit avec case à cocher simple
 function toggleTakeProfit(event) {
     const enableCheckbox = document.getElementById('enableTakeProfit');
     const takeProfitInput = document.getElementById('backtestTakeProfit');
-    const toggleSwitch = document.getElementById('takeProfitToggle');
     const container = takeProfitInput.closest('.take-profit-container');
-    
-    // Si appelé depuis un clic sur le toggle switch ou le label, basculer la checkbox
-    if (event && event.target && 
-        (event.target.classList.contains('toggle-switch') || 
-         event.target.tagName === 'LABEL' ||
-         event.target.classList.contains('toggle-switch-ball'))) {
-        enableCheckbox.checked = !enableCheckbox.checked;
-    }
     
     // Appliquer les styles selon l'état actuel
     if (enableCheckbox.checked) {
@@ -1237,13 +1239,6 @@ function toggleTakeProfit(event) {
         takeProfitInput.style.opacity = '1';
         takeProfitInput.style.background = 'white';
         takeProfitInput.style.color = '#2d3748';
-        
-        // Animer le toggle switch vers la droite
-        if (toggleSwitch) {
-            toggleSwitch.style.transform = 'translateX(24px)';
-            toggleSwitch.parentElement.style.background = '#48bb78';
-            toggleSwitch.parentElement.style.boxShadow = '0 2px 6px rgba(72, 187, 120, 0.3)';
-        }
         
         // Effet sur le container
         if (container) {
@@ -1258,13 +1253,6 @@ function toggleTakeProfit(event) {
         takeProfitInput.style.opacity = '0.5';
         takeProfitInput.style.background = '#f5f5f5';
         takeProfitInput.style.color = '#a0a0a0';
-        
-        // Animer le toggle switch vers la gauche
-        if (toggleSwitch) {
-            toggleSwitch.style.transform = 'translateX(2px)';
-            toggleSwitch.parentElement.style.background = '#cbd5e0';
-            toggleSwitch.parentElement.style.boxShadow = '0 2px 6px rgba(203, 213, 224, 0.3)';
-        }
         
         // Effet sur le container
         if (container) {
@@ -1325,19 +1313,45 @@ window.updateBacktestChart = function(symbol) {
     
     // Vérifier et charger Lightweight Charts
     console.log('🔍 [CHART] Vérification de LightweightCharts:', typeof LightweightCharts);
-    console.log('🔍 [CHART] Variables globales disponibles:', Object.keys(window).filter(key => key.toLowerCase().includes('chart')));
+    console.log('🔍 [CHART] window.LightweightCharts:', typeof window.LightweightCharts);
     
-    if (typeof LightweightCharts === 'undefined' && typeof window.LightweightCharts === 'undefined') {
+    // Vérifier si Lightweight Charts est disponible
+    const LightweightChartsLib = window.LightweightCharts || LightweightCharts;
+    
+    if (typeof LightweightChartsLib === 'undefined') {
         console.log('📦 [CHART] Chargement dynamique de Lightweight Charts...');
+        
+        // Supprimer les anciens scripts pour éviter les conflits
+        const existingScripts = document.querySelectorAll('script[src*="lightweight-charts"]');
+        existingScripts.forEach(script => script.remove());
+        
         const script = document.createElement('script');
         script.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
         script.onload = () => {
             console.log('✅ [CHART] Lightweight Charts chargé dynamiquement');
-            setTimeout(() => createLightweightChart(symbol, container), 100);
+            // Attendre que la bibliothèque soit vraiment disponible
+            setTimeout(() => {
+                if (typeof window.LightweightCharts !== 'undefined') {
+                    createLightweightChart(symbol, container);
+                } else {
+                    console.error('❌ [CHART] Lightweight Charts non disponible après chargement');
+                    container.innerHTML = `<div style="text-align: center; padding: 50px;">
+                        <div>❌ Impossible de charger Lightweight Charts</div>
+                        <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🔄 Réessayer
+                        </button>
+                    </div>`;
+                }
+            }, 500);
         };
         script.onerror = () => {
             console.error('❌ [CHART] Erreur de chargement dynamique');
-            createSimpleChart(symbol, container);
+            container.innerHTML = `<div style="text-align: center; padding: 50px;">
+                <div>❌ Erreur de chargement du CDN Lightweight Charts</div>
+                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🔄 Réessayer
+                </button>
+            </div>`;
         };
         document.head.appendChild(script);
     } else {
@@ -1509,138 +1523,35 @@ async function createLightweightChart(symbol, container) {
     } catch (error) {
         console.error('❌ [CHART] Erreur lors de la création du graphique:', error);
         
-        // Fallback : créer un graphique simple avec Canvas
-        try {
-            console.log('🔄 [CHART] Tentative de fallback avec graphique simple...');
-            createSimpleChart(symbol, container);
-        } catch (fallbackError) {
-            console.error('❌ [CHART] Erreur fallback:', fallbackError);
-            container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
-                    <div>Impossible de charger le graphique</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Erreur: ${error.message}</div>
-                    <button onclick="testLightweightCharts()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        🧪 Tester Lightweight Charts
-                    </button>
-                </div>
-            </div>`;
-        }
-    }
-}
-
-// Fonction de fallback pour créer un graphique simple
-async function createSimpleChart(symbol, container) {
-    try {
-        console.log('🔄 [CHART] Création d\'un graphique simple pour', symbol);
-        
-        // Charger les données historiques
-        const data = await getBinanceKlineData(symbol, 100, '15m');
-        
-        if (data.length === 0) {
-            throw new Error('Aucune donnée historique disponible');
-        }
-        
-        // Créer un graphique simple avec du texte
-        const prices = data.map(candle => candle.close);
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        const currentPrice = prices[prices.length - 1];
-        const firstPrice = prices[0];
-        const change = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(2);
-        
-        container.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 500px; background: #f8f9fa; border-radius: 8px; padding: 20px;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0; color: #2d3748;">${symbol}</h3>
-                    <div style="font-size: 24px; font-weight: bold; color: ${change >= 0 ? '#26a69a' : '#ef5350'}; margin: 10px 0;">
-                        $${currentPrice.toFixed(4)}
-                    </div>
-                    <div style="font-size: 14px; color: ${change >= 0 ? '#26a69a' : '#ef5350'};">
-                        ${change >= 0 ? '+' : ''}${change}%
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; width: 100%; max-width: 400px;">
-                    <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Prix Max</div>
-                        <div style="font-size: 16px; font-weight: bold; color: #26a69a;">$${maxPrice.toFixed(4)}</div>
-                    </div>
-                    <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Prix Min</div>
-                        <div style="font-size: 16px; font-weight: bold; color: #ef5350;">$${minPrice.toFixed(4)}</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 12px; color: #1976d2; margin-bottom: 5px;">📊 Données chargées</div>
-                    <div style="font-size: 14px; color: #1976d2; font-weight: bold;">${data.length} bougies (15m)</div>
-                </div>
-                
-                <div style="margin-top: 15px; font-size: 12px; color: #666; text-align: center;">
-                    Graphique simplifié - Les marqueurs de trades apparaîtront après le backtesting
-                </div>
+        // Afficher l'erreur mais ne pas utiliser le fallback simplifié
+        container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
+            <div style="text-align: center;">
+                <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
+                <div>Erreur de chargement du graphique Lightweight Charts</div>
+                <div style="font-size: 12px; color: #999; margin-top: 5px;">Erreur: ${error.message}</div>
+                <button onclick="testLightweightCharts()" style="margin-top: 10px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🧪 Tester Lightweight Charts
+                </button>
+                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; margin-left: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    🔄 Réessayer
+                </button>
             </div>
-        `;
+        </div>`;
         
-        // Créer un objet simple pour les marqueurs
+        // Créer un objet minimal pour éviter les erreurs
         lightweightChart = {
             candleSeries: {
                 setMarkers: function(markers) {
-                    console.log(`📊 [CHART] ${markers.length} marqueurs reçus pour affichage simplifié`);
-                    // Ajouter les marqueurs visuellement dans le graphique simple
-                    addSimpleMarkers(container, markers);
+                    console.log(`📊 [CHART] ${markers.length} marqueurs ignorés (graphique en erreur)`);
                 }
             }
         };
-        
-        console.log('✅ [CHART] Graphique simple créé avec succès');
-        
-    } catch (error) {
-        console.error('❌ [CHART] Erreur création graphique simple:', error);
-        throw error;
     }
 }
 
-// Fonction pour ajouter des marqueurs simples
-function addSimpleMarkers(container, markers) {
-    const markersDiv = container.querySelector('.simple-markers');
-    if (markersDiv) {
-        markersDiv.remove();
-    }
-    
-    const newMarkersDiv = document.createElement('div');
-    newMarkersDiv.className = 'simple-markers';
-    newMarkersDiv.style.cssText = `
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: white;
-        border-radius: 8px;
-        padding: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        max-width: 200px;
-        font-size: 12px;
-    `;
-    
-    const entriesCount = markers.filter(m => m.shape === 'arrowUp').length;
-    const exitsCount = markers.filter(m => m.shape === 'arrowDown').length;
-    
-    newMarkersDiv.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 8px; color: #2d3748;">📊 Trades</div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-            <span style="color: #26a69a;">📈 Entrées:</span>
-            <span style="font-weight: bold;">${entriesCount}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-            <span style="color: #ef5350;">📉 Sorties:</span>
-            <span style="font-weight: bold;">${exitsCount}</span>
-        </div>
-    `;
-    
-    container.style.position = 'relative';
-    container.appendChild(newMarkersDiv);
-}
+// Fonction de fallback supprimée - on force l'utilisation de Lightweight Charts
+
+// Fonction addSimpleMarkers supprimée - plus nécessaire
 
 // Nouvelle fonction pour ajouter les marqueurs de trades
 function addTradeMarkersToChart() {
@@ -1737,17 +1648,50 @@ function testLightweightCharts() {
             
             if (typeof testChart.addCandlestickSeries === 'function') {
                 console.log('✅ [TEST] addCandlestickSeries disponible');
+                
+                // Test d'ajout de série
+                const series = testChart.addCandlestickSeries();
+                console.log('✅ [TEST] Série créée avec succès');
+                console.log('📊 [TEST] Méthodes de la série:', Object.getOwnPropertyNames(series));
+                
+                if (typeof series.setMarkers === 'function') {
+                    console.log('✅ [TEST] setMarkers disponible');
+                } else {
+                    console.log('❌ [TEST] setMarkers non disponible');
+                }
+                
             } else {
                 console.log('❌ [TEST] addCandlestickSeries non disponible');
             }
             
             // Nettoyer
             testChart.remove();
+            
+            // Forcer la recréation du graphique actuel
+            const chartSymbol = document.getElementById('chartSymbol');
+            if (chartSymbol && chartSymbol.value) {
+                const symbol = chartSymbol.value.includes(':') ? 
+                    chartSymbol.value.split(':')[1] : 
+                    chartSymbol.value;
+                console.log('🔄 [TEST] Recréation du graphique pour', symbol);
+                setTimeout(() => window.updateBacktestChart(symbol), 1000);
+            }
+            
         } catch (error) {
             console.error('❌ [TEST] Erreur création graphique:', error);
         }
     } else {
         console.error('❌ [TEST] Bibliothèque non trouvée');
+        console.log('🔄 [TEST] Tentative de rechargement...');
+        
+        // Forcer le rechargement de la bibliothèque
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
+        script.onload = () => {
+            console.log('✅ [TEST] Bibliothèque rechargée');
+            setTimeout(testLightweightCharts, 500);
+        };
+        document.head.appendChild(script);
     }
     console.log('🧪 [TEST] === FIN DIAGNOSTIC ===');
 }
@@ -1755,14 +1699,13 @@ function testLightweightCharts() {
 // Rendre la fonction de test accessible globalement
 window.testLightweightCharts = testLightweightCharts;
 
-// Fonction pour initialiser le toggle switch Take Profit
+// Fonction pour initialiser la case à cocher Take Profit
 function initializeTakeProfitToggle() {
     const enableCheckbox = document.getElementById('enableTakeProfit');
     const takeProfitInput = document.getElementById('backtestTakeProfit');
-    const toggleSwitch = document.getElementById('takeProfitToggle');
     const container = takeProfitInput ? takeProfitInput.closest('.take-profit-container') : null;
     
-    if (!enableCheckbox || !takeProfitInput || !toggleSwitch) {
+    if (!enableCheckbox || !takeProfitInput) {
         console.warn('⚠️ Éléments Take Profit manquants pour l\'initialisation');
         return;
     }
@@ -1775,10 +1718,6 @@ function initializeTakeProfitToggle() {
         takeProfitInput.style.background = 'white';
         takeProfitInput.style.color = '#2d3748';
         
-        toggleSwitch.style.transform = 'translateX(24px)';
-        toggleSwitch.parentElement.style.background = '#48bb78';
-        toggleSwitch.parentElement.style.boxShadow = '0 2px 6px rgba(72, 187, 120, 0.3)';
-        
         if (container) {
             container.style.background = 'linear-gradient(135deg, #f0fff4, #e6fffa)';
             container.style.borderColor = '#48bb78';
@@ -1790,17 +1729,13 @@ function initializeTakeProfitToggle() {
         takeProfitInput.style.background = '#f5f5f5';
         takeProfitInput.style.color = '#a0a0a0';
         
-        toggleSwitch.style.transform = 'translateX(2px)';
-        toggleSwitch.parentElement.style.background = '#cbd5e0';
-        toggleSwitch.parentElement.style.boxShadow = '0 2px 6px rgba(203, 213, 224, 0.3)';
-        
         if (container) {
             container.style.background = 'linear-gradient(135deg, #f8f9fa, #e9ecef)';
             container.style.borderColor = '#cbd5e0';
         }
     }
     
-    console.log('✅ Toggle switch Take Profit initialisé');
+    console.log('✅ Case à cocher Take Profit initialisée');
 }
 
 // Initialiser les événements
