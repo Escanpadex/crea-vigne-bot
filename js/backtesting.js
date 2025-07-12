@@ -1410,11 +1410,15 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série de bougies avec gestion d'erreur
         let candleSeries;
         try {
-            // Use the correct API: chart.addSeries with CandlestickSeries type
-            // Ensure 'CandlestickSeries' is imported at the top of the file (add if missing):
-            // import { ..., CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+            // Use the correct API: chart.addSeries with the proper series type from LightweightCharts
             if (typeof chart.addSeries === 'function') {
-                candleSeries = chart.addSeries('candlestick', {  // 'candlestick' is the series type string
+                // Access the series types from the LightweightCharts library
+                const { CandlestickSeries } = LightweightChartsLib;
+                if (!CandlestickSeries) {
+                    throw new Error('CandlestickSeries non disponible dans la bibliothèque');
+                }
+                
+                candleSeries = chart.addSeries(CandlestickSeries, {
                     upColor: '#26a69a',
                     downColor: '#ef5350',
                     borderVisible: false,
@@ -1437,18 +1441,21 @@ async function createLightweightChart(symbol, container) {
         // Ajouter la série MACD (histogramme) - optionnel
         let macdSeries = null;
         try {
-            macdSeries = chart.addSeries('histogram', {  // Use 'histogram' type
-                color: '#26a69a',
-                priceFormat: {
-                    type: 'volume',
-                },
-                priceScaleId: 'left',
-                scaleMargins: {
-                    top: 0.8,
-                    bottom: 0,
-                },
-            });
-            console.log('✅ [CHART] Série MACD ajoutée');
+            const { HistogramSeries } = LightweightChartsLib;
+            if (HistogramSeries) {
+                macdSeries = chart.addSeries(HistogramSeries, {
+                    color: '#26a69a',
+                    priceFormat: {
+                        type: 'volume',
+                    },
+                    priceScaleId: 'left',
+                    scaleMargins: {
+                        top: 0.8,
+                        bottom: 0,
+                    },
+                });
+                console.log('✅ [CHART] Série MACD ajoutée');
+            }
         } catch (macdError) {
             console.warn('⚠️ [CHART] Impossible d\'ajouter la série MACD:', macdError);
         }
