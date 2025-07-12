@@ -704,12 +704,17 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
     try {
         // Filtrer les données pour le timeframe
         const tfData = getTimeframeData(historicalData, timeframe);
-        if (!tfData || tfData.length < 50) {
-            return { symbol, timeframe, signal: 'INSUFFICIENT_DATA' };
-        }
         
         // 🎯 Récupérer les paramètres MACD spécifiques au timeframe (IDENTIQUES AU TRADING)
         const macdParams = getMACDParametersForBacktest(timeframe);
+        const minRequired = macdParams.minCandles || 50;
+        
+        if (!tfData || tfData.length < minRequired) {
+            if (backtestConfig.debugMode) {
+                log(`❌ [MACD_DEBUG] ${timeframe} - Données insuffisantes: ${tfData?.length || 0}/${minRequired}`, 'DEBUG');
+            }
+            return { symbol, timeframe, signal: 'INSUFFICIENT_DATA' };
+        }
         
         // Calcul MACD avec paramètres spécifiques au timeframe
         const prices = tfData.map(candle => candle.close);
@@ -728,6 +733,10 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
             let lastSignal = 'BUY'; // Par défaut BUY
             let lastCrossoverIndex = -1;
             
+            if (backtestConfig.debugMode) {
+                log(`🔍 [MACD_DEBUG] ${timeframe} - Recherche croisements dans ${macdData.length} points MACD`, 'DEBUG');
+            }
+            
             // Parcourir les données pour trouver le dernier croisement d'histogramme
             for (let i = 1; i < macdData.length; i++) {
                 const curr = macdData[i];
@@ -737,15 +746,25 @@ async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
                 if (prev.histogram <= 0 && curr.histogram > 0) {
                     lastSignal = 'BUY';
                     lastCrossoverIndex = i;
+                    if (backtestConfig.debugMode) {
+                        log(`🔍 [MACD_DEBUG] ${timeframe} - Croisement BUY à l'index ${i} (${prev.histogram.toFixed(6)} → ${curr.histogram.toFixed(6)})`, 'DEBUG');
+                    }
                 }
                 // Croisement baissier de l'histogramme (crossunder delta < 0)
                 else if (prev.histogram >= 0 && curr.histogram < 0) {
                     lastSignal = 'SELL';
                     lastCrossoverIndex = i;
+                    if (backtestConfig.debugMode) {
+                        log(`🔍 [MACD_DEBUG] ${timeframe} - Croisement SELL à l'index ${i} (${prev.histogram.toFixed(6)} → ${curr.histogram.toFixed(6)})`, 'DEBUG');
+                    }
                 }
             }
             
             const reason = `Dernier croisement histogramme ${lastSignal} à l'index ${lastCrossoverIndex} (${timeframe})`;
+            
+            if (backtestConfig.debugMode) {
+                log(`✅ [MACD_DEBUG] ${timeframe} - Signal final: ${lastSignal} (${lastCrossoverIndex === -1 ? 'défaut' : 'croisement'})`, 'DEBUG');
+            }
             
             return {
                 symbol,
@@ -856,17 +875,20 @@ function getTimeframeData(historicalData, targetTimeframe) {
     return aggregatedData;
 }
 
-// NOUVELLE FONCTION : Paramètres MACD adaptés par timeframe (IDENTIQUES AU TRADING) - SANS LOGS RÉPÉTITIFS
+// NOUVELLE FONCTION : Paramètres MACD adaptés par timeframe (OPTIMISÉS POUR BACKTESTING)
 function getMACDParametersForBacktest(timeframe) {
     const parameters = {
-        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 200 },
-        '1h': { fast: 30, slow: 50, signal: 20, minCandles: 300 },
-        '15m': { fast: 30, slow: 50, signal: 40, minCandles: 350 }
+        // Paramètres identiques au code TradingView pour tous les timeframes
+        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 50 },
+        '1h': { fast: 12, slow: 26, signal: 9, minCandles: 50 },
+        '15m': { fast: 12, slow: 26, signal: 9, minCandles: 50 }
     };
     
     const params = parameters[timeframe] || parameters['4h'];
-    // SUPPRESSION DU LOG RÉPÉTITIF
-    // log(`📊 MACD ${timeframe} (Backtesting): Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}`, 'DEBUG');
+    // Log seulement si demandé
+    if (backtestConfig.debugMode) {
+        log(`📊 MACD ${timeframe} (Backtesting): Fast=${params.fast}, Slow=${params.slow}, Signal=${params.signal}`, 'DEBUG');
+    }
     return params;
 }
 
@@ -2380,7 +2402,51 @@ async function diagnoseBacktestIssues(symbol) {
     log(`🔍 [DIAGNOSTIC] === FIN DIAGNOSTIC ===`, 'INFO');
 }
 
+// NOUVELLE FONCTION : Analyser les données d'un timeframe spécifique
+async function analyzeTimeframeData(symbol, timeframe) {
+    log(`🔍 [TIMEFRAME_DEBUG] === ANALYSE ${timeframe} ===`, 'INFO');
+    
+    const extendedData = timeframe === '4h' ? extended4hData : 
+                        timeframe === '1h' ? extended1hData : 
+                        backtestData;
+    
+    if (!extendedData || extendedData.length === 0) {
+        log(`❌ [TIMEFRAME_DEBUG] Pas de données ${timeframe}`, 'ERROR');
+        return;
+    }
+    
+    log(`📊 [TIMEFRAME_DEBUG] ${timeframe} - ${extendedData.length} bougies disponibles`, 'INFO');
+    
+    // Tester l'analyse MACD sur les dernières données
+    const testData = extendedData.slice(-100); // Prendre les 100 dernières bougies
+    log(`📊 [TIMEFRAME_DEBUG] Test avec ${testData.length} bougies récentes`, 'INFO');
+    
+    try {
+        const analysis = await analyzePairMACDForBacktest(symbol, timeframe, testData);
+        log(`📊 [TIMEFRAME_DEBUG] Résultat: ${analysis.signal} - ${analysis.reason}`, 'INFO');
+        
+        if (analysis.signal === 'INSUFFICIENT_DATA') {
+            log(`❌ [TIMEFRAME_DEBUG] Données insuffisantes même avec ${testData.length} bougies`, 'ERROR');
+            
+            // Tester l'agrégation des données
+            const tfData = getTimeframeData(testData, timeframe);
+            log(`📊 [TIMEFRAME_DEBUG] Après agrégation: ${tfData?.length || 0} bougies ${timeframe}`, 'INFO');
+            
+            if (tfData && tfData.length > 0) {
+                log(`📊 [TIMEFRAME_DEBUG] Première bougie: ${new Date(tfData[0].timestamp).toISOString()}`, 'INFO');
+                log(`📊 [TIMEFRAME_DEBUG] Dernière bougie: ${new Date(tfData[tfData.length - 1].timestamp).toISOString()}`, 'INFO');
+            }
+        }
+        
+    } catch (error) {
+        log(`❌ [TIMEFRAME_DEBUG] Erreur analyse: ${error.message}`, 'ERROR');
+    }
+    
+    log(`🔍 [TIMEFRAME_DEBUG] === FIN ANALYSE ${timeframe} ===`, 'INFO');
+}
+
 // Rendre les fonctions de debug accessibles globalement
 window.enableDebugMode = enableDebugMode;
 window.enableDebugMode15mOnly = enableDebugMode15mOnly;
 window.diagnoseBacktestIssues = diagnoseBacktestIssues;
+window.analyzeTimeframeData = analyzeTimeframeData;
