@@ -1241,6 +1241,7 @@ window.updateBacktestChart = function(symbol) {
         widgetContainer.id = uniqueId;
         widgetContainer.style.width = '100%';
         widgetContainer.style.height = '100%';
+        widgetContainer.style.minHeight = '1500px';
         
         container.appendChild(widgetContainer);
         
