@@ -21,6 +21,7 @@
  * - Recherche améliorée post-SELL (50 itérations max, pas de 1)
  * - Force BUY si pas de données post-SELL
  * - Garantie sampleRate=1 si disableSampling=true
+ * - FIXED: Utilisation données étendues 4H/1H au lieu d'agrégation 15M (résout INSUFFICIENT_DATA)
  * 
  * Stratégie optimisée : Multi-timeframe → BUY strict → LONG → Fermeture par trailing stop
  */
@@ -765,8 +766,27 @@ async function getExtendedHistoricalData(symbol, timeframe, days = null, endTime
 // NOUVELLE FONCTION : Analyse MACD pour backtesting (basée sur les croisements d'histogramme)
 async function analyzePairMACDForBacktest(symbol, timeframe, historicalData) {
     try {
-        // Filtrer les données pour le timeframe
-        const tfData = getTimeframeData(historicalData, timeframe);
+        // FIXED: Utiliser les vraies données étendues pour 4H et 1H au lieu d'agréger depuis 15M
+        let tfData;
+        if (timeframe === '4h' && extended4hData && extended4hData.length > 0) {
+            // Utiliser les données 4H étendues directement
+            tfData = extended4hData.filter(candle => candle && candle.timestamp && candle.timestamp <= historicalData[historicalData.length - 1].timestamp);
+            if (backtestConfig.debugMode) {
+                log(`🔧 [MACD_DEBUG] ${timeframe} - Utilisation données étendues: ${tfData.length} bougies (au lieu d'agrégation)`, 'DEBUG');
+            }
+        } else if (timeframe === '1h' && extended1hData && extended1hData.length > 0) {
+            // Utiliser les données 1H étendues directement
+            tfData = extended1hData.filter(candle => candle && candle.timestamp && candle.timestamp <= historicalData[historicalData.length - 1].timestamp);
+            if (backtestConfig.debugMode) {
+                log(`🔧 [MACD_DEBUG] ${timeframe} - Utilisation données étendues: ${tfData.length} bougies (au lieu d'agrégation)`, 'DEBUG');
+            }
+        } else {
+            // Pour 15M ou si pas de données étendues, utiliser l'agrégation normale
+            tfData = getTimeframeData(historicalData, timeframe);
+            if (backtestConfig.debugMode) {
+                log(`🔧 [MACD_DEBUG] ${timeframe} - Utilisation agrégation: ${tfData.length} bougies`, 'DEBUG');
+            }
+        }
         
         // 🎯 Récupérer les paramètres MACD spécifiques au timeframe (IDENTIQUES AU TRADING)
         const macdParams = getMACDParametersForBacktest(timeframe);
