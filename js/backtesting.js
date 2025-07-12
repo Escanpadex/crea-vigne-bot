@@ -1217,18 +1217,55 @@ function updateSelectedPair() {
     }
 }
 
-// Fonction pour activer/désactiver le Take Profit
+// Fonction pour activer/désactiver le Take Profit avec nouveau design
 function toggleTakeProfit() {
     const enableCheckbox = document.getElementById('enableTakeProfit');
     const takeProfitInput = document.getElementById('backtestTakeProfit');
+    const toggleSwitch = document.getElementById('takeProfitToggle');
+    const container = takeProfitInput.closest('div[style*="background: linear-gradient"]');
+    
+    // Basculer l'état de la checkbox
+    enableCheckbox.checked = !enableCheckbox.checked;
     
     if (enableCheckbox.checked) {
+        // Activé
         takeProfitInput.disabled = false;
         takeProfitInput.style.opacity = '1';
+        takeProfitInput.style.background = 'white';
+        takeProfitInput.style.color = '#2d3748';
+        
+        // Animer le toggle switch vers la droite
+        if (toggleSwitch) {
+            toggleSwitch.style.transform = 'translateX(24px)';
+            toggleSwitch.parentElement.style.background = '#48bb78';
+        }
+        
+        // Effet sur le container
+        if (container) {
+            container.style.background = 'linear-gradient(135deg, #f0fff4, #e6fffa)';
+            container.style.borderColor = '#48bb78';
+        }
+        
         log('✅ Take Profit activé', 'INFO');
     } else {
+        // Désactivé
         takeProfitInput.disabled = true;
         takeProfitInput.style.opacity = '0.5';
+        takeProfitInput.style.background = '#f5f5f5';
+        takeProfitInput.style.color = '#a0a0a0';
+        
+        // Animer le toggle switch vers la gauche
+        if (toggleSwitch) {
+            toggleSwitch.style.transform = 'translateX(2px)';
+            toggleSwitch.parentElement.style.background = '#cbd5e0';
+        }
+        
+        // Effet sur le container
+        if (container) {
+            container.style.background = 'linear-gradient(135deg, #f8f9fa, #e9ecef)';
+            container.style.borderColor = '#cbd5e0';
+        }
+        
         log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
     }
 }
@@ -1300,7 +1337,14 @@ async function createLightweightChart(symbol, container) {
     try {
         console.log(`🚀 [CHART] Création du graphique Lightweight Charts pour ${symbol}`);
         
-        // Créer le graphique
+        // Vérifier que la bibliothèque est chargée
+        if (typeof LightweightCharts === 'undefined') {
+            throw new Error('Lightweight Charts library not loaded');
+        }
+        
+        console.log('✅ [CHART] LightweightCharts détecté:', typeof LightweightCharts);
+        
+        // Créer le graphique avec la bonne API
         const chart = LightweightCharts.createChart(container, {
             width: container.clientWidth,
             height: 500,
@@ -1329,7 +1373,15 @@ async function createLightweightChart(symbol, container) {
             },
         });
         
+        console.log('✅ [CHART] Graphique créé:', chart);
         lightweightChart = chart;
+        
+        // Vérifier que les méthodes existent
+        if (typeof chart.addCandlestickSeries !== 'function') {
+            console.error('❌ [CHART] addCandlestickSeries n\'est pas une fonction');
+            console.log('📊 [CHART] Méthodes disponibles:', Object.getOwnPropertyNames(chart));
+            throw new Error('addCandlestickSeries method not available');
+        }
         
         // Ajouter la série de bougies
         const candleSeries = chart.addCandlestickSeries({
@@ -1340,18 +1392,29 @@ async function createLightweightChart(symbol, container) {
             wickDownColor: '#ef5350',
         });
         
-        // Ajouter la série MACD (histogramme)
-        const macdSeries = chart.addHistogramSeries({
-            color: '#26a69a',
-            priceFormat: {
-                type: 'volume',
-            },
-            priceScaleId: 'left',
-            scaleMargins: {
-                top: 0.8,
-                bottom: 0,
-            },
-        });
+        // Stocker la référence pour les marqueurs
+        chart.candleSeries = candleSeries;
+        
+        console.log('✅ [CHART] Série de bougies ajoutée');
+        
+        // Ajouter la série MACD (histogramme) - optionnel
+        let macdSeries = null;
+        try {
+            macdSeries = chart.addHistogramSeries({
+                color: '#26a69a',
+                priceFormat: {
+                    type: 'volume',
+                },
+                priceScaleId: 'left',
+                scaleMargins: {
+                    top: 0.8,
+                    bottom: 0,
+                },
+            });
+            console.log('✅ [CHART] Série MACD ajoutée');
+        } catch (macdError) {
+            console.warn('⚠️ [CHART] Impossible d\'ajouter la série MACD:', macdError);
+        }
         
         // Charger les données historiques
         console.log('📊 [CHART] Chargement des données historiques...');
@@ -1372,24 +1435,26 @@ async function createLightweightChart(symbol, container) {
         
         candleSeries.setData(chartData);
         
-        // Calculer et ajouter le MACD
-        const prices = data.map(candle => candle.close);
-        const macd = calculateMACD(prices);
-        
-        if (macd && macd.delta) {
-            const macdData = macd.delta.map((delta, index) => {
-                if (index < data.length && delta !== null && delta !== undefined) {
-                    return {
-                        time: Math.floor(data[index].timestamp / 1000),
-                        value: delta,
-                        color: delta > 0 ? '#26a69a' : '#ef5350',
-                    };
-                }
-                return null;
-            }).filter(item => item !== null);
+        // Calculer et ajouter le MACD si la série existe
+        if (macdSeries) {
+            const prices = data.map(candle => candle.close);
+            const macd = calculateMACD(prices);
             
-            macdSeries.setData(macdData);
-            console.log(`✅ [CHART] MACD ajouté avec ${macdData.length} points`);
+            if (macd && macd.delta) {
+                const macdData = macd.delta.map((delta, index) => {
+                    if (index < data.length && delta !== null && delta !== undefined) {
+                        return {
+                            time: Math.floor(data[index].timestamp / 1000),
+                            value: delta,
+                            color: delta > 0 ? '#26a69a' : '#ef5350',
+                        };
+                    }
+                    return null;
+                }).filter(item => item !== null);
+                
+                macdSeries.setData(macdData);
+                console.log(`✅ [CHART] MACD ajouté avec ${macdData.length} points`);
+            }
         }
         
         // Ajuster la vue
@@ -1399,8 +1464,135 @@ async function createLightweightChart(symbol, container) {
         
     } catch (error) {
         console.error('❌ [CHART] Erreur lors de la création du graphique:', error);
-        container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">Erreur: ${error.message}</div>`;
+        
+        // Fallback : créer un graphique simple avec Canvas
+        try {
+            console.log('🔄 [CHART] Tentative de fallback avec graphique simple...');
+            createSimpleChart(symbol, container);
+        } catch (fallbackError) {
+            console.error('❌ [CHART] Erreur fallback:', fallbackError);
+            container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
+                    <div>Impossible de charger le graphique</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Erreur: ${error.message}</div>
+                </div>
+            </div>`;
+        }
     }
+}
+
+// Fonction de fallback pour créer un graphique simple
+async function createSimpleChart(symbol, container) {
+    try {
+        console.log('🔄 [CHART] Création d\'un graphique simple pour', symbol);
+        
+        // Charger les données historiques
+        const data = await getBinanceKlineData(symbol, 100, '15m');
+        
+        if (data.length === 0) {
+            throw new Error('Aucune donnée historique disponible');
+        }
+        
+        // Créer un graphique simple avec du texte
+        const prices = data.map(candle => candle.close);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        const currentPrice = prices[prices.length - 1];
+        const firstPrice = prices[0];
+        const change = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(2);
+        
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 500px; background: #f8f9fa; border-radius: 8px; padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: #2d3748;">${symbol}</h3>
+                    <div style="font-size: 24px; font-weight: bold; color: ${change >= 0 ? '#26a69a' : '#ef5350'}; margin: 10px 0;">
+                        $${currentPrice.toFixed(4)}
+                    </div>
+                    <div style="font-size: 14px; color: ${change >= 0 ? '#26a69a' : '#ef5350'};">
+                        ${change >= 0 ? '+' : ''}${change}%
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; width: 100%; max-width: 400px;">
+                    <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Prix Max</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #26a69a;">$${maxPrice.toFixed(4)}</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Prix Min</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #ef5350;">$${minPrice.toFixed(4)}</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 12px; color: #1976d2; margin-bottom: 5px;">📊 Données chargées</div>
+                    <div style="font-size: 14px; color: #1976d2; font-weight: bold;">${data.length} bougies (15m)</div>
+                </div>
+                
+                <div style="margin-top: 15px; font-size: 12px; color: #666; text-align: center;">
+                    Graphique simplifié - Les marqueurs de trades apparaîtront après le backtesting
+                </div>
+            </div>
+        `;
+        
+        // Créer un objet simple pour les marqueurs
+        lightweightChart = {
+            candleSeries: {
+                setMarkers: function(markers) {
+                    console.log(`📊 [CHART] ${markers.length} marqueurs reçus pour affichage simplifié`);
+                    // Ajouter les marqueurs visuellement dans le graphique simple
+                    addSimpleMarkers(container, markers);
+                }
+            }
+        };
+        
+        console.log('✅ [CHART] Graphique simple créé avec succès');
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur création graphique simple:', error);
+        throw error;
+    }
+}
+
+// Fonction pour ajouter des marqueurs simples
+function addSimpleMarkers(container, markers) {
+    const markersDiv = container.querySelector('.simple-markers');
+    if (markersDiv) {
+        markersDiv.remove();
+    }
+    
+    const newMarkersDiv = document.createElement('div');
+    newMarkersDiv.className = 'simple-markers';
+    newMarkersDiv.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: white;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        max-width: 200px;
+        font-size: 12px;
+    `;
+    
+    const entriesCount = markers.filter(m => m.shape === 'arrowUp').length;
+    const exitsCount = markers.filter(m => m.shape === 'arrowDown').length;
+    
+    newMarkersDiv.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 8px; color: #2d3748;">📊 Trades</div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span style="color: #26a69a;">📈 Entrées:</span>
+            <span style="font-weight: bold;">${entriesCount}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <span style="color: #ef5350;">📉 Sorties:</span>
+            <span style="font-weight: bold;">${exitsCount}</span>
+        </div>
+    `;
+    
+    container.style.position = 'relative';
+    container.appendChild(newMarkersDiv);
 }
 
 // Nouvelle fonction pour ajouter les marqueurs de trades
@@ -1418,14 +1610,14 @@ function addTradeMarkersToChart() {
             return;
         }
         
-        // Récupérer la série de bougies (première série)
-        const series = lightweightChart.series();
-        if (series.length === 0) {
-            console.warn('⚠️ [CHART] Aucune série disponible pour les marqueurs');
+        // Récupérer la série de bougies - nouvelle approche
+        // Stocker la référence à la série de bougies lors de sa création
+        if (!lightweightChart.candleSeries) {
+            console.warn('⚠️ [CHART] Série de bougies non disponible pour les marqueurs');
             return;
         }
         
-        const candleSeries = series[0];
+        const candleSeries = lightweightChart.candleSeries;
         const trades = backtestResults.trades;
         
         // Limiter à 100 marqueurs max pour éviter la surcharge
