@@ -1733,8 +1733,11 @@ function addPositionedTradeMarkers() {
         // Attendre que le graphique soit chargé
         setTimeout(() => {
             try {
-                // Calculer les positions des marqueurs avec les données de backtesting
-                calculateMarkersWithBacktestData();
+                // Calculer les positions des marqueurs avec synchronisation
+                calculateMarkersWithChartSync();
+                
+                // Démarrer la synchronisation avec le zoom/défilement
+                syncMarkersWithChart();
                 
                 // Ajouter aussi l'overlay de résumé
                 addCustomOverlays();
@@ -1996,5 +1999,317 @@ function clearPositionedMarkers() {
         
     } catch (error) {
         console.error('❌ [CLEANUP] Erreur nettoyage marqueurs positionnés:', error);
+    }
+}
+
+// Variables pour le suivi du zoom et du défilement
+let chartSyncInterval = null;
+let lastVisibleRange = null;
+let isChartReady = false;
+
+// NOUVELLE FONCTION : Synchroniser les marqueurs avec le zoom/défilement TradingView
+function syncMarkersWithChart() {
+    try {
+        console.log('🔄 [SYNC] Initialisation de la synchronisation des marqueurs...');
+        
+        if (!backtestTradingViewWidget || !backtestResults || !backtestResults.trades) {
+            console.log('⚠️ [SYNC] Widget ou résultats non disponibles');
+            return;
+        }
+        
+        // Attendre que le graphique soit prêt
+        if (backtestTradingViewWidget.onChartReady) {
+            backtestTradingViewWidget.onChartReady(() => {
+                console.log('✅ [SYNC] Graphique prêt, démarrage de la synchronisation');
+                isChartReady = true;
+                startChartSynchronization();
+            });
+        } else {
+            // Fallback si onChartReady n'est pas disponible
+            setTimeout(() => {
+                isChartReady = true;
+                startChartSynchronization();
+            }, 3000);
+        }
+        
+    } catch (error) {
+        console.error('❌ [SYNC] Erreur initialisation synchronisation:', error);
+    }
+}
+
+// Fonction pour démarrer la synchronisation
+function startChartSynchronization() {
+    try {
+        console.log('🚀 [SYNC] Démarrage de la synchronisation en temps réel...');
+        
+        // Nettoyer l'ancien intervalle s'il existe
+        if (chartSyncInterval) {
+            clearInterval(chartSyncInterval);
+        }
+        
+        // Créer un intervalle pour vérifier les changements de vue
+        chartSyncInterval = setInterval(() => {
+            try {
+                checkAndUpdateMarkerPositions();
+            } catch (error) {
+                console.error('❌ [SYNC] Erreur dans l\'intervalle de synchronisation:', error);
+            }
+        }, 100); // Vérifier toutes les 100ms
+        
+        // Ajouter des listeners pour les événements de zoom/défilement si disponibles
+        addChartEventListeners();
+        
+        console.log('✅ [SYNC] Synchronisation démarrée');
+        
+    } catch (error) {
+        console.error('❌ [SYNC] Erreur démarrage synchronisation:', error);
+    }
+}
+
+// Fonction pour vérifier et mettre à jour les positions des marqueurs
+function checkAndUpdateMarkerPositions() {
+    try {
+        if (!isChartReady || !backtestTradingViewWidget) return;
+        
+        // Essayer d'obtenir la plage visible du graphique
+        let currentVisibleRange = null;
+        
+        try {
+            // Méthode 1: Essayer d'accéder à la plage visible via l'API
+            if (backtestTradingViewWidget.chart && backtestTradingViewWidget.chart().getVisibleRange) {
+                currentVisibleRange = backtestTradingViewWidget.chart().getVisibleRange();
+            }
+        } catch (apiError) {
+            // Méthode 2: Détecter les changements via les dimensions du container
+            currentVisibleRange = detectVisibleRangeChange();
+        }
+        
+        // Vérifier si la plage visible a changé
+        if (hasVisibleRangeChanged(currentVisibleRange)) {
+            console.log('🔄 [SYNC] Changement de vue détecté, repositionnement des marqueurs...');
+            lastVisibleRange = currentVisibleRange;
+            
+            // Repositionner tous les marqueurs
+            repositionAllMarkers();
+        }
+        
+    } catch (error) {
+        // Erreur silencieuse pour éviter de spammer les logs
+        if (error.message && !error.message.includes('getVisibleRange')) {
+            console.error('❌ [SYNC] Erreur vérification positions:', error);
+        }
+    }
+}
+
+// Fonction pour détecter les changements de plage visible
+function detectVisibleRangeChange() {
+    try {
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return null;
+        
+        // Utiliser une heuristique basée sur les dimensions et le scroll
+        const rect = chartContainer.getBoundingClientRect();
+        const scrollInfo = {
+            width: rect.width,
+            height: rect.height,
+            timestamp: Date.now()
+        };
+        
+        return scrollInfo;
+        
+    } catch (error) {
+        return null;
+    }
+}
+
+// Fonction pour vérifier si la plage visible a changé
+function hasVisibleRangeChanged(currentRange) {
+    if (!lastVisibleRange || !currentRange) return true;
+    
+    // Comparer les plages (adaptation selon le type de données disponibles)
+    if (currentRange.from !== undefined && currentRange.to !== undefined) {
+        return currentRange.from !== lastVisibleRange.from || 
+               currentRange.to !== lastVisibleRange.to;
+    }
+    
+    // Fallback: comparer les timestamps
+    return Math.abs(currentRange.timestamp - lastVisibleRange.timestamp) > 500;
+}
+
+// Fonction pour repositionner tous les marqueurs
+function repositionAllMarkers() {
+    try {
+        console.log('📍 [REPOSITION] Repositionnement des marqueurs...');
+        
+        // Nettoyer les marqueurs existants
+        clearPositionedMarkers();
+        
+        // Recalculer et repositionner avec les nouvelles coordonnées
+        setTimeout(() => {
+            calculateMarkersWithChartSync();
+        }, 50);
+        
+    } catch (error) {
+        console.error('❌ [REPOSITION] Erreur repositionnement:', error);
+    }
+}
+
+// Fonction améliorée pour calculer les positions avec synchronisation
+function calculateMarkersWithChartSync() {
+    try {
+        console.log('📊 [CALC_SYNC] Calcul des positions avec synchronisation...');
+        
+        if (!backtestData || backtestData.length === 0 || !backtestResults || !backtestResults.trades) {
+            console.log('⚠️ [CALC_SYNC] Données manquantes');
+            return;
+        }
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        // Obtenir les dimensions actuelles du graphique
+        const chartRect = chartContainer.getBoundingClientRect();
+        const chartWidth = chartRect.width;
+        const chartHeight = chartRect.height;
+        
+        // Essayer d'obtenir la plage visible actuelle
+        let visibleTimeRange = null;
+        let visiblePriceRange = null;
+        
+        try {
+            if (backtestTradingViewWidget.chart && backtestTradingViewWidget.chart().getVisibleRange) {
+                const range = backtestTradingViewWidget.chart().getVisibleRange();
+                visibleTimeRange = range;
+                console.log('📊 [CALC_SYNC] Plage visible obtenue:', range);
+            }
+        } catch (apiError) {
+            console.log('⚠️ [CALC_SYNC] Impossible d\'obtenir la plage visible, utilisation des données complètes');
+        }
+        
+        // Utiliser les données complètes si pas de plage visible
+        const firstCandle = backtestData[0];
+        const lastCandle = backtestData[backtestData.length - 1];
+        
+        const timeStart = visibleTimeRange ? visibleTimeRange.from * 1000 : firstCandle.timestamp;
+        const timeEnd = visibleTimeRange ? visibleTimeRange.to * 1000 : lastCandle.timestamp;
+        const totalTimeSpan = timeEnd - timeStart;
+        
+        // Calculer la plage de prix pour la période visible
+        const visibleCandles = backtestData.filter(candle => 
+            candle.timestamp >= timeStart && candle.timestamp <= timeEnd
+        );
+        
+        let minPrice, maxPrice;
+        if (visibleCandles.length > 0) {
+            minPrice = Math.min(...visibleCandles.map(d => d.low));
+            maxPrice = Math.max(...visibleCandles.map(d => d.high));
+        } else {
+            minPrice = Math.min(...backtestData.map(d => d.low));
+            maxPrice = Math.max(...backtestData.map(d => d.high));
+        }
+        
+        const priceRange = maxPrice - minPrice;
+        
+        console.log(`📊 [CALC_SYNC] Période visible: ${new Date(timeStart).toLocaleString()} à ${new Date(timeEnd).toLocaleString()}`);
+        console.log(`📊 [CALC_SYNC] Prix visibles: ${minPrice.toFixed(4)} à ${maxPrice.toFixed(4)}`);
+        
+        // Repositionner chaque trade visible
+        let visibleTrades = 0;
+        backtestResults.trades.forEach((trade, index) => {
+            try {
+                // Vérifier si le trade est dans la plage visible
+                if (trade.entryTime >= timeStart && trade.entryTime <= timeEnd) {
+                    // Calculer la position X basée sur la plage visible
+                    const timeProgress = (trade.entryTime - timeStart) / totalTimeSpan;
+                    const xPosition = 60 + (timeProgress * (chartWidth - 120));
+                    
+                    // Calculer la position Y basée sur la plage de prix visible
+                    const priceProgress = (trade.entryPrice - minPrice) / priceRange;
+                    const yPosition = chartHeight - 60 - (priceProgress * (chartHeight - 120));
+                    
+                    // Créer le marqueur seulement s'il est dans la vue
+                    if (xPosition >= 60 && xPosition <= chartWidth - 60) {
+                        createPositionedMarker(trade, index, xPosition, yPosition, chartContainer);
+                        visibleTrades++;
+                    }
+                }
+                
+            } catch (markerError) {
+                console.error(`❌ [CALC_SYNC] Erreur marqueur #${index + 1}:`, markerError);
+            }
+        });
+        
+        console.log(`✅ [CALC_SYNC] ${visibleTrades} marqueurs repositionnés pour la vue actuelle`);
+        
+    } catch (error) {
+        console.error('❌ [CALC_SYNC] Erreur calcul synchronisé:', error);
+    }
+}
+
+// Fonction pour ajouter des listeners d'événements du graphique
+function addChartEventListeners() {
+    try {
+        console.log('📡 [LISTENERS] Ajout des listeners d\'événements...');
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        // Listener pour les événements de scroll/zoom sur le container
+        chartContainer.addEventListener('wheel', (event) => {
+            // Déclencher une mise à jour après un court délai
+            setTimeout(() => {
+                repositionAllMarkers();
+            }, 100);
+        });
+        
+        // Listener pour les changements de taille
+        window.addEventListener('resize', () => {
+            setTimeout(() => {
+                repositionAllMarkers();
+            }, 200);
+        });
+        
+        // Essayer d'ajouter des listeners TradingView spécifiques
+        try {
+            if (backtestTradingViewWidget.chart) {
+                const chart = backtestTradingViewWidget.chart();
+                
+                // Listener pour les changements de plage visible
+                if (chart.onVisibleRangeChanged) {
+                    chart.onVisibleRangeChanged().subscribe(null, () => {
+                        setTimeout(() => {
+                            repositionAllMarkers();
+                        }, 50);
+                    });
+                }
+            }
+        } catch (tvError) {
+            console.log('⚠️ [LISTENERS] Listeners TradingView non disponibles, utilisation des fallbacks');
+        }
+        
+        console.log('✅ [LISTENERS] Listeners ajoutés');
+        
+    } catch (error) {
+        console.error('❌ [LISTENERS] Erreur ajout listeners:', error);
+    }
+}
+
+// Fonction pour arrêter la synchronisation
+function stopChartSynchronization() {
+    try {
+        console.log('⏹️ [SYNC] Arrêt de la synchronisation...');
+        
+        if (chartSyncInterval) {
+            clearInterval(chartSyncInterval);
+            chartSyncInterval = null;
+        }
+        
+        isChartReady = false;
+        lastVisibleRange = null;
+        
+        console.log('✅ [SYNC] Synchronisation arrêtée');
+        
+    } catch (error) {
+        console.error('❌ [SYNC] Erreur arrêt synchronisation:', error);
     }
 }
