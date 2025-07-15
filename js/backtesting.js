@@ -182,6 +182,16 @@ function cleanupBacktestingVariables() {
             equityChart = null;
         }
         
+        // Nettoyer le graphique TradingView
+        if (backtestTradingViewWidget) {
+            try {
+                backtestTradingViewWidget.remove();
+            } catch (chartError) {
+                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', chartError);
+            }
+            backtestTradingViewWidget = null;
+        }
+        
         // Réinitialiser l'état
         backtestRunning = false;
         
@@ -1177,6 +1187,15 @@ function updateSelectedPair() {
         stopBacktest();
         log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
     }
+    
+    // Créer le graphique TradingView pour la nouvelle paire
+    if (symbol && typeof updateBacktestChart === 'function') {
+        // Vérifier si l'onglet backtesting est actif
+        const backtestingTab = document.getElementById('backtesting');
+        if (backtestingTab && backtestingTab.classList.contains('active')) {
+            setTimeout(() => updateBacktestChart(symbol), 500);
+        }
+    }
 }
 
 // Rendre les fonctions accessibles globalement
@@ -1184,6 +1203,135 @@ window.startBacktest = startBacktest;
 window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
+
+// NOUVELLE FONCTION : Créer et mettre à jour le graphique TradingView pour backtesting
+let backtestTradingViewWidget = null;
+
+function updateBacktestChart(symbol) {
+    try {
+        console.log(`🔄 [CHART] Mise à jour du graphique TradingView pour ${symbol}`);
+        
+        // Vérifier si TradingView est disponible
+        if (typeof TradingView === 'undefined') {
+            console.error('❌ [CHART] TradingView non disponible');
+            return;
+        }
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        const placeholder = document.getElementById('backtestChartPlaceholder');
+        
+        if (!chartContainer) {
+            console.error('❌ [CHART] Container backtestTradingViewChart non trouvé');
+            return;
+        }
+        
+        // Masquer le placeholder
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+        
+        // Détruire le widget existant s'il existe
+        if (backtestTradingViewWidget) {
+            try {
+                backtestTradingViewWidget.remove();
+            } catch (error) {
+                console.warn('⚠️ [CHART] Erreur lors de la suppression du widget existant:', error);
+            }
+            backtestTradingViewWidget = null;
+        }
+        
+        // Vider le container
+        chartContainer.innerHTML = '';
+        
+        // Créer un nouveau widget TradingView
+        backtestTradingViewWidget = new TradingView.widget({
+            autosize: true,
+            symbol: `BINANCE:${symbol}`,
+            interval: '15',
+            timezone: 'Etc/UTC',
+            theme: 'light',
+            style: '1',
+            locale: 'fr',
+            toolbar_bg: '#f1f3f6',
+            enable_publishing: false,
+            hide_top_toolbar: false,
+            hide_legend: false,
+            save_image: false,
+            container_id: 'backtestTradingViewChart',
+            studies: [
+                {
+                    id: 'MACD@tv-basicstudies',
+                    inputs: {
+                        fastLength: 12,
+                        slowLength: 26,
+                        MACDLength: 9,
+                        source: 'close'
+                    }
+                }
+            ],
+            loading_screen: {
+                backgroundColor: '#f8f9fa',
+                foregroundColor: '#2196F3'
+            },
+            disabled_features: [
+                'use_localstorage_for_settings',
+                'volume_force_overlay',
+                'create_volume_indicator_by_default'
+            ],
+            enabled_features: [
+                'study_templates'
+            ],
+            overrides: {
+                'paneProperties.background': '#ffffff',
+                'paneProperties.vertGridProperties.color': '#e1e4e8',
+                'paneProperties.horzGridProperties.color': '#e1e4e8',
+                'symbolWatermarkProperties.transparency': 90,
+                'scalesProperties.textColor': '#666666'
+            }
+        });
+        
+        console.log(`✅ [CHART] Graphique TradingView créé pour ${symbol}`);
+        
+        // Ajouter un listener pour quand le graphique est prêt
+        if (backtestTradingViewWidget.onChartReady) {
+            backtestTradingViewWidget.onChartReady(() => {
+                console.log('✅ [CHART] Graphique TradingView prêt');
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ [CHART] Erreur création graphique TradingView:', error);
+        
+        // Afficher le placeholder en cas d'erreur
+        const placeholder = document.getElementById('backtestChartPlaceholder');
+        if (placeholder) {
+            placeholder.style.display = 'block';
+            placeholder.textContent = '❌ Erreur lors du chargement du graphique TradingView';
+        }
+    }
+}
+
+// Fonction pour tester la disponibilité de TradingView
+function testTradingViewAvailability() {
+    console.log('🧪 [TEST] Test de disponibilité TradingView...');
+    
+    if (typeof TradingView === 'undefined') {
+        console.error('❌ [TEST] TradingView non disponible - Vérifiez la connexion internet');
+        return false;
+    }
+    
+    if (typeof TradingView.widget === 'undefined') {
+        console.error('❌ [TEST] TradingView.widget non disponible');
+        return false;
+    }
+    
+    console.log('✅ [TEST] TradingView disponible et fonctionnel');
+    return true;
+}
+
+// Rendre les nouvelles fonctions accessibles globalement
+window.updateBacktestChart = updateBacktestChart;
+window.testTradingViewAvailability = testTradingViewAvailability;
 
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
