@@ -550,6 +550,15 @@ function stopBacktest() {
 async function updateBacktestConfig() {
     try {
         console.log('🔍 [DEBUG] Vérification des éléments HTML pour backtesting...');
+        console.log('🔍 [DEBUG] DOM ready state:', document.readyState);
+        
+        // Attendre que le DOM soit prêt si nécessaire
+        if (document.readyState === 'loading') {
+            console.log('🔍 [DEBUG] DOM en cours de chargement, attente...');
+            await new Promise(resolve => {
+                document.addEventListener('DOMContentLoaded', resolve);
+            });
+        }
         
         const elements = {
             backtestDuration: document.getElementById('backtestDuration'),
@@ -557,11 +566,16 @@ async function updateBacktestConfig() {
             backtestTrailingStop: document.getElementById('backtestTrailingStop')
         };
         
+        console.log('🔍 [DEBUG] Éléments recherchés:', Object.keys(elements));
+        
         // Vérifier chaque élément
         for (const [name, element] of Object.entries(elements)) {
             if (!element) {
                 console.error(`❌ [DEBUG] Élément HTML manquant: ${name}`);
+                console.error(`❌ [DEBUG] Élément recherché avec getElementById('${name}'):`, element);
                 throw new Error(`Élément HTML manquant: ${name}`);
+            } else {
+                console.log(`✅ [DEBUG] Élément trouvé: ${name}`);
             }
         }
         
