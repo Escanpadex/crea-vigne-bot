@@ -40,8 +40,6 @@ let backtestConfig = {
     capital: 1000, // Capital fixe
     positionSize: 10, // pourcentage
     trailingStop: 1.5, // pourcentage
-    takeProfit: 4, // pourcentage
-    enableTakeProfit: true, // activer/désactiver le take profit
     disableSampling: true, // analyser toutes les bougies
     
     // Options de debug
@@ -91,8 +89,6 @@ function initializeBacktestingVariables() {
                 capital: 1000,
                 positionSize: 10,
                 trailingStop: 1.5,
-                takeProfit: 4,
-                enableTakeProfit: true,
                 disableSampling: true
             };
             console.log('⚠️ [INIT] backtestConfig réinitialisé avec valeurs par défaut');
@@ -387,8 +383,6 @@ async function runSimplifiedBacktest(symbol) {
                         reason: 'MACD Crossover',
                         highestPrice: currentCandle.close,
                         stopLossPrice: currentCandle.close * (1 - backtestConfig.trailingStop / 100),
-                        takeProfitPrice: backtestConfig.enableTakeProfit ? 
-                            currentCandle.close * (1 + backtestConfig.takeProfit / 100) : null
                     };
                     
                     openTrades.push(trade);
@@ -442,12 +436,6 @@ async function runSimplifiedBacktest(symbol) {
                     if (currentCandle.low <= trade.stopLossPrice) {
                         closeReason = 'Stop Loss';
                         closePrice = trade.stopLossPrice;
-                    }
-                    
-                    // Vérifier take profit
-                    if (trade.takeProfitPrice && currentCandle.high >= trade.takeProfitPrice) {
-                        closeReason = 'Take Profit';
-                        closePrice = trade.takeProfitPrice;
                     }
                     
                     // Fermer la position LONG
@@ -566,9 +554,7 @@ async function updateBacktestConfig() {
         const elements = {
             backtestDuration: document.getElementById('backtestDuration'),
             backtestPositionSize: document.getElementById('backtestPositionSize'),
-            backtestTrailingStop: document.getElementById('backtestTrailingStop'),
-            backtestTakeProfit: document.getElementById('backtestTakeProfit'),
-            enableTakeProfit: document.getElementById('enableTakeProfit')
+            backtestTrailingStop: document.getElementById('backtestTrailingStop')
         };
         
         // Vérifier chaque élément
@@ -583,8 +569,6 @@ async function updateBacktestConfig() {
         const duration = elements.backtestDuration.value;
         const positionSize = elements.backtestPositionSize.value;
         const trailingStop = elements.backtestTrailingStop.value;
-        const takeProfit = elements.backtestTakeProfit.value;
-        const enableTakeProfit = elements.enableTakeProfit.checked;
         
         // Construire la configuration simplifiée
         backtestConfig = {
@@ -593,8 +577,6 @@ async function updateBacktestConfig() {
             capital: 1000,
             positionSize: parseFloat(positionSize),
             trailingStop: parseFloat(trailingStop),
-            takeProfit: parseFloat(takeProfit),
-            enableTakeProfit: enableTakeProfit,
             disableSampling: true,
             debugMode: false,
             enablePrecisionTrailingStop: true,
@@ -619,11 +601,6 @@ function validateBacktestConfig() {
     
     if (backtestConfig.trailingStop < 0.1 || backtestConfig.trailingStop > 5) {
         alert('Le trailing stop loss doit être entre 0.1% et 5%');
-        return false;
-    }
-    
-    if (backtestConfig.enableTakeProfit && (backtestConfig.takeProfit < 0.1 || backtestConfig.takeProfit > 20)) {
-        alert('Le take profit doit être entre 0.1% et 20%');
         return false;
     }
     
@@ -1188,89 +1165,11 @@ function updateSelectedPair() {
     }
 }
 
-// Fonction pour activer/désactiver le Take Profit avec case à cocher simple
-function toggleTakeProfit(event) {
-    const enableCheckbox = document.getElementById('enableTakeProfit');
-    const takeProfitInput = document.getElementById('backtestTakeProfit');
-    const container = takeProfitInput.closest('.take-profit-container');
-    
-    // Appliquer les styles selon l'état actuel
-    if (enableCheckbox.checked) {
-        // Activé
-        takeProfitInput.disabled = false;
-        takeProfitInput.style.opacity = '1';
-        takeProfitInput.style.background = 'white';
-        takeProfitInput.style.color = '#2d3748';
-        
-        // Effet sur le container
-        if (container) {
-            container.style.background = 'linear-gradient(135deg, #f0fff4, #e6fffa)';
-            container.style.borderColor = '#48bb78';
-        }
-        
-        log('✅ Take Profit activé', 'INFO');
-    } else {
-        // Désactivé
-        takeProfitInput.disabled = true;
-        takeProfitInput.style.opacity = '0.5';
-        takeProfitInput.style.background = '#f5f5f5';
-        takeProfitInput.style.color = '#a0a0a0';
-        
-        // Effet sur le container
-        if (container) {
-            container.style.background = 'linear-gradient(135deg, #f8f9fa, #e9ecef)';
-            container.style.borderColor = '#cbd5e0';
-        }
-        
-        log('❌ Take Profit désactivé - Utilisation du trailing stop loss uniquement', 'INFO');
-    }
-}
-
 // Rendre les fonctions accessibles globalement
 window.startBacktest = startBacktest;
 window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
-window.toggleTakeProfit = toggleTakeProfit;
-
-// Fonction pour initialiser la case à cocher Take Profit
-function initializeTakeProfitToggle() {
-    const enableCheckbox = document.getElementById('enableTakeProfit');
-    const takeProfitInput = document.getElementById('backtestTakeProfit');
-    const container = takeProfitInput ? takeProfitInput.closest('.take-profit-container') : null;
-    
-    if (!enableCheckbox || !takeProfitInput) {
-        console.warn('⚠️ Éléments Take Profit manquants pour l\'initialisation');
-        return;
-    }
-    
-    // Appliquer l'état initial basé sur la checkbox
-    if (enableCheckbox.checked) {
-        // Activé par défaut
-        takeProfitInput.disabled = false;
-        takeProfitInput.style.opacity = '1';
-        takeProfitInput.style.background = 'white';
-        takeProfitInput.style.color = '#2d3748';
-        
-        if (container) {
-            container.style.background = 'linear-gradient(135deg, #f0fff4, #e6fffa)';
-            container.style.borderColor = '#48bb78';
-        }
-    } else {
-        // Désactivé
-        takeProfitInput.disabled = true;
-        takeProfitInput.style.opacity = '0.5';
-        takeProfitInput.style.background = '#f5f5f5';
-        takeProfitInput.style.color = '#a0a0a0';
-        
-        if (container) {
-            container.style.background = 'linear-gradient(135deg, #f8f9fa, #e9ecef)';
-            container.style.borderColor = '#cbd5e0';
-        }
-    }
-    
-    console.log('✅ Case à cocher Take Profit initialisée');
-}
 
 // Initialiser les événements
 document.addEventListener('DOMContentLoaded', function() {
@@ -1282,8 +1181,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'backtestDuration',
         'backtestPositionSize',
         'backtestTrailingStop',
-        'backtestTakeProfit',
-        'enableTakeProfit',
         'startBacktestBtn',
         'stopBacktestBtn'
     ];
@@ -1300,8 +1197,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('⚠️ Éléments HTML manquants pour le backtesting:', missingElements);
     } else {
         console.log('✅ Tous les éléments HTML critiques sont présents');
-        // Initialiser le toggle switch Take Profit
-        setTimeout(initializeTakeProfitToggle, 100);
     }
 });
 
