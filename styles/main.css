@@ -144,39 +144,7 @@ input:focus, select:focus {
     }
 }
 
-/* Animation pulse pour les indicateurs Take Profit */
-@keyframes pulse {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    50% {
-        opacity: 0.7;
-        transform: scale(1.1);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
 
-/* Styles pour les inputs Take Profit améliorés */
-.take-profit-input-focused {
-    border-color: #48bb78 !important;
-    box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1) !important;
-}
-
-/* Styles pour les cases à cocher Take Profit */
-input[type="checkbox"] {
-    transition: all 0.3s ease;
-}
-
-/* Effet hover pour les containers Take Profit */
-.take-profit-container:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.15) !important;
-    transition: all 0.3s ease;
-}
 
 .grid {
     display: grid;
