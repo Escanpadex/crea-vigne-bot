@@ -31,9 +31,7 @@ let backtestData = null;
 let backtestResults = null;
 let backtestInterval = null;
 let equityChart = null;
-let backtestTradingViewWidget = null;
 let precisionData = [];  // Nouvelle variable globale pour stocker toutes les bougies de précision (ex. 3m) pré-chargées
-// Variable supprimée : lightweightChart (plus nécessaire avec TradingView)
 
 // Configuration du backtesting (simplifiée)
 let backtestConfig = {
@@ -186,23 +184,6 @@ function cleanupBacktestingVariables() {
                 console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du graphique:', chartError);
             }
             equityChart = null;
-        }
-        
-        // Nettoyer le graphique TradingView
-        if (backtestTradingViewWidget) {
-            try {
-                // Vérification sécurisée avant suppression
-                if (backtestTradingViewWidget && 
-                    typeof backtestTradingViewWidget.remove === 'function' && 
-                    backtestTradingViewWidget._id) {
-                    backtestTradingViewWidget.remove();
-                } else {
-                    console.log('⚠️ [CLEANUP] Méthode remove non disponible ou widget invalide pour le widget TradingView');
-                }
-            } catch (chartError) {
-                console.warn('⚠️ [CLEANUP] Erreur lors de la destruction du widget TradingView:', chartError);
-            }
-            backtestTradingViewWidget = null;
         }
         
         // Réinitialiser l'état
@@ -1205,29 +1186,6 @@ function updateSelectedPair() {
         stopBacktest();
         log('⏹️ Backtesting arrêté - Nouvelle paire sélectionnée', 'INFO');
     }
-    
-    // Nettoyer le graphique existant avant de créer le nouveau
-    if (backtestTradingViewWidget) {
-        try {
-            // Vérification sécurisée avant suppression
-            if (backtestTradingViewWidget && 
-                typeof backtestTradingViewWidget.remove === 'function' && 
-                backtestTradingViewWidget._id) {
-                backtestTradingViewWidget.remove();
-                console.log('✅ [UPDATE] Widget TradingView précédent nettoyé');
-            } else {
-                console.log('⚠️ [UPDATE] Méthode remove non disponible ou widget invalide');
-            }
-        } catch (error) {
-            console.warn('⚠️ [UPDATE] Erreur nettoyage widget TradingView:', error);
-        }
-        backtestTradingViewWidget = null;
-    }
-    
-    // Mise à jour du graphique avec un délai pour s'assurer que le nettoyage est terminé
-    if (typeof window.updateBacktestChart === 'function') {
-        setTimeout(() => window.updateBacktestChart(symbol), 100);
-    }
 }
 
 // Fonction pour activer/désactiver le Take Profit avec case à cocher simple
@@ -1274,223 +1232,6 @@ window.stopBacktest = stopBacktest;
 window.exportBacktestResults = exportBacktestResults;
 window.updateSelectedPair = updateSelectedPair;
 window.toggleTakeProfit = toggleTakeProfit;
-
-// Fonction simple pour créer un graphique TradingView de base
-window.updateBacktestChart = function(symbol) {
-    console.log(`🚀 [CHART] Création graphique TradingView simple pour ${symbol}`);
-    
-    const containerId = 'backtestTradingViewChart';
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error('❌ [CHART] Conteneur backtestTradingViewChart non trouvé');
-        return;
-    }
-    
-    // Vérifier que le conteneur est visible et a des dimensions
-    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-        console.warn('⚠️ [CHART] Conteneur non visible, tentative dans 1 seconde...');
-        setTimeout(() => window.updateBacktestChart(symbol), 1000);
-        return;
-    }
-    
-    console.log('✅ [CHART] Conteneur trouvé, dimensions:', container.offsetWidth, 'x', container.offsetHeight);
-    
-    const placeholder = document.getElementById('backtestChartPlaceholder');
-    if (placeholder) {
-        placeholder.style.display = 'none';
-        console.log('✅ [CHART] Placeholder masqué');
-    }
-    
-    // Nettoyer le graphique existant
-    if (backtestTradingViewWidget) {
-        try {
-            // Vérifier que le widget et sa méthode remove existent
-            if (backtestTradingViewWidget && 
-                typeof backtestTradingViewWidget.remove === 'function' && 
-                backtestTradingViewWidget._id) {
-                backtestTradingViewWidget.remove();
-                console.log('✅ [CHART] Widget TradingView précédent supprimé');
-            } else {
-                console.log('⚠️ [CHART] Méthode remove non disponible ou widget invalide, nettoyage du conteneur');
-            }
-        } catch (error) {
-            console.warn('⚠️ [CHART] Erreur lors de la suppression du widget TradingView:', error);
-        }
-        backtestTradingViewWidget = null;
-    }
-    
-    // Vider le container pour éviter les conflits
-    container.innerHTML = '';
-    
-    // Attendre un peu pour s'assurer que le nettoyage est terminé
-    setTimeout(async () => {
-        await createSimpleTradingViewChart(symbol, container);
-    }, 100);
-};
-
-// Fonction simple pour créer un graphique TradingView de base
-async function createSimpleTradingViewChart(symbol, container) {
-    try {
-        console.log(`🚀 [CHART] Création du graphique TradingView simple pour ${symbol}`);
-        
-        // Vérifier que TradingView est disponible
-        if (typeof TradingView === 'undefined') {
-            console.error('❌ [CHART] TradingView non disponible');
-            container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
-                    <div>TradingView non disponible</div>
-                    <div style="font-size: 12px; color: #999; margin-top: 5px;">Veuillez vérifier la connexion internet</div>
-                </div>
-            </div>`;
-            return;
-        }
-        
-        // Créer un ID unique pour le widget
-        const widgetId = `tradingview_${Date.now()}`;
-        container.innerHTML = `<div id="${widgetId}" style="width: 100%; height: 500px;"></div>`;
-        
-        // Attendre que le DOM soit mis à jour
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Configuration du widget TradingView
-        const widgetConfig = {
-            autosize: true,
-            symbol: `BINANCE:${symbol}`,
-            interval: "15",
-            timezone: "Etc/UTC",
-            theme: "light",
-            style: "1",
-            locale: "fr",
-            toolbar_bg: "#f1f3f6",
-            enable_publishing: false,
-            allow_symbol_change: true,
-            container_id: widgetId,
-            hide_side_toolbar: true,
-            hide_top_toolbar: false,
-            hide_legend: false,
-            save_image: false,
-            studies: [
-                "MACD@tv-basicstudies"
-            ],
-            backgroundColor: "#ffffff",
-            gridColor: "#e1e1e1",
-            upColor: "#26a69a",
-            downColor: "#ef5350",
-            borderUpColor: "#26a69a",
-            borderDownColor: "#ef5350",
-            wickUpColor: "#26a69a",
-            wickDownColor: "#ef5350"
-        };
-        
-        // Créer le widget avec vérification
-        backtestTradingViewWidget = new TradingView.widget(widgetConfig);
-        
-        // Vérifier si le widget a été créé correctement
-        if (!backtestTradingViewWidget) {
-            console.error('❌ [CHART] Échec de la création du widget TradingView');
-            throw new Error('Widget TradingView non créé');
-        }
-        
-        console.log('✅ [CHART] Widget TradingView créé avec succès');
-        
-        // Attendre que le widget soit chargé (avec vérification sûre)
-        // Note: onChartReady peut ne pas être disponible immédiatement
-        setTimeout(() => {
-            if (backtestTradingViewWidget && typeof backtestTradingViewWidget.onChartReady === 'function') {
-                try {
-                    backtestTradingViewWidget.onChartReady(() => {
-                        console.log('✅ [CHART] Graphique TradingView prêt');
-                    });
-                } catch (callbackError) {
-                    console.warn('⚠️ [CHART] Erreur lors du callback onChartReady:', callbackError);
-                }
-            } else {
-                console.log('ℹ️ [CHART] onChartReady non disponible ou widget invalide, continuation sans callback');
-            }
-        }, 100);
-        
-    } catch (error) {
-        console.error('❌ [CHART] Erreur lors de la création du graphique TradingView:', error);
-        
-        container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 500px; color: #666; font-size: 14px;">
-            <div style="text-align: center;">
-                <div style="font-size: 18px; margin-bottom: 10px;">📊</div>
-                <div>Erreur de chargement du graphique TradingView</div>
-                <div style="font-size: 12px; color: #999; margin-top: 5px;">Erreur: ${error.message}</div>
-                <button onclick="window.updateBacktestChart('${symbol}')" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    🔄 Réessayer
-                </button>
-            </div>
-        </div>`;
-    }
-}
-
-// Fonction de fallback supprimée - on force l'utilisation de Lightweight Charts
-
-// Fonction addSimpleMarkers supprimée - plus nécessaire
-
-// Fonction simplifiée pour ajouter les marqueurs de trades (TradingView)
-function addTradeMarkersToChart() {
-    try {
-        console.log('🎯 [CHART] Ajout des marqueurs de trades sur TradingView...');
-        
-        if (!backtestTradingViewWidget) {
-            console.warn('⚠️ [CHART] Widget TradingView non disponible pour les marqueurs');
-            return;
-        }
-        
-        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
-            console.log('📊 [CHART] Aucun trade à afficher');
-            return;
-        }
-        
-        // Note: TradingView ne permet pas d'ajouter des marqueurs personnalisés 
-        // via l'API publique du widget. Les marqueurs sont gérés par le backtesting.
-        console.log(`📊 [CHART] ${backtestResults.trades.length} trades disponibles dans les résultats`);
-        
-    } catch (error) {
-        console.error('❌ [CHART] Erreur lors de l\'ajout des marqueurs:', error);
-    }
-}
-
-// Fonction de test simplifiée pour TradingView
-function testTradingViewWidget() {
-    console.log('🧪 [TEST] === DIAGNOSTIC TRADINGVIEW ===');
-    console.log('🔍 [TEST] typeof TradingView:', typeof TradingView);
-    
-    if (typeof TradingView !== 'undefined') {
-        console.log('✅ [TEST] TradingView disponible');
-        console.log('📊 [TEST] Version:', TradingView.version || 'Non disponible');
-        console.log('🔍 [TEST] TradingView.widget:', typeof TradingView.widget);
-        
-        // Test de l'état du widget actuel
-        if (backtestTradingViewWidget) {
-            console.log('📊 [TEST] Widget actuel existe');
-            console.log('🔍 [TEST] Widget._id:', backtestTradingViewWidget._id || 'Non disponible');
-            console.log('🔍 [TEST] Widget.remove:', typeof backtestTradingViewWidget.remove);
-            console.log('🔍 [TEST] Widget.onChartReady:', typeof backtestTradingViewWidget.onChartReady);
-        } else {
-            console.log('📊 [TEST] Aucun widget actuel');
-        }
-        
-        // Test de recréation du graphique
-        const chartSymbol = document.getElementById('chartSymbol');
-        if (chartSymbol && chartSymbol.value) {
-            const symbol = chartSymbol.value.includes(':') ? 
-                chartSymbol.value.split(':')[1] : 
-                chartSymbol.value;
-            console.log('🔄 [TEST] Recréation du graphique pour', symbol);
-            setTimeout(() => window.updateBacktestChart(symbol), 1000);
-        }
-    } else {
-        console.error('❌ [TEST] TradingView non disponible');
-    }
-    console.log('🧪 [TEST] === FIN DIAGNOSTIC ===');
-}
-
-// Rendre la fonction de test accessible globalement
-window.testTradingViewWidget = testTradingViewWidget;
 
 // Fonction pour initialiser la case à cocher Take Profit
 function initializeTakeProfitToggle() {
