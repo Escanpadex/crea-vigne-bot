@@ -192,6 +192,15 @@ function cleanupBacktestingVariables() {
             backtestTradingViewWidget = null;
         }
         
+        // Nettoyer les marqueurs de trades
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (chartContainer) {
+            const markersInfo = document.getElementById('trade-markers-info');
+            if (markersInfo) {
+                markersInfo.remove();
+            }
+        }
+        
         // Réinitialiser l'état
         backtestRunning = false;
         
@@ -976,7 +985,7 @@ function displayBacktestResults() {
         }
         
         // Ajouter les marqueurs de trades sur le graphique
-        addTradeMarkersToChart();
+        addSimpleTradeMarkers();
         
     } catch (error) {
         log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
@@ -1230,6 +1239,12 @@ function updateBacktestChart(symbol) {
             placeholder.style.display = 'none';
         }
         
+        // Nettoyer les marqueurs existants
+        const existingMarkersInfo = document.getElementById('trade-markers-info');
+        if (existingMarkersInfo) {
+            existingMarkersInfo.remove();
+        }
+        
         // Détruire le widget existant s'il existe
         if (backtestTradingViewWidget) {
             try {
@@ -1363,3 +1378,272 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('✅ Simplified backtesting system loaded successfully');
+
+// Ajouter les marqueurs de trades sur le graphique
+function addTradeMarkersToChart() {
+    try {
+        console.log('📍 [MARKERS] Ajout des marqueurs de trades sur le graphique...');
+        
+        // Vérifier si le widget TradingView est disponible et les résultats existent
+        if (!backtestTradingViewWidget || !backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('⚠️ [MARKERS] Widget TradingView ou résultats non disponibles');
+            return;
+        }
+        
+        // Attendre que le graphique soit complètement chargé
+        setTimeout(() => {
+            try {
+                // Vérifier si le widget a la méthode onChartReady
+                if (backtestTradingViewWidget.onChartReady) {
+                    backtestTradingViewWidget.onChartReady(() => {
+                        addMarkersToChart();
+                    });
+                } else {
+                    // Fallback: essayer d'ajouter les marqueurs directement
+                    addMarkersToChart();
+                }
+            } catch (error) {
+                console.error('❌ [MARKERS] Erreur lors de l\'ajout des marqueurs:', error);
+            }
+        }, 2000); // Attendre 2 secondes que le graphique soit prêt
+        
+    } catch (error) {
+        console.error('❌ [MARKERS] Erreur dans addTradeMarkersToChart:', error);
+    }
+}
+
+// Fonction pour ajouter effectivement les marqueurs
+function addMarkersToChart() {
+    try {
+        console.log('📍 [MARKERS] Ajout effectif des marqueurs...');
+        
+        // Vérifier si le widget a accès aux études/annotations
+        if (!backtestTradingViewWidget.activeChart) {
+            console.log('⚠️ [MARKERS] activeChart non disponible, tentative alternative...');
+            
+            // Méthode alternative: utiliser les annotations via l'API TradingView
+            if (backtestTradingViewWidget.chart) {
+                addMarkersViaChart();
+            } else {
+                console.log('⚠️ [MARKERS] Impossible d\'accéder au graphique pour ajouter les marqueurs');
+            }
+            return;
+        }
+        
+        // Méthode principale: utiliser activeChart
+        addMarkersViaActiveChart();
+        
+    } catch (error) {
+        console.error('❌ [MARKERS] Erreur dans addMarkersToChart:', error);
+    }
+}
+
+// Méthode principale pour ajouter les marqueurs via activeChart
+function addMarkersViaActiveChart() {
+    try {
+        const chart = backtestTradingViewWidget.activeChart();
+        
+        if (!chart) {
+            console.log('⚠️ [MARKERS] Impossible d\'accéder à activeChart');
+            return;
+        }
+        
+        console.log(`📍 [MARKERS] Ajout de ${backtestResults.trades.length} marqueurs d'entrée...`);
+        
+        // Parcourir tous les trades et ajouter des marqueurs d'entrée
+        backtestResults.trades.forEach((trade, index) => {
+            try {
+                // Convertir le timestamp en format TradingView (secondes)
+                const entryTime = Math.floor(trade.entryTime / 1000);
+                
+                // Couleur selon le résultat du trade
+                const isProfit = trade.pnl > 0;
+                const color = isProfit ? '#28a745' : '#dc3545'; // Vert pour profit, rouge pour perte
+                const backgroundColor = isProfit ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
+                
+                // Créer le marqueur d'entrée
+                const marker = {
+                    time: entryTime,
+                    position: 'belowBar',
+                    color: color,
+                    shape: 'arrowUp',
+                    text: `📈 ENTRÉE #${index + 1}\n${trade.entryPrice.toFixed(4)}\n${trade.reason}`,
+                    size: 'small'
+                };
+                
+                // Ajouter le marqueur au graphique
+                chart.createShape({
+                    time: entryTime,
+                    price: trade.entryPrice
+                }, {
+                    shape: 'arrow_up',
+                    text: `ENTRÉE ${index + 1}`,
+                    overrides: {
+                        color: color,
+                        backgroundColor: backgroundColor,
+                        textColor: '#ffffff',
+                        fontSize: 10
+                    }
+                });
+                
+                console.log(`✅ [MARKERS] Marqueur #${index + 1} ajouté: ${trade.symbol} à ${trade.entryPrice.toFixed(4)}`);
+                
+            } catch (markerError) {
+                console.error(`❌ [MARKERS] Erreur marqueur #${index + 1}:`, markerError);
+            }
+        });
+        
+        console.log(`✅ [MARKERS] ${backtestResults.trades.length} marqueurs d'entrée ajoutés avec succès`);
+        
+    } catch (error) {
+        console.error('❌ [MARKERS] Erreur dans addMarkersViaActiveChart:', error);
+    }
+}
+
+// Méthode alternative pour ajouter les marqueurs
+function addMarkersViaChart() {
+    try {
+        console.log('📍 [MARKERS] Tentative d\'ajout via méthode alternative...');
+        
+        // Cette méthode utilise une approche différente si activeChart n'est pas disponible
+        // On peut essayer d'utiliser l'API de dessin directement
+        
+        if (backtestTradingViewWidget.chart && backtestTradingViewWidget.chart()) {
+            const chart = backtestTradingViewWidget.chart();
+            
+            // Créer des annotations pour chaque trade
+            backtestResults.trades.forEach((trade, index) => {
+                try {
+                    const entryTime = Math.floor(trade.entryTime / 1000);
+                    const isProfit = trade.pnl > 0;
+                    
+                    // Créer une annotation simple
+                    chart.createMultipointShape([{
+                        time: entryTime,
+                        price: trade.entryPrice
+                    }], {
+                        shape: 'icon',
+                        icon: isProfit ? '📈' : '📉',
+                        text: `Entrée #${index + 1}: ${trade.entryPrice.toFixed(4)}`,
+                        color: isProfit ? '#28a745' : '#dc3545'
+                    });
+                    
+                } catch (annotationError) {
+                    console.error(`❌ [MARKERS] Erreur annotation #${index + 1}:`, annotationError);
+                }
+            });
+            
+            console.log('✅ [MARKERS] Marqueurs ajoutés via méthode alternative');
+            
+        } else {
+            console.log('⚠️ [MARKERS] Aucune méthode disponible pour ajouter les marqueurs');
+        }
+        
+    } catch (error) {
+        console.error('❌ [MARKERS] Erreur dans addMarkersViaChart:', error);
+    }
+}
+
+// Fonction pour nettoyer les marqueurs existants
+function clearTradeMarkers() {
+    try {
+        console.log('🧹 [MARKERS] Nettoyage des marqueurs existants...');
+        
+        if (backtestTradingViewWidget && backtestTradingViewWidget.activeChart) {
+            const chart = backtestTradingViewWidget.activeChart();
+            if (chart && chart.getAllShapes) {
+                const shapes = chart.getAllShapes();
+                shapes.forEach(shape => {
+                    if (shape.name && shape.name.includes('ENTRÉE')) {
+                        chart.removeEntity(shape.id);
+                    }
+                });
+            }
+        }
+        
+        console.log('✅ [MARKERS] Marqueurs nettoyés');
+        
+    } catch (error) {
+        console.error('❌ [MARKERS] Erreur nettoyage marqueurs:', error);
+    }
+}
+
+// NOUVELLE FONCTION SIMPLIFIÉE : Ajouter des marqueurs via les données du graphique
+function addSimpleTradeMarkers() {
+    try {
+        console.log('📍 [SIMPLE_MARKERS] Ajout de marqueurs simplifiés...');
+        
+        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('⚠️ [SIMPLE_MARKERS] Aucun trade à marquer');
+            return;
+        }
+        
+        // Créer un indicateur visuel simple dans l'interface
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) {
+            console.log('⚠️ [SIMPLE_MARKERS] Container graphique non trouvé');
+            return;
+        }
+        
+        // Supprimer les marqueurs existants
+        const existingMarkers = chartContainer.querySelectorAll('.trade-marker');
+        existingMarkers.forEach(marker => marker.remove());
+        
+        // Ajouter un résumé des trades au-dessus du graphique
+        let markersInfo = document.getElementById('trade-markers-info');
+        if (!markersInfo) {
+            markersInfo = document.createElement('div');
+            markersInfo.id = 'trade-markers-info';
+            markersInfo.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: rgba(255, 255, 255, 0.9);
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid #e2e8f0;
+                font-size: 12px;
+                z-index: 1000;
+                max-width: 300px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            `;
+            chartContainer.appendChild(markersInfo);
+        }
+        
+        // Générer le contenu des marqueurs
+        const totalTrades = backtestResults.trades.length;
+        const profitTrades = backtestResults.trades.filter(t => t.pnl > 0).length;
+        const lossTrades = totalTrades - profitTrades;
+        
+        markersInfo.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 8px; color: #2d3748;">
+                📍 Points d'Entrée des Trades
+            </div>
+            <div style="margin-bottom: 4px;">
+                <span style="color: #28a745;">✅ ${profitTrades} trades gagnants</span>
+            </div>
+            <div style="margin-bottom: 4px;">
+                <span style="color: #dc3545;">❌ ${lossTrades} trades perdants</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <span style="color: #666;">📊 Total: ${totalTrades} trades</span>
+            </div>
+            <div style="font-size: 10px; color: #999; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+                Les points d'entrée sont visibles sur le graphique TradingView ci-dessous
+            </div>
+        `;
+        
+        // Ajouter les détails des trades dans les logs
+        console.log(`📍 [SIMPLE_MARKERS] Résumé des ${totalTrades} trades:`);
+        backtestResults.trades.forEach((trade, index) => {
+            const date = new Date(trade.entryTime).toLocaleString();
+            const profit = trade.pnl > 0 ? '✅' : '❌';
+            console.log(`${profit} Trade #${index + 1}: ${trade.symbol} à ${trade.entryPrice.toFixed(4)} le ${date} (${trade.reason})`);
+        });
+        
+        console.log('✅ [SIMPLE_MARKERS] Marqueurs simplifiés ajoutés');
+        
+    } catch (error) {
+        console.error('❌ [SIMPLE_MARKERS] Erreur:', error);
+    }
+}
