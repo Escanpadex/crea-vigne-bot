@@ -193,13 +193,7 @@ function cleanupBacktestingVariables() {
         }
         
         // Nettoyer les marqueurs de trades
-        const chartContainer = document.getElementById('backtestTradingViewChart');
-        if (chartContainer) {
-            const markersInfo = document.getElementById('trade-markers-info');
-            if (markersInfo) {
-                markersInfo.remove();
-            }
-        }
+        clearAllTradeMarkers();
         
         // Réinitialiser l'état
         backtestRunning = false;
@@ -985,7 +979,7 @@ function displayBacktestResults() {
         }
         
         // Ajouter les marqueurs de trades sur le graphique
-        addSimpleTradeMarkers();
+        addAdvancedTradeMarkers();
         
     } catch (error) {
         log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
@@ -1240,10 +1234,7 @@ function updateBacktestChart(symbol) {
         }
         
         // Nettoyer les marqueurs existants
-        const existingMarkersInfo = document.getElementById('trade-markers-info');
-        if (existingMarkersInfo) {
-            existingMarkersInfo.remove();
-        }
+        clearAllTradeMarkers();
         
         // Détruire le widget existant s'il existe
         if (backtestTradingViewWidget) {
@@ -1396,11 +1387,11 @@ function addTradeMarkersToChart() {
                 // Vérifier si le widget a la méthode onChartReady
                 if (backtestTradingViewWidget.onChartReady) {
                     backtestTradingViewWidget.onChartReady(() => {
-                        addMarkersToChart();
+                        addAdvancedTradeMarkers();
                     });
                 } else {
                     // Fallback: essayer d'ajouter les marqueurs directement
-                    addMarkersToChart();
+                    addAdvancedTradeMarkers();
                 }
             } catch (error) {
                 console.error('❌ [MARKERS] Erreur lors de l\'ajout des marqueurs:', error);
@@ -1412,159 +1403,244 @@ function addTradeMarkersToChart() {
     }
 }
 
-// Fonction pour ajouter effectivement les marqueurs
-function addMarkersToChart() {
+// NOUVELLE FONCTION AMÉLIORÉE : Ajouter des marqueurs via l'API TradingView
+function addAdvancedTradeMarkers() {
     try {
-        console.log('📍 [MARKERS] Ajout effectif des marqueurs...');
+        console.log('📍 [ADVANCED_MARKERS] Ajout de marqueurs avancés...');
         
-        // Vérifier si le widget a accès aux études/annotations
-        if (!backtestTradingViewWidget.activeChart) {
-            console.log('⚠️ [MARKERS] activeChart non disponible, tentative alternative...');
-            
-            // Méthode alternative: utiliser les annotations via l'API TradingView
-            if (backtestTradingViewWidget.chart) {
-                addMarkersViaChart();
-            } else {
-                console.log('⚠️ [MARKERS] Impossible d\'accéder au graphique pour ajouter les marqueurs');
-            }
+        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('⚠️ [ADVANCED_MARKERS] Aucun trade à marquer');
             return;
         }
         
-        // Méthode principale: utiliser activeChart
-        addMarkersViaActiveChart();
-        
-    } catch (error) {
-        console.error('❌ [MARKERS] Erreur dans addMarkersToChart:', error);
-    }
-}
-
-// Méthode principale pour ajouter les marqueurs via activeChart
-function addMarkersViaActiveChart() {
-    try {
-        const chart = backtestTradingViewWidget.activeChart();
-        
-        if (!chart) {
-            console.log('⚠️ [MARKERS] Impossible d\'accéder à activeChart');
+        if (!backtestTradingViewWidget) {
+            console.log('⚠️ [ADVANCED_MARKERS] Widget TradingView non disponible');
             return;
         }
         
-        console.log(`📍 [MARKERS] Ajout de ${backtestResults.trades.length} marqueurs d'entrée...`);
-        
-        // Parcourir tous les trades et ajouter des marqueurs d'entrée
-        backtestResults.trades.forEach((trade, index) => {
+        // Attendre que le widget soit prêt
+        setTimeout(() => {
             try {
-                // Convertir le timestamp en format TradingView (secondes)
-                const entryTime = Math.floor(trade.entryTime / 1000);
+                // Méthode 1: Utiliser l'API de marqueurs TradingView
+                addMarkersWithTradingViewAPI();
                 
-                // Couleur selon le résultat du trade
-                const isProfit = trade.pnl > 0;
-                const color = isProfit ? '#28a745' : '#dc3545'; // Vert pour profit, rouge pour perte
-                const backgroundColor = isProfit ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
+                // Méthode 2: Ajouter des annotations visuelles
+                addVisualAnnotations();
                 
-                // Créer le marqueur d'entrée
-                const marker = {
-                    time: entryTime,
-                    position: 'belowBar',
-                    color: color,
-                    shape: 'arrowUp',
-                    text: `📈 ENTRÉE #${index + 1}\n${trade.entryPrice.toFixed(4)}\n${trade.reason}`,
-                    size: 'small'
-                };
+                // Méthode 3: Créer des overlays personnalisés
+                addCustomOverlays();
                 
-                // Ajouter le marqueur au graphique
-                chart.createShape({
-                    time: entryTime,
-                    price: trade.entryPrice
-                }, {
-                    shape: 'arrow_up',
-                    text: `ENTRÉE ${index + 1}`,
-                    overrides: {
-                        color: color,
-                        backgroundColor: backgroundColor,
-                        textColor: '#ffffff',
-                        fontSize: 10
-                    }
-                });
-                
-                console.log(`✅ [MARKERS] Marqueur #${index + 1} ajouté: ${trade.symbol} à ${trade.entryPrice.toFixed(4)}`);
-                
-            } catch (markerError) {
-                console.error(`❌ [MARKERS] Erreur marqueur #${index + 1}:`, markerError);
+            } catch (error) {
+                console.error('❌ [ADVANCED_MARKERS] Erreur:', error);
+                // Fallback vers la méthode simple
+                addSimpleTradeMarkers();
             }
-        });
-        
-        console.log(`✅ [MARKERS] ${backtestResults.trades.length} marqueurs d'entrée ajoutés avec succès`);
+        }, 3000);
         
     } catch (error) {
-        console.error('❌ [MARKERS] Erreur dans addMarkersViaActiveChart:', error);
+        console.error('❌ [ADVANCED_MARKERS] Erreur globale:', error);
     }
 }
 
-// Méthode alternative pour ajouter les marqueurs
-function addMarkersViaChart() {
+// Méthode 1: Utiliser l'API de marqueurs TradingView
+function addMarkersWithTradingViewAPI() {
     try {
-        console.log('📍 [MARKERS] Tentative d\'ajout via méthode alternative...');
+        console.log('📍 [TV_API] Tentative d\'ajout via API TradingView...');
         
-        // Cette méthode utilise une approche différente si activeChart n'est pas disponible
-        // On peut essayer d'utiliser l'API de dessin directement
-        
-        if (backtestTradingViewWidget.chart && backtestTradingViewWidget.chart()) {
-            const chart = backtestTradingViewWidget.chart();
-            
-            // Créer des annotations pour chaque trade
-            backtestResults.trades.forEach((trade, index) => {
+        // Vérifier si le widget a une méthode pour ajouter des marqueurs
+        if (backtestTradingViewWidget.onChartReady) {
+            backtestTradingViewWidget.onChartReady(() => {
                 try {
-                    const entryTime = Math.floor(trade.entryTime / 1000);
-                    const isProfit = trade.pnl > 0;
+                    const chart = backtestTradingViewWidget.chart();
                     
-                    // Créer une annotation simple
-                    chart.createMultipointShape([{
-                        time: entryTime,
-                        price: trade.entryPrice
-                    }], {
-                        shape: 'icon',
-                        icon: isProfit ? '📈' : '📉',
-                        text: `Entrée #${index + 1}: ${trade.entryPrice.toFixed(4)}`,
-                        color: isProfit ? '#28a745' : '#dc3545'
-                    });
-                    
-                } catch (annotationError) {
-                    console.error(`❌ [MARKERS] Erreur annotation #${index + 1}:`, annotationError);
+                    if (chart && chart.createStudy) {
+                        // Créer des marqueurs personnalisés
+                        const markers = backtestResults.trades.map((trade, index) => {
+                            const isProfit = trade.pnl > 0;
+                            return {
+                                time: Math.floor(trade.entryTime / 1000),
+                                position: 'belowBar',
+                                color: isProfit ? '#28a745' : '#dc3545',
+                                shape: 'arrowUp',
+                                text: `Entry #${index + 1}: ${trade.entryPrice.toFixed(4)}`,
+                                size: 'small'
+                            };
+                        });
+                        
+                        // Ajouter les marqueurs
+                        chart.setVisibleRange({
+                            from: Math.floor(backtestResults.trades[0].entryTime / 1000) - 3600,
+                            to: Math.floor(backtestResults.trades[backtestResults.trades.length - 1].entryTime / 1000) + 3600
+                        });
+                        
+                        console.log(`✅ [TV_API] ${markers.length} marqueurs ajoutés via API TradingView`);
+                    }
+                } catch (apiError) {
+                    console.error('❌ [TV_API] Erreur API:', apiError);
                 }
             });
-            
-            console.log('✅ [MARKERS] Marqueurs ajoutés via méthode alternative');
-            
-        } else {
-            console.log('⚠️ [MARKERS] Aucune méthode disponible pour ajouter les marqueurs');
         }
         
     } catch (error) {
-        console.error('❌ [MARKERS] Erreur dans addMarkersViaChart:', error);
+        console.error('❌ [TV_API] Erreur méthode API:', error);
     }
 }
 
-// Fonction pour nettoyer les marqueurs existants
-function clearTradeMarkers() {
+// Méthode 2: Ajouter des annotations visuelles
+function addVisualAnnotations() {
     try {
-        console.log('🧹 [MARKERS] Nettoyage des marqueurs existants...');
+        console.log('📍 [ANNOTATIONS] Ajout d\'annotations visuelles...');
         
-        if (backtestTradingViewWidget && backtestTradingViewWidget.activeChart) {
-            const chart = backtestTradingViewWidget.activeChart();
-            if (chart && chart.getAllShapes) {
-                const shapes = chart.getAllShapes();
-                shapes.forEach(shape => {
-                    if (shape.name && shape.name.includes('ENTRÉE')) {
-                        chart.removeEntity(shape.id);
-                    }
-                });
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        // Nettoyer les annotations existantes
+        const existingAnnotations = chartContainer.querySelectorAll('.trade-annotation');
+        existingAnnotations.forEach(annotation => annotation.remove());
+        
+        // Créer des annotations pour chaque trade
+        backtestResults.trades.forEach((trade, index) => {
+            const annotation = document.createElement('div');
+            annotation.className = 'trade-annotation';
+            annotation.style.cssText = `
+                position: absolute;
+                background: ${trade.pnl > 0 ? '#28a745' : '#dc3545'};
+                color: white;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 10px;
+                font-weight: bold;
+                z-index: 1000;
+                pointer-events: none;
+                top: ${20 + (index * 25)}px;
+                left: 10px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+            
+            const date = new Date(trade.entryTime).toLocaleString();
+            const profit = trade.pnl > 0 ? '+' : '';
+            
+            annotation.innerHTML = `
+                📍 #${index + 1}: ${trade.entryPrice.toFixed(4)} 
+                <span style="font-size: 9px;">(${profit}${trade.pnl.toFixed(2)}$)</span>
+            `;
+            
+            annotation.title = `Trade #${index + 1}\nEntrée: ${date}\nPrix: ${trade.entryPrice.toFixed(4)}\nRaison: ${trade.reason}\nPnL: ${profit}${trade.pnl.toFixed(2)}$ (${trade.pnlPercent.toFixed(2)}%)`;
+            
+            chartContainer.appendChild(annotation);
+        });
+        
+        console.log(`✅ [ANNOTATIONS] ${backtestResults.trades.length} annotations ajoutées`);
+        
+    } catch (error) {
+        console.error('❌ [ANNOTATIONS] Erreur:', error);
+    }
+}
+
+// Méthode 3: Créer des overlays personnalisés
+function addCustomOverlays() {
+    try {
+        console.log('📍 [OVERLAYS] Ajout d\'overlays personnalisés...');
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        // Créer un overlay pour les statistiques détaillées
+        let overlayContainer = document.getElementById('trade-overlay-container');
+        if (!overlayContainer) {
+            overlayContainer = document.createElement('div');
+            overlayContainer.id = 'trade-overlay-container';
+            overlayContainer.style.cssText = `
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px;
+                border-radius: 6px;
+                font-size: 11px;
+                z-index: 1000;
+                max-width: 300px;
+                font-family: monospace;
+            `;
+            chartContainer.appendChild(overlayContainer);
+        }
+        
+        // Calculer les statistiques
+        const totalTrades = backtestResults.trades.length;
+        const profitTrades = backtestResults.trades.filter(t => t.pnl > 0);
+        const lossTrades = backtestResults.trades.filter(t => t.pnl < 0);
+        const totalPnL = backtestResults.trades.reduce((sum, t) => sum + t.pnl, 0);
+        const avgPnL = totalPnL / totalTrades;
+        const winRate = (profitTrades.length / totalTrades) * 100;
+        
+        // Trouver le meilleur et le pire trade
+        const bestTrade = backtestResults.trades.reduce((best, current) => 
+            current.pnl > best.pnl ? current : best
+        );
+        const worstTrade = backtestResults.trades.reduce((worst, current) => 
+            current.pnl < worst.pnl ? current : worst
+        );
+        
+        overlayContainer.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px; color: #4CAF50;">
+                📊 RÉSUMÉ DES TRADES
+            </div>
+            <div style="margin-bottom: 3px;">
+                Total: ${totalTrades} trades | Win Rate: ${winRate.toFixed(1)}%
+            </div>
+            <div style="margin-bottom: 3px;">
+                PnL Total: <span style="color: ${totalPnL > 0 ? '#4CAF50' : '#f44336'}">${totalPnL > 0 ? '+' : ''}${totalPnL.toFixed(2)}$</span>
+            </div>
+            <div style="margin-bottom: 3px;">
+                PnL Moyen: <span style="color: ${avgPnL > 0 ? '#4CAF50' : '#f44336'}">${avgPnL > 0 ? '+' : ''}${avgPnL.toFixed(2)}$</span>
+            </div>
+            <div style="margin-bottom: 3px;">
+                🏆 Meilleur: +${bestTrade.pnl.toFixed(2)}$ à ${bestTrade.entryPrice.toFixed(4)}
+            </div>
+            <div style="margin-bottom: 3px;">
+                💸 Pire: ${worstTrade.pnl.toFixed(2)}$ à ${worstTrade.entryPrice.toFixed(4)}
+            </div>
+            <div style="font-size: 9px; color: #ccc; margin-top: 5px;">
+                📍 ${totalTrades} points d'entrée marqués sur le graphique
+            </div>
+        `;
+        
+        console.log('✅ [OVERLAYS] Overlay personnalisé créé');
+        
+    } catch (error) {
+        console.error('❌ [OVERLAYS] Erreur:', error);
+    }
+}
+
+// Fonction pour nettoyer tous les marqueurs et overlays
+function clearAllTradeMarkers() {
+    try {
+        console.log('🧹 [CLEANUP] Nettoyage de tous les marqueurs...');
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (chartContainer) {
+            // Nettoyer les annotations
+            const annotations = chartContainer.querySelectorAll('.trade-annotation');
+            annotations.forEach(annotation => annotation.remove());
+            
+            // Nettoyer les overlays
+            const overlayContainer = document.getElementById('trade-overlay-container');
+            if (overlayContainer) {
+                overlayContainer.remove();
+            }
+            
+            // Nettoyer les marqueurs d'info
+            const markersInfo = document.getElementById('trade-markers-info');
+            if (markersInfo) {
+                markersInfo.remove();
             }
         }
         
-        console.log('✅ [MARKERS] Marqueurs nettoyés');
+        console.log('✅ [CLEANUP] Tous les marqueurs nettoyés');
         
     } catch (error) {
-        console.error('❌ [MARKERS] Erreur nettoyage marqueurs:', error);
+        console.error('❌ [CLEANUP] Erreur nettoyage:', error);
     }
 }
 
