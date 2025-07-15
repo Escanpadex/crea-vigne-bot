@@ -979,7 +979,7 @@ function displayBacktestResults() {
         }
         
         // Ajouter les marqueurs de trades sur le graphique
-        addAdvancedTradeMarkers();
+        addPositionedTradeMarkers();
         
     } catch (error) {
         log(`❌ Erreur affichage résultats: ${error.message}`, 'ERROR');
@@ -1418,24 +1418,8 @@ function addAdvancedTradeMarkers() {
             return;
         }
         
-        // Attendre que le widget soit prêt
-        setTimeout(() => {
-            try {
-                // Méthode 1: Utiliser l'API de marqueurs TradingView
-                addMarkersWithTradingViewAPI();
-                
-                // Méthode 2: Ajouter des annotations visuelles
-                addVisualAnnotations();
-                
-                // Méthode 3: Créer des overlays personnalisés
-                addCustomOverlays();
-                
-            } catch (error) {
-                console.error('❌ [ADVANCED_MARKERS] Erreur:', error);
-                // Fallback vers la méthode simple
-                addSimpleTradeMarkers();
-            }
-        }, 3000);
+        // Utiliser la nouvelle méthode positionnée
+        addPositionedTradeMarkers();
         
     } catch (error) {
         console.error('❌ [ADVANCED_MARKERS] Erreur globale:', error);
@@ -1635,6 +1619,9 @@ function clearAllTradeMarkers() {
             if (markersInfo) {
                 markersInfo.remove();
             }
+            
+            // Nettoyer les marqueurs positionnés
+            clearPositionedMarkers();
         }
         
         console.log('✅ [CLEANUP] Tous les marqueurs nettoyés');
@@ -1721,5 +1708,293 @@ function addSimpleTradeMarkers() {
         
     } catch (error) {
         console.error('❌ [SIMPLE_MARKERS] Erreur:', error);
+    }
+}
+
+// NOUVELLE FONCTION : Positionner les marqueurs aux coordonnées exactes du graphique
+function addPositionedTradeMarkers() {
+    try {
+        console.log('📍 [POSITIONED_MARKERS] Ajout de marqueurs positionnés...');
+        
+        if (!backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
+            console.log('⚠️ [POSITIONED_MARKERS] Aucun trade à marquer');
+            return;
+        }
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) {
+            console.log('⚠️ [POSITIONED_MARKERS] Container graphique non trouvé');
+            return;
+        }
+        
+        // Nettoyer les marqueurs existants
+        clearAllTradeMarkers();
+        
+        // Attendre que le graphique soit chargé
+        setTimeout(() => {
+            try {
+                // Calculer les positions des marqueurs avec les données de backtesting
+                calculateMarkersWithBacktestData();
+                
+                // Ajouter aussi l'overlay de résumé
+                addCustomOverlays();
+                
+            } catch (error) {
+                console.error('❌ [POSITIONED_MARKERS] Erreur positionnement:', error);
+                // Fallback vers les annotations fixes
+                addVisualAnnotations();
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('❌ [POSITIONED_MARKERS] Erreur globale:', error);
+    }
+}
+
+// Fonction pour calculer et positionner les marqueurs
+function calculateAndPositionMarkers() {
+    try {
+        console.log('📊 [CALC_MARKERS] Calcul des positions des marqueurs...');
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        // Obtenir les dimensions du graphique
+        const chartRect = chartContainer.getBoundingClientRect();
+        const chartWidth = chartRect.width;
+        const chartHeight = chartRect.height;
+        
+        console.log(`📊 [CALC_MARKERS] Dimensions graphique: ${chartWidth}x${chartHeight}`);
+        
+        // Calculer la période de temps couverte par le backtesting
+        const trades = backtestResults.trades;
+        const firstTradeTime = Math.min(...trades.map(t => t.entryTime));
+        const lastTradeTime = Math.max(...trades.map(t => t.entryTime));
+        
+        // Obtenir aussi les données du backtesting pour les prix min/max
+        let minPrice = Math.min(...backtestData.map(d => d.low));
+        let maxPrice = Math.max(...backtestData.map(d => d.high));
+        
+        // Ajouter une marge de 5% pour les prix
+        const priceRange = maxPrice - minPrice;
+        minPrice -= priceRange * 0.05;
+        maxPrice += priceRange * 0.05;
+        
+        console.log(`📊 [CALC_MARKERS] Période: ${new Date(firstTradeTime).toLocaleString()} à ${new Date(lastTradeTime).toLocaleString()}`);
+        console.log(`📊 [CALC_MARKERS] Prix: ${minPrice.toFixed(4)} à ${maxPrice.toFixed(4)}`);
+        
+        // Calculer les positions pour chaque trade
+        trades.forEach((trade, index) => {
+            try {
+                // Calculer la position X (temporelle)
+                const timeProgress = (trade.entryTime - firstTradeTime) / (lastTradeTime - firstTradeTime);
+                const xPosition = 60 + (timeProgress * (chartWidth - 120)); // Marges de 60px
+                
+                // Calculer la position Y (prix)
+                const priceProgress = (trade.entryPrice - minPrice) / (maxPrice - minPrice);
+                const yPosition = chartHeight - 60 - (priceProgress * (chartHeight - 120)); // Marges de 60px
+                
+                // Créer le marqueur positionné
+                createPositionedMarker(trade, index, xPosition, yPosition, chartContainer);
+                
+            } catch (markerError) {
+                console.error(`❌ [CALC_MARKERS] Erreur marqueur #${index + 1}:`, markerError);
+            }
+        });
+        
+        console.log(`✅ [CALC_MARKERS] ${trades.length} marqueurs positionnés`);
+        
+    } catch (error) {
+        console.error('❌ [CALC_MARKERS] Erreur calcul:', error);
+    }
+}
+
+// Fonction pour créer un marqueur positionné
+function createPositionedMarker(trade, index, xPosition, yPosition, container) {
+    try {
+        const isProfit = trade.pnl > 0;
+        const profit = trade.pnl > 0 ? '+' : '';
+        
+        // Créer le marqueur principal
+        const marker = document.createElement('div');
+        marker.className = 'positioned-trade-marker';
+        marker.style.cssText = `
+            position: absolute;
+            left: ${xPosition}px;
+            top: ${yPosition}px;
+            width: 20px;
+            height: 20px;
+            background: ${isProfit ? '#28a745' : '#dc3545'};
+            border: 2px solid white;
+            border-radius: 50%;
+            z-index: 1000;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        `;
+        
+        // Ajouter le numéro du trade
+        const tradeNumber = document.createElement('div');
+        tradeNumber.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+        `;
+        tradeNumber.textContent = index + 1;
+        marker.appendChild(tradeNumber);
+        
+        // Créer le tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'trade-tooltip';
+        tooltip.style.cssText = `
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 1001;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+        `;
+        
+        const entryDate = new Date(trade.entryTime);
+        const dateStr = entryDate.toLocaleDateString();
+        const timeStr = entryDate.toLocaleTimeString();
+        
+        tooltip.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 2px;">Trade #${index + 1}</div>
+            <div>📅 ${dateStr} ${timeStr}</div>
+            <div>💰 Entrée: ${trade.entryPrice.toFixed(4)}</div>
+            <div>📊 PnL: <span style="color: ${isProfit ? '#4CAF50' : '#f44336'}">${profit}${trade.pnl.toFixed(2)}$ (${trade.pnlPercent.toFixed(2)}%)</span></div>
+            <div>🔍 ${trade.reason}</div>
+        `;
+        
+        marker.appendChild(tooltip);
+        
+        // Ajouter les événements hover
+        marker.addEventListener('mouseenter', () => {
+            tooltip.style.display = 'block';
+            marker.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            marker.style.zIndex = '1002';
+        });
+        
+        marker.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+            marker.style.transform = 'translate(-50%, -50%) scale(1)';
+            marker.style.zIndex = '1000';
+        });
+        
+        // Ajouter une ligne verticale pour mieux voir l'alignement temporel
+        const verticalLine = document.createElement('div');
+        verticalLine.className = 'trade-vertical-line';
+        verticalLine.style.cssText = `
+            position: absolute;
+            left: ${xPosition}px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: ${isProfit ? 'rgba(40, 167, 69, 0.3)' : 'rgba(220, 53, 69, 0.3)'};
+            z-index: 999;
+            pointer-events: none;
+        `;
+        
+        container.appendChild(verticalLine);
+        container.appendChild(marker);
+        
+        console.log(`✅ [MARKER] Trade #${index + 1} positionné à (${xPosition.toFixed(0)}, ${yPosition.toFixed(0)})`);
+        
+    } catch (error) {
+        console.error(`❌ [MARKER] Erreur création marqueur #${index + 1}:`, error);
+    }
+}
+
+// Fonction améliorée pour calculer les positions avec les données de backtesting
+function calculateMarkersWithBacktestData() {
+    try {
+        console.log('📊 [CALC_IMPROVED] Calcul amélioré avec données de backtesting...');
+        
+        if (!backtestData || backtestData.length === 0) {
+            console.log('⚠️ [CALC_IMPROVED] Données de backtesting non disponibles');
+            return calculateAndPositionMarkers(); // Fallback
+        }
+        
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (!chartContainer) return;
+        
+        const chartRect = chartContainer.getBoundingClientRect();
+        const chartWidth = chartRect.width;
+        const chartHeight = chartRect.height;
+        
+        // Utiliser les données réelles du backtesting pour les calculs
+        const firstCandle = backtestData[0];
+        const lastCandle = backtestData[backtestData.length - 1];
+        const totalTimeSpan = lastCandle.timestamp - firstCandle.timestamp;
+        
+        // Calculer la plage de prix réelle
+        const minPrice = Math.min(...backtestData.map(d => d.low));
+        const maxPrice = Math.max(...backtestData.map(d => d.high));
+        const priceRange = maxPrice - minPrice;
+        
+        console.log(`📊 [CALC_IMPROVED] Période réelle: ${new Date(firstCandle.timestamp).toLocaleString()} à ${new Date(lastCandle.timestamp).toLocaleString()}`);
+        console.log(`📊 [CALC_IMPROVED] Prix réels: ${minPrice.toFixed(4)} à ${maxPrice.toFixed(4)}`);
+        
+        // Positionner chaque trade
+        backtestResults.trades.forEach((trade, index) => {
+            try {
+                // Position X basée sur le timestamp réel
+                const timeProgress = (trade.entryTime - firstCandle.timestamp) / totalTimeSpan;
+                const xPosition = 60 + (timeProgress * (chartWidth - 120));
+                
+                // Position Y basée sur le prix réel
+                const priceProgress = (trade.entryPrice - minPrice) / priceRange;
+                const yPosition = chartHeight - 60 - (priceProgress * (chartHeight - 120));
+                
+                // Créer le marqueur avec les positions calculées
+                createPositionedMarker(trade, index, xPosition, yPosition, chartContainer);
+                
+            } catch (markerError) {
+                console.error(`❌ [CALC_IMPROVED] Erreur marqueur #${index + 1}:`, markerError);
+            }
+        });
+        
+        console.log(`✅ [CALC_IMPROVED] ${backtestResults.trades.length} marqueurs positionnés avec données réelles`);
+        
+    } catch (error) {
+        console.error('❌ [CALC_IMPROVED] Erreur calcul amélioré:', error);
+        // Fallback vers la méthode standard
+        calculateAndPositionMarkers();
+    }
+}
+
+// Fonction pour nettoyer tous les marqueurs positionnés
+function clearPositionedMarkers() {
+    try {
+        const chartContainer = document.getElementById('backtestTradingViewChart');
+        if (chartContainer) {
+            // Nettoyer les marqueurs positionnés
+            const markers = chartContainer.querySelectorAll('.positioned-trade-marker');
+            markers.forEach(marker => marker.remove());
+            
+            // Nettoyer les lignes verticales
+            const lines = chartContainer.querySelectorAll('.trade-vertical-line');
+            lines.forEach(line => line.remove());
+        }
+        
+        console.log('✅ [CLEANUP] Marqueurs positionnés nettoyés');
+        
+    } catch (error) {
+        console.error('❌ [CLEANUP] Erreur nettoyage marqueurs positionnés:', error);
     }
 }
