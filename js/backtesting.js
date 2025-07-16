@@ -1090,7 +1090,10 @@ function displayTradeHistory() {
             const entryTime = new Date(trade.entryTime);
             const exitTime = new Date(trade.exitTime);
             
-            // Format jour/mois
+            // Debug: vérifier les dates
+            console.log('Entry Time:', entryTime, 'Exit Time:', exitTime);
+            
+            // Format jour/mois avec vérification
             const entryDay = entryTime.getDate().toString().padStart(2, '0');
             const entryMonth = (entryTime.getMonth() + 1).toString().padStart(2, '0');
             const exitDay = exitTime.getDate().toString().padStart(2, '0');
@@ -1100,6 +1103,12 @@ function displayTradeHistory() {
             const entryHour = entryTime.getHours().toString().padStart(2, '0') + 'h' + entryTime.getMinutes().toString().padStart(2, '0');
             const exitHour = exitTime.getHours().toString().padStart(2, '0') + 'h' + exitTime.getMinutes().toString().padStart(2, '0');
             
+            // Format date complet
+            const entryDateStr = `${entryDay}/${entryMonth}`;
+            const exitDateStr = `${exitDay}/${exitMonth}`;
+            
+            console.log('Entry Date:', entryDateStr, 'Exit Date:', exitDateStr);
+            
             html += `
                 <div class="trade-item ${isProfit ? 'profit' : 'loss'}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; ${isProfit ? 'background: #f0f8f0;' : 'background: #fff0f0;'}">
                     <div class="trade-info">
@@ -1108,7 +1117,7 @@ function displayTradeHistory() {
                             Entrée: ${Math.round(trade.entryPrice)} → Sortie: ${Math.round(trade.exitPrice)}
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 2px;">
-                            ${entryDay}/${entryMonth} - Heure entrée : ${entryHour} → Sortie : ${exitDay}/${exitMonth} ${exitHour}
+                            ${entryDateStr} - Heure entrée : ${entryHour} → Sortie : ${exitDateStr} ${exitHour}
                         </div>
                     </div>
                     <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
