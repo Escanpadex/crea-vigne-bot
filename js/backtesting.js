@@ -1988,11 +1988,21 @@ function clearPositionedMarkers() {
         if (chartContainer) {
             // Nettoyer les marqueurs positionnés
             const markers = chartContainer.querySelectorAll('.positioned-trade-marker');
-            markers.forEach(marker => marker.remove());
+            if (markers.length > 0) {
+                markers.forEach(marker => marker.remove());
+            }
             
             // Nettoyer les lignes verticales
             const lines = chartContainer.querySelectorAll('.trade-vertical-line');
-            lines.forEach(line => line.remove());
+            if (lines.length > 0) {
+                lines.forEach(line => line.remove());
+            }
+            
+            // Nettoyer le résumé des trades s'il existe
+            const summary = chartContainer.querySelector('.trade-summary-overlay');
+            if (summary) {
+                summary.remove();
+            }
         }
         
         console.log('✅ [CLEANUP] Marqueurs positionnés nettoyés');
@@ -2047,14 +2057,14 @@ function startChartSynchronization() {
             clearInterval(chartSyncInterval);
         }
         
-        // Créer un intervalle pour vérifier les changements de vue
+        // Créer un intervalle pour vérifier les changements de vue (réduit la fréquence)
         chartSyncInterval = setInterval(() => {
             try {
                 checkAndUpdateMarkerPositions();
             } catch (error) {
                 console.error('❌ [SYNC] Erreur dans l\'intervalle de synchronisation:', error);
             }
-        }, 100); // Vérifier toutes les 100ms
+        }, 250); // Vérifier toutes les 250ms (réduit le scintillement)
         
         // Ajouter des listeners pour les événements de zoom/défilement si disponibles
         addChartEventListeners();
@@ -2066,10 +2076,19 @@ function startChartSynchronization() {
     }
 }
 
+// Variables pour optimiser la détection des changements
+let lastChartState = null;
+let lastUpdateTime = 0;
+let isUpdating = false;
+
 // Fonction pour vérifier et mettre à jour les positions des marqueurs
 function checkAndUpdateMarkerPositions() {
     try {
-        if (!isChartReady || !backtestTradingViewWidget) return;
+        if (!isChartReady || !backtestTradingViewWidget || isUpdating) return;
+        
+        // Throttle: ne pas vérifier plus d'une fois par 200ms
+        const now = Date.now();
+        if (now - lastUpdateTime < 200) return;
         
         // Essayer d'obtenir la plage visible du graphique
         let currentVisibleRange = null;
@@ -2084,12 +2103,13 @@ function checkAndUpdateMarkerPositions() {
             currentVisibleRange = detectVisibleRangeChange();
         }
         
-        // Vérifier si la plage visible a changé
+        // Vérifier si la plage visible a réellement changé
         if (hasVisibleRangeChanged(currentVisibleRange)) {
             console.log('🔄 [SYNC] Changement de vue détecté, repositionnement des marqueurs...');
             lastVisibleRange = currentVisibleRange;
+            lastUpdateTime = now;
             
-            // Repositionner tous les marqueurs
+            // Repositionner tous les marqueurs avec protection contre les appels multiples
             repositionAllMarkers();
         }
         
@@ -2112,6 +2132,8 @@ function detectVisibleRangeChange() {
         const scrollInfo = {
             width: rect.width,
             height: rect.height,
+            scrollLeft: chartContainer.scrollLeft || 0,
+            scrollTop: chartContainer.scrollTop || 0,
             timestamp: Date.now()
         };
         
@@ -2128,17 +2150,32 @@ function hasVisibleRangeChanged(currentRange) {
     
     // Comparer les plages (adaptation selon le type de données disponibles)
     if (currentRange.from !== undefined && currentRange.to !== undefined) {
-        return currentRange.from !== lastVisibleRange.from || 
-               currentRange.to !== lastVisibleRange.to;
+        const timeThreshold = 1000; // 1 seconde de seuil
+        const fromChanged = Math.abs(currentRange.from - lastVisibleRange.from) > timeThreshold;
+        const toChanged = Math.abs(currentRange.to - lastVisibleRange.to) > timeThreshold;
+        return fromChanged || toChanged;
     }
     
-    // Fallback: comparer les timestamps
-    return Math.abs(currentRange.timestamp - lastVisibleRange.timestamp) > 500;
+    // Fallback: comparer les dimensions et scroll (plus précis)
+    if (currentRange.width !== undefined && lastVisibleRange.width !== undefined) {
+        const widthChanged = Math.abs(currentRange.width - lastVisibleRange.width) > 10;
+        const heightChanged = Math.abs(currentRange.height - lastVisibleRange.height) > 10;
+        const scrollLeftChanged = Math.abs(currentRange.scrollLeft - lastVisibleRange.scrollLeft) > 5;
+        const scrollTopChanged = Math.abs(currentRange.scrollTop - lastVisibleRange.scrollTop) > 5;
+        
+        return widthChanged || heightChanged || scrollLeftChanged || scrollTopChanged;
+    }
+    
+    // Dernier recours: ne jamais déclencher sur timestamp seul
+    return false;
 }
 
 // Fonction pour repositionner tous les marqueurs
 function repositionAllMarkers() {
     try {
+        if (isUpdating) return; // Éviter les appels multiples
+        
+        isUpdating = true;
         console.log('📍 [REPOSITION] Repositionnement des marqueurs...');
         
         // Nettoyer les marqueurs existants
@@ -2147,10 +2184,12 @@ function repositionAllMarkers() {
         // Recalculer et repositionner avec les nouvelles coordonnées
         setTimeout(() => {
             calculateMarkersWithChartSync();
+            isUpdating = false; // Libérer le verrou
         }, 50);
         
     } catch (error) {
         console.error('❌ [REPOSITION] Erreur repositionnement:', error);
+        isUpdating = false; // Libérer le verrou en cas d'erreur
     }
 }
 
