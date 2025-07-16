@@ -1108,7 +1108,7 @@ function displayTradeHistory() {
                             Entrée: ${Math.round(trade.entryPrice)} → Sortie: ${Math.round(trade.exitPrice)}
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 2px;">
-                            ${entryDay}/${entryMonth} - Heure entrée : ${entryHour} → Sortie : ${exitHour}
+                            ${entryDay}/${entryMonth} - Heure entrée : ${entryHour} → Sortie : ${exitDay}/${exitMonth} ${exitHour}
                         </div>
                     </div>
                     <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
