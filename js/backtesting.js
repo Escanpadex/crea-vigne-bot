@@ -5,7 +5,7 @@
  * - Single timeframe MACD analysis (15m by default)
  * - Long on MACD delta crossover above 0
  * - Short on MACD delta crossunder below 0
- * - Exact same MACD parameters as TradingView (12, 26, 9)
+ * - MACD parameters (30, 50, 20) - Custom settings
  * - Support for both LONG and SHORT positions
  * - Proper trailing stop for both directions
  * 
@@ -16,7 +16,7 @@
  * - Complex signal filtering
  * 
  * 🔧 SIMPLIFIED APPROACH:
- * - Direct MACD calculation matching TradingView
+ * - Direct MACD calculation with custom parameters (30, 50, 20)
  * - Simple crossover/crossunder detection
  * - Unified position management for LONG/SHORT
  * - Precision trailing stop support maintained
@@ -208,7 +208,7 @@ function cleanupBacktestingVariables() {
 initializeBacktestingVariables();
 
 // NOUVELLE FONCTION : Calcul MACD simplifié pour correspondre exactement à TradingView
-function calculateMACD(prices, fastLength = 12, slowLength = 26, signalLength = 9) {
+function calculateMACD(prices, fastLength = 30, slowLength = 50, signalLength = 20) {
     if (prices.length < slowLength + signalLength) {
         return null;
     }
@@ -225,7 +225,7 @@ function calculateMACD(prices, fastLength = 12, slowLength = 26, signalLength = 
 // NOUVELLE FONCTION : Détection des signaux MACD correspondant exactement à TradingView
 function getMACDSignal(historicalData, i) {
     const prices = historicalData.slice(0, i + 1).map(c => c.close);
-    if (prices.length < 26 + 9) return { long: false };
+    if (prices.length < 50 + 20) return { long: false };
 
     const macdData = calculateMACD(prices);
     if (!macdData) return { long: false };
@@ -362,10 +362,10 @@ async function runSimplifiedBacktest(symbol) {
             log(`🔧 [BACKTEST] Sampling forcé à 1 (disableSampling=true) - Analyse complète`, 'INFO');
         }
         
-        log(`📊 [BACKTEST] Début analyse de l'index 50 à ${backtestData.length} avec pas de ${sampleRate}`, 'INFO');
+        log(`📊 [BACKTEST] Début analyse de l'index 70 à ${backtestData.length} avec pas de ${sampleRate}`, 'INFO');
         
         // Parcourir les données historiques
-        for (let i = 50; i < backtestData.length; i += sampleRate) {
+        for (let i = 70; i < backtestData.length; i += sampleRate) {
             try {
                 const currentCandle = backtestData[i];
                 
@@ -650,7 +650,7 @@ async function fetchHistoricalData(symbol) {
         
         // Calculer le nombre de bougies nécessaires + marge pour les indicateurs
         const expectedCandles = Math.floor(totalMs / timeframeMs);
-        const totalCandles = expectedCandles + 100; // Ajouter 100 bougies pour les indicateurs
+        const totalCandles = expectedCandles + 150; // Ajouter 150 bougies pour les indicateurs MACD (30,50,20)
         
         log(`📊 Récupération de ${totalCandles} bougies ${backtestConfig.timeframe} pour ${backtestConfig.duration} jours`, 'INFO');
         
@@ -1123,7 +1123,7 @@ function exportBacktestResults() {
         results: backtestResults,
         summary: {
             symbol: document.getElementById('chartSymbol').value.split(':')[1],
-            strategy: 'MACD Crossover LONG seulement (simplifié)',
+            strategy: 'MACD (30,50,20) Crossover LONG seulement (simplifié)',
             timeframe: backtestConfig.timeframe,
             duration: backtestConfig.duration,
             totalTrades: backtestResults.totalTrades,
@@ -1270,9 +1270,9 @@ function updateBacktestChart(symbol) {
                 {
                     id: 'MACD@tv-basicstudies',
                     inputs: {
-                        fastLength: 12,
-                        slowLength: 26,
-                        MACDLength: 9,
+                        fastLength: 30,
+                        slowLength: 50,
+                        MACDLength: 20,
                         source: 'close'
                     }
                 }
