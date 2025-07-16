@@ -251,6 +251,8 @@ function getMACDSignal(historicalData, i) {
 // Fonction pour démarrer le backtesting (SIMPLIFIÉE)
 async function startBacktest() {
     try {
+        console.log('🚀 [DEBUG] Début startBacktest - Vérification des conditions');  // NEW: Log au tout début
+        
         // Validation préliminaire des variables
         if (!validateBacktestingState()) {
             console.error('❌ [VALIDATION] État invalide, réinitialisation des variables...');
@@ -290,6 +292,8 @@ async function startBacktest() {
         backtestRunning = true;
         updateBacktestUI(true);
         
+        console.log(`🔍 [DEBUG] Backtest lancé pour ${symbol} - Timeframe: ${backtestConfig.timeframe}, Duration: ${backtestConfig.duration} jours`);  // NEW: Log des params
+        
         log(`🚀 Démarrage du backtesting simplifié: ${symbol} - MACD Crossover/Crossunder - ${backtestConfig.duration} jours`, 'INFO');
         
         // Récupérer les données historiques
@@ -302,9 +306,13 @@ async function startBacktest() {
         // Exécuter le backtesting avec la logique simplifiée
         await runSimplifiedBacktest(symbol);
 
+        console.log('✅ [DEBUG] Fin simulation backtest - Résultats générés:', !!backtestResults);  // NEW: Log de fin de simulation
+        
         // Afficher les résultats
         displayBacktestResults();
 
+        console.log('🔍 [DEBUG] Fin startBacktest - Backtest terminé');  // NEW: Log final
+        
         log('✅ Backtesting terminé avec succès', 'SUCCESS');
         
         // Arrêter automatiquement le backtesting
@@ -312,6 +320,7 @@ async function startBacktest() {
         updateBacktestUI(false);
 
     } catch (error) {
+        console.error('❌ [DEBUG] Erreur dans startBacktest:', error);  // NEW: Log d'erreur
         log(`❌ Erreur dans startBacktest: ${error.message}`, 'ERROR');
         
         // Nettoyer les variables en cas d'erreur
@@ -366,6 +375,11 @@ async function runSimplifiedBacktest(symbol) {
                 if (!currentCandle) {
                     log(`❌ [BACKTEST] Bougie manquante à l'index ${i}`, 'ERROR');
                     continue;
+                }
+                
+                // NEW: Log par bougie pour tracer la progression (seulement tous les 100 pour éviter le spam)
+                if (i % 100 === 0) {
+                    console.log(`🔍 [DEBUG] Analyse bougie #${i} - Timestamp: ${currentCandle.timestamp}`);
                 }
                 
                 // Mettre à jour le progrès
@@ -1549,6 +1563,7 @@ function addMACDStrategyMarkers() {
             
             // Détection crossover (long) comme dans Pine
             if (prevDelta <= 0 && currentDelta > 0) {
+                console.log(`🔍 [MACD_STRATEGY] Crossover détecté (LONG) à ${timestamp} - Delta: ${currentDelta}`);  // NEW: Log détaillé
                 chart.createShape({
                     time: timestamp,
                     price: macdYPosition,
@@ -1563,6 +1578,7 @@ function addMACDStrategyMarkers() {
             
             // Détection crossunder (short) comme dans Pine
             if (prevDelta >= 0 && currentDelta < 0) {
+                console.log(`🔍 [MACD_STRATEGY] Crossunder détecté (SHORT) à ${timestamp} - Delta: ${currentDelta}`);  // NEW: Log détaillé
                 chart.createShape({
                     time: timestamp,
                     price: macdYPosition,
