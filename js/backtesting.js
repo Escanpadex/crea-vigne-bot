@@ -1079,13 +1079,24 @@ function displayTradeHistory() {
             return;
         }
         
+        // Trier les trades par ordre chronologique (du plus ancien au plus récent)
+        const sortedTrades = backtestResults.trades.sort((a, b) => a.entryTime - b.entryTime);
+        
         let html = '';
-        backtestResults.trades.forEach((trade, index) => {
+        sortedTrades.forEach((trade, index) => {
             const isProfit = trade.pnl > 0;
             
-            // Formatage des heures
+            // Formatage des dates et heures
             const entryTime = new Date(trade.entryTime);
             const exitTime = new Date(trade.exitTime);
+            
+            // Format jour/mois
+            const entryDay = entryTime.getDate().toString().padStart(2, '0');
+            const entryMonth = (entryTime.getMonth() + 1).toString().padStart(2, '0');
+            const exitDay = exitTime.getDate().toString().padStart(2, '0');
+            const exitMonth = (exitTime.getMonth() + 1).toString().padStart(2, '0');
+            
+            // Format heures
             const entryHour = entryTime.getHours().toString().padStart(2, '0') + 'h' + entryTime.getMinutes().toString().padStart(2, '0');
             const exitHour = exitTime.getHours().toString().padStart(2, '0') + 'h' + exitTime.getMinutes().toString().padStart(2, '0');
             
@@ -1097,7 +1108,7 @@ function displayTradeHistory() {
                             Entrée: ${Math.round(trade.entryPrice)} → Sortie: ${Math.round(trade.exitPrice)}
                         </div>
                         <div style="font-size: 12px; color: #666; margin-top: 2px;">
-                            Heure entrée : ${entryHour} → Sortie : ${exitHour}
+                            ${entryDay}/${entryMonth} - Heure entrée : ${entryHour} → Sortie : ${exitHour}
                         </div>
                     </div>
                     <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
