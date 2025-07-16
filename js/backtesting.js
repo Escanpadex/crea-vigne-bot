@@ -925,6 +925,8 @@ async function checkTrailingStopPrecision(trade, currentCandle, nextCandle) {
 // Afficher les résultats du backtesting
 function displayBacktestResults() {
     try {
+        console.log('🔍 [DEBUG] Début displayBacktestResults - Trades disponibles:', backtestResults?.trades?.length || 0);  // NEW: Log pour vérifier si on atteint cette fonction
+        
         if (!backtestResults) {
             log('❌ Aucun résultat de backtesting à afficher', 'ERROR');
             return;
@@ -1440,6 +1442,9 @@ function addAdvancedTradeMarkers() {
         
         addMarkersWithTradingViewAPI();  // Prioritize native API
         
+        // NEW: Appel à la nouvelle fonction pour intégrer la stratégie MACD Pine-like
+        addMACDStrategyMarkers();
+        
         // REMOVE: All HTML fallback calls (addPositionedTradeMarkers, addVisualAnnotations, etc.)
         // REMOVE: syncMarkersWithChart() and related polling
         
@@ -1505,6 +1510,76 @@ function addMarkersWithTradingViewAPI() {
         
     } catch (error) {
         console.error('❌ [DEBUG] Erreur globale dans addMarkersWithTradingViewAPI:', error);
+    }
+}
+
+// NEW: Fonction pour intégrer la logique de stratégie MACD (similaire au Pine Script)
+function addMACDStrategyMarkers() {
+    try {
+        console.log('📍 [MACD_STRATEGY] Ajout de marqueurs stratégie MACD...');
+        
+        if (!backtestTradingViewWidget || !backtestData || backtestData.length < 26 + 9) {
+            console.warn('⚠️ [MACD_STRATEGY] Données insuffisantes ou widget non disponible');
+            return;
+        }
+        
+        const chart = backtestTradingViewWidget.activeChart();
+        if (!chart || !chart.createShape || !window.macdPaneId) {
+            console.warn('⚠️ [MACD_STRATEGY] API ou pane MACD non disponible');
+            return;
+        }
+        
+        // Paramètres du Pine Script
+        const fastLength = 12;
+        const slowLength = 26;
+        const MACDLength = 9;
+        
+        // Itérer sur les données de backtest pour détecter crossovers/crossunders
+        for (let i = slowLength + MACDLength; i < backtestData.length; i++) {
+            const prices = backtestData.slice(0, i + 1).map(c => c.close);
+            const macdData = calculateMACD(prices, fastLength, slowLength, MACDLength);
+            if (!macdData) continue;
+            
+            const { macdLine, signalLine, delta } = macdData;
+            const currentDelta = delta[delta.length - 1];
+            const prevDelta = delta[delta.length - 2];
+            
+            const timestamp = Math.floor(backtestData[i].timestamp / 1000);  // Temps de la bougie
+            const macdYPosition = currentDelta;  // Position Y sur l'échelle MACD (basé sur delta)
+            
+            // Détection crossover (long) comme dans Pine
+            if (prevDelta <= 0 && currentDelta > 0) {
+                chart.createShape({
+                    time: timestamp,
+                    price: macdYPosition,
+                    shape: 'arrow_up',
+                    text: 'MacdLE (Long)',
+                    lock: true,
+                    overrides: { color: '#00FF00', textColor: '#FFFFFF', size: 1 },  // Vert pour long
+                    pane: window.macdPaneId
+                });
+                console.log(`✅ [MACD_STRATEGY] Ajout flèche LONG à ${timestamp}`);
+            }
+            
+            // Détection crossunder (short) comme dans Pine
+            if (prevDelta >= 0 && currentDelta < 0) {
+                chart.createShape({
+                    time: timestamp,
+                    price: macdYPosition,
+                    shape: 'arrow_down',
+                    text: 'MacdSE (Short)',
+                    lock: true,
+                    overrides: { color: '#FF0000', textColor: '#FFFFFF', size: 1 },  // Rouge pour short
+                    pane: window.macdPaneId
+                });
+                console.log(`✅ [MACD_STRATEGY] Ajout flèche SHORT à ${timestamp}`);
+            }
+        }
+        
+        console.log('✅ [MACD_STRATEGY] Marqueurs stratégie MACD ajoutés');
+        
+    } catch (error) {
+        console.error('❌ [MACD_STRATEGY] Erreur:', error);
     }
 }
 
