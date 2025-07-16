@@ -1521,7 +1521,7 @@ function addMarkersWithTradingViewAPI() {
             backtestTradingViewWidget.onChartReady(tryAddMarkers);
         } else {
             console.warn('⚠️ [DEBUG] onChartReady non disponible - Utilisation fallback avec timeout');
-            setTimeout(tryAddMarkers, 2000);  // Attendre 2s pour que le chart charge
+            setTimeout(tryAddMarkers, 5000);  // Attendre 5s pour que le chart charge (cohérent avec MACD)
         }
         
     } catch (error) {
@@ -1539,66 +1539,91 @@ function addMACDStrategyMarkers() {
             return;
         }
         
-        // NEW: Utiliser chart() au lieu de activeChart() pour compatibilité
-        const chart = backtestTradingViewWidget.chart ? backtestTradingViewWidget.chart() : null;
-        if (!chart || !chart.createShape || !window.macdPaneId) {
-            console.warn('⚠️ [MACD_STRATEGY] Chart, createShape ou pane MACD non disponible');
-            return;
-        }
-        
-        // Paramètres du Pine Script
-        const fastLength = 12;
-        const slowLength = 26;
-        const MACDLength = 9;
-        
-        // Itérer sur les données de backtest pour détecter crossovers/crossunders
-        for (let i = slowLength + MACDLength; i < backtestData.length; i++) {
-            const prices = backtestData.slice(0, i + 1).map(c => c.close);
-            const macdData = calculateMACD(prices, fastLength, slowLength, MACDLength);
-            if (!macdData) continue;
-            
-            const { macdLine, signalLine, delta } = macdData;
-            const currentDelta = delta[delta.length - 1];
-            const prevDelta = delta[delta.length - 2];
-            
-            const timestamp = Math.floor(backtestData[i].timestamp / 1000);  // Temps de la bougie
-            const macdYPosition = currentDelta;  // Position Y sur l'échelle MACD (basé sur delta)
-            
-            // Détection crossover (long) comme dans Pine
-            if (prevDelta <= 0 && currentDelta > 0) {
-                console.log(`🔍 [MACD_STRATEGY] Crossover détecté (LONG) à ${timestamp} - Delta: ${currentDelta}`);  // NEW: Log détaillé
-                chart.createShape({
-                    time: timestamp,
-                    price: macdYPosition,
-                    shape: 'arrow_up',
-                    text: 'MacdLE (Long)',
-                    lock: true,
-                    overrides: { color: '#00FF00', textColor: '#FFFFFF', size: 1 },  // Vert pour long
-                    pane: window.macdPaneId
-                });
-                console.log(`✅ [MACD_STRATEGY] Ajout flèche LONG à ${timestamp}`);
+        // NEW: Timeout pour attendre le chargement complet du widget (5s)
+        setTimeout(() => {
+            try {
+                // NEW: Utiliser chart() au lieu de activeChart() pour compatibilité
+                const chart = backtestTradingViewWidget.chart ? backtestTradingViewWidget.chart() : null;
+                if (!chart || !chart.createShape || !window.macdPaneId) {
+                    console.warn('⚠️ [MACD_STRATEGY] Chart, createShape ou pane MACD non disponible après timeout');
+                    
+                    // NEW: Fallback HTML si API échoue
+                    console.warn('⚠️ [MACD_STRATEGY] Fallback sur overlays HTML (API non disponible)');
+                    const chartContainer = document.getElementById('backtestTradingViewChart');
+                    if (chartContainer) {
+                        // Exemple simple : Ajouter un DIV rouge pour tester (adaptez pour vos flèches)
+                        const fallbackMarker = document.createElement('div');
+                        fallbackMarker.style.position = 'absolute';
+                        fallbackMarker.style.top = '50%';
+                        fallbackMarker.style.left = '50%';
+                        fallbackMarker.style.background = 'red';
+                        fallbackMarker.style.padding = '5px';
+                        fallbackMarker.textContent = 'Fallback Marker (Test)';
+                        chartContainer.appendChild(fallbackMarker);
+                    }
+                    return;
+                }
+                
+                console.log('✅ [MACD_STRATEGY] Chart accessible après timeout');  // Log de confirmation
+                
+                // Paramètres du Pine Script
+                const fastLength = 12;
+                const slowLength = 26;
+                const MACDLength = 9;
+                
+                // Itérer sur les données de backtest pour détecter crossovers/crossunders
+                for (let i = slowLength + MACDLength; i < backtestData.length; i++) {
+                    const prices = backtestData.slice(0, i + 1).map(c => c.close);
+                    const macdData = calculateMACD(prices, fastLength, slowLength, MACDLength);
+                    if (!macdData) continue;
+                    
+                    const { macdLine, signalLine, delta } = macdData;
+                    const currentDelta = delta[delta.length - 1];
+                    const prevDelta = delta[delta.length - 2];
+                    
+                    const timestamp = Math.floor(backtestData[i].timestamp / 1000);  // Temps de la bougie
+                    const macdYPosition = currentDelta;  // Position Y sur l'échelle MACD (basé sur delta)
+                    
+                    // Détection crossover (long) comme dans Pine
+                    if (prevDelta <= 0 && currentDelta > 0) {
+                        console.log(`🔍 [MACD_STRATEGY] Crossover détecté (LONG) à ${timestamp} - Delta: ${currentDelta}`);
+                        chart.createShape({
+                            time: timestamp,
+                            price: macdYPosition,
+                            shape: 'arrow_up',
+                            text: 'MacdLE (Long)',
+                            lock: true,
+                            overrides: { color: '#00FF00', textColor: '#FFFFFF', size: 1 },  // Vert pour long
+                            pane: window.macdPaneId
+                        });
+                        console.log(`✅ [MACD_STRATEGY] Ajout flèche LONG à ${timestamp}`);
+                    }
+                    
+                    // Détection crossunder (short) comme dans Pine
+                    if (prevDelta >= 0 && currentDelta < 0) {
+                        console.log(`🔍 [MACD_STRATEGY] Crossunder détecté (SHORT) à ${timestamp} - Delta: ${currentDelta}`);
+                        chart.createShape({
+                            time: timestamp,
+                            price: macdYPosition,
+                            shape: 'arrow_down',
+                            text: 'MacdSE (Short)',
+                            lock: true,
+                            overrides: { color: '#FF0000', textColor: '#FFFFFF', size: 1 },  // Rouge pour short
+                            pane: window.macdPaneId
+                        });
+                        console.log(`✅ [MACD_STRATEGY] Ajout flèche SHORT à ${timestamp}`);
+                    }
+                }
+                
+                console.log('✅ [MACD_STRATEGY] Marqueurs stratégie MACD ajoutés');
+                
+            } catch (error) {
+                console.error('❌ [MACD_STRATEGY] Erreur après timeout:', error);
             }
-            
-            // Détection crossunder (short) comme dans Pine
-            if (prevDelta >= 0 && currentDelta < 0) {
-                console.log(`🔍 [MACD_STRATEGY] Crossunder détecté (SHORT) à ${timestamp} - Delta: ${currentDelta}`);  // NEW: Log détaillé
-                chart.createShape({
-                    time: timestamp,
-                    price: macdYPosition,
-                    shape: 'arrow_down',
-                    text: 'MacdSE (Short)',
-                    lock: true,
-                    overrides: { color: '#FF0000', textColor: '#FFFFFF', size: 1 },  // Rouge pour short
-                    pane: window.macdPaneId
-                });
-                console.log(`✅ [MACD_STRATEGY] Ajout flèche SHORT à ${timestamp}`);
-            }
-        }
-        
-        console.log('✅ [MACD_STRATEGY] Marqueurs stratégie MACD ajoutés');
+        }, 5000);  // Timeout de 5s pour attendre le chargement
         
     } catch (error) {
-        console.error('❌ [MACD_STRATEGY] Erreur:', error);
+        console.error('❌ [MACD_STRATEGY] Erreur globale:', error);
     }
 }
 
