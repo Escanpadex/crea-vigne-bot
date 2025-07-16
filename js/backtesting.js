@@ -1472,54 +1472,56 @@ function addMarkersWithTradingViewAPI() {
     try {
         console.log('📍 [DEBUG] Début addMarkersWithTradingViewAPI');
         
-        // Vérifier si le widget a une méthode pour ajouter des marqueurs
-        if (backtestTradingViewWidget.onChartReady) {
-            backtestTradingViewWidget.onChartReady(() => {
-                try {
-                    const chart = backtestTradingViewWidget.activeChart();
-                    
-                    console.log('🔍 [DEBUG] Chart actif:', !!chart);  // Vérifie si chart existe
-                    console.log('🔍 [DEBUG] Méthodes disponibles: createShape?', !!chart.createShape, ' | addUserMarks?', !!chart.addUserMarks);
-                    console.log('🔍 [DEBUG] macdPaneId disponible:', window.macdPaneId);
-                    console.log('🔍 [DEBUG] Nombre de trades à marquer:', backtestResults.trades.length);
-                    
-                    if (chart && chart.createShape && window.macdPaneId) {  // Ensure MACD ID is available
-                        backtestResults.trades.forEach((trade, index) => {
-                            const isProfit = trade.pnl > 0;
-                            
-                            // NEW: Log pour chaque marqueur
-                            console.log(`🔍 [DEBUG] Ajout marqueur pour trade #${index + 1} - Time: ${Math.floor(trade.entryTime / 1000)}, Profit: ${isProfit}, Pane: ${window.macdPaneId}`);
-                            
-                            // NEW: Calculate approximate MACD value for Y-position (fetch from backtest data or approximate)
-                            // For simplicity, assume MACD delta ~0 for entry; refine with actual MACD calc if needed
-                            const macdYPosition = 0;  // Or compute from calculateMACD at trade.entryTime
-                            
-                            chart.createShape({
-                                time: Math.floor(trade.entryTime / 1000),  // X-position (timestamp)
-                                price: macdYPosition,  // Y-position on MACD scale
-                                channel: 'open',  // Or 'high', 'low' as needed
-                                shape: isProfit ? 'arrow_up' : 'arrow_down',
-                                text: `Trade #${index + 1}: ${trade.entryPrice.toFixed(4)}`,
-                                lock: true,
-                                overrides: {
-                                    color: isProfit ? '#28a745' : '#dc3545',
-                                    textColor: '#ffffff',
-                                    size: 1
-                                },
-                                pane: window.macdPaneId  // Target MACD pane
-                            });
-                        });
+        // NEW: Fallback si onChartReady n'est pas disponible
+        const tryAddMarkers = () => {
+            try {
+                // NEW: Utiliser chart() au lieu de activeChart() pour compatibilité
+                const chart = backtestTradingViewWidget.chart ? backtestTradingViewWidget.chart() : null;
+                
+                console.log('🔍 [DEBUG] Chart accessible:', !!chart);  // Vérifie l'accès au chart
+                console.log('🔍 [DEBUG] Méthodes disponibles: createShape?', !!chart?.createShape, ' | addUserMarks?', !!chart?.addUserMarks);
+                console.log('🔍 [DEBUG] macdPaneId disponible:', window.macdPaneId);
+                console.log('🔍 [DEBUG] Nombre de trades à marquer:', backtestResults.trades.length);
+                
+                if (chart && chart.createShape && window.macdPaneId) {
+                    backtestResults.trades.forEach((trade, index) => {
+                        const isProfit = trade.pnl > 0;
                         
-                        console.log(`✅ [DEBUG] Fin ajout des marqueurs - Total: ${backtestResults.trades.length}`);
-                    } else {
-                        console.warn('⚠️ [DEBUG] Conditions non remplies pour ajouter des shapes');
-                    }
-                } catch (apiError) {
-                    console.error('❌ [DEBUG] Erreur dans onChartReady:', apiError);
+                        console.log(`🔍 [DEBUG] Ajout marqueur pour trade #${index + 1} - Time: ${Math.floor(trade.entryTime / 1000)}, Profit: ${isProfit}, Pane: ${window.macdPaneId}`);
+                        
+                        const macdYPosition = 0;  // Ou calculez via calculateMACD
+                        
+                        chart.createShape({
+                            time: Math.floor(trade.entryTime / 1000),
+                            price: macdYPosition,
+                            channel: 'open',
+                            shape: isProfit ? 'arrow_up' : 'arrow_down',
+                            text: `Trade #${index + 1}: ${trade.entryPrice.toFixed(4)}`,
+                            lock: true,
+                            overrides: {
+                                color: isProfit ? '#28a745' : '#dc3545',
+                                textColor: '#ffffff',
+                                size: 1
+                            },
+                            pane: window.macdPaneId
+                        });
+                    });
+                    
+                    console.log(`✅ [DEBUG] Fin ajout des marqueurs - Total: ${backtestResults.trades.length}`);
+                } else {
+                    console.warn('⚠️ [DEBUG] Conditions non remplies pour ajouter des shapes (chart ou méthodes manquantes)');
                 }
-            });
+            } catch (apiError) {
+                console.error('❌ [DEBUG] Erreur dans tryAddMarkers:', apiError);
+            }
+        };
+        
+        // Si onChartReady disponible, l'utiliser ; sinon, fallback avec timeout
+        if (backtestTradingViewWidget.onChartReady) {
+            backtestTradingViewWidget.onChartReady(tryAddMarkers);
         } else {
-            console.warn('⚠️ [DEBUG] onChartReady non disponible');
+            console.warn('⚠️ [DEBUG] onChartReady non disponible - Utilisation fallback avec timeout');
+            setTimeout(tryAddMarkers, 2000);  // Attendre 2s pour que le chart charge
         }
         
     } catch (error) {
@@ -1537,9 +1539,10 @@ function addMACDStrategyMarkers() {
             return;
         }
         
-        const chart = backtestTradingViewWidget.activeChart();
+        // NEW: Utiliser chart() au lieu de activeChart() pour compatibilité
+        const chart = backtestTradingViewWidget.chart ? backtestTradingViewWidget.chart() : null;
         if (!chart || !chart.createShape || !window.macdPaneId) {
-            console.warn('⚠️ [MACD_STRATEGY] API ou pane MACD non disponible');
+            console.warn('⚠️ [MACD_STRATEGY] Chart, createShape ou pane MACD non disponible');
             return;
         }
         
