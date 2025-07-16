@@ -1082,18 +1082,22 @@ function displayTradeHistory() {
         let html = '';
         backtestResults.trades.forEach((trade, index) => {
             const isProfit = trade.pnl > 0;
-            const duration = (trade.exitTime - trade.entryTime) / (1000 * 60 * 60);
+            
+            // Formatage des heures
+            const entryTime = new Date(trade.entryTime);
+            const exitTime = new Date(trade.exitTime);
+            const entryHour = entryTime.getHours().toString().padStart(2, '0') + 'h' + entryTime.getMinutes().toString().padStart(2, '0');
+            const exitHour = exitTime.getHours().toString().padStart(2, '0') + 'h' + exitTime.getMinutes().toString().padStart(2, '0');
             
             html += `
                 <div class="trade-item ${isProfit ? 'profit' : 'loss'}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; ${isProfit ? 'background: #f0f8f0;' : 'background: #fff0f0;'}">
                     <div class="trade-info">
                         <div class="trade-symbol" style="font-weight: bold;">${trade.symbol} ${trade.side}</div>
                         <div class="trade-details" style="font-size: 12px; color: #666;">
-                            Entrée: ${trade.entryPrice.toFixed(4)} → Sortie: ${trade.exitPrice.toFixed(4)} 
-                            (${trade.exitReason}) - ${duration.toFixed(1)}h
+                            Entrée: ${Math.round(trade.entryPrice)} → Sortie: ${Math.round(trade.exitPrice)}
                         </div>
-                        <div style="font-size: 11px; color: #999; margin-top: 2px;">
-                            ${trade.reason}
+                        <div style="font-size: 12px; color: #666; margin-top: 2px;">
+                            Heure entrée : ${entryHour} → Sortie : ${exitHour}
                         </div>
                     </div>
                     <div class="trade-result ${isProfit ? 'profit' : 'loss'}" style="text-align: right; font-weight: bold; ${isProfit ? 'color: #28a745;' : 'color: #dc3545;'}">
