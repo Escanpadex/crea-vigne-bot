@@ -1301,18 +1301,21 @@ function updateBacktestChart(symbol) {
         // Ajouter un listener pour quand le graphique est prêt
         if (backtestTradingViewWidget.onChartReady) {
             backtestTradingViewWidget.onChartReady(() => {
-                console.log('✅ [CHART] Graphique TradingView prêt');
+                console.log('✅ [DEBUG] Graphique TradingView prêt - Début recherche MACD');
                 
-                // NEW: Get all studies and find MACD ID for targeting
+                // NEW: Logs de débogage
                 const chart = backtestTradingViewWidget.activeChart();
                 const studies = chart.getAllStudies();
+                console.log('🔍 [DEBUG] Toutes les études disponibles:', studies);  // Liste toutes les études pour vérifier MACD
                 const macdStudy = studies.find(study => study.name === 'MACD');
                 if (macdStudy) {
-                    window.macdPaneId = macdStudy.id;  // Store globally for marker addition
-                    console.log(`✅ [CHART] MACD study ID found: ${window.macdPaneId}`);
+                    window.macdPaneId = macdStudy.id;
+                    console.log(`✅ [DEBUG] MACD study ID trouvé: ${window.macdPaneId}`);
                 } else {
-                    console.warn('⚠️ [CHART] MACD study not found');
+                    console.warn('⚠️ [DEBUG] MACD study non trouvé dans les études');
                 }
+                
+                console.log('🔍 [DEBUG] Fin onChartReady - macdPaneId:', window.macdPaneId);  // Vérifie la valeur finale
             });
         }
         
@@ -1384,30 +1387,36 @@ console.log('✅ Simplified backtesting system loaded successfully');
 // Ajouter les marqueurs de trades sur le graphique
 function addTradeMarkersToChart() {
     try {
-        console.log('📍 [MARKERS] Ajout des marqueurs de trades sur le graphique...');
+        console.log('📍 [DEBUG] Début addTradeMarkersToChart');
         
         // Vérifier si le widget TradingView est disponible et les résultats existent
         if (!backtestTradingViewWidget || !backtestResults || !backtestResults.trades || backtestResults.trades.length === 0) {
-            console.log('⚠️ [MARKERS] Widget TradingView ou résultats non disponibles');
+            console.log('⚠️ [DEBUG] Widget ou résultats non disponibles - Trades:', backtestResults?.trades?.length || 0);
             return;
         }
         
         // Attendre que le graphique soit complètement chargé
         setTimeout(() => {
             try {
+                console.log('🔍 [DEBUG] Début timeout - macdPaneId prêt?', !!window.macdPaneId);
+                
                 // Vérifier si le widget a la méthode onChartReady
                 if (backtestTradingViewWidget.onChartReady) {
                     backtestTradingViewWidget.onChartReady(() => {
+                        console.log('🔍 [DEBUG] onChartReady déclenché dans timeout');
                         addAdvancedTradeMarkers();
                     });
                 } else {
                     // Fallback: essayer d'ajouter les marqueurs directement
+                    console.log('🔍 [DEBUG] Fallback direct');
                     addAdvancedTradeMarkers();
                 }
             } catch (error) {
-                console.error('❌ [MARKERS] Erreur lors de l\'ajout des marqueurs:', error);
+                console.error('❌ [DEBUG] Erreur dans timeout:', error);
             }
         }, 2000); // Attendre 2 secondes que le graphique soit prêt
+        
+        console.log('📍 [DEBUG] Fin addTradeMarkersToChart');
         
     } catch (error) {
         console.error('❌ [MARKERS] Erreur dans addTradeMarkersToChart:', error);
@@ -1442,7 +1451,7 @@ function addAdvancedTradeMarkers() {
 // Méthode 1: Utiliser l'API de marqueurs TradingView
 function addMarkersWithTradingViewAPI() {
     try {
-        console.log('📍 [TV_API] Tentative d\'ajout via API TradingView...');
+        console.log('📍 [DEBUG] Début addMarkersWithTradingViewAPI');
         
         // Vérifier si le widget a une méthode pour ajouter des marqueurs
         if (backtestTradingViewWidget.onChartReady) {
@@ -1450,9 +1459,17 @@ function addMarkersWithTradingViewAPI() {
                 try {
                     const chart = backtestTradingViewWidget.activeChart();
                     
+                    console.log('🔍 [DEBUG] Chart actif:', !!chart);  // Vérifie si chart existe
+                    console.log('🔍 [DEBUG] Méthodes disponibles: createShape?', !!chart.createShape, ' | addUserMarks?', !!chart.addUserMarks);
+                    console.log('🔍 [DEBUG] macdPaneId disponible:', window.macdPaneId);
+                    console.log('🔍 [DEBUG] Nombre de trades à marquer:', backtestResults.trades.length);
+                    
                     if (chart && chart.createShape && window.macdPaneId) {  // Ensure MACD ID is available
                         backtestResults.trades.forEach((trade, index) => {
                             const isProfit = trade.pnl > 0;
+                            
+                            // NEW: Log pour chaque marqueur
+                            console.log(`🔍 [DEBUG] Ajout marqueur pour trade #${index + 1} - Time: ${Math.floor(trade.entryTime / 1000)}, Profit: ${isProfit}, Pane: ${window.macdPaneId}`);
                             
                             // NEW: Calculate approximate MACD value for Y-position (fetch from backtest data or approximate)
                             // For simplicity, assume MACD delta ~0 for entry; refine with actual MACD calc if needed
@@ -1474,18 +1491,20 @@ function addMarkersWithTradingViewAPI() {
                             });
                         });
                         
-                        console.log(`✅ [TV_API] ${backtestResults.trades.length} marqueurs ajoutés via API TradingView sur le pane MACD`);
+                        console.log(`✅ [DEBUG] Fin ajout des marqueurs - Total: ${backtestResults.trades.length}`);
                     } else {
-                        console.warn('⚠️ [TV_API] Impossible d\'ajouter des shapes - MACD pane non trouvé');
+                        console.warn('⚠️ [DEBUG] Conditions non remplies pour ajouter des shapes');
                     }
                 } catch (apiError) {
-                    console.error('❌ [TV_API] Erreur API:', apiError);
+                    console.error('❌ [DEBUG] Erreur dans onChartReady:', apiError);
                 }
             });
+        } else {
+            console.warn('⚠️ [DEBUG] onChartReady non disponible');
         }
         
     } catch (error) {
-        console.error('❌ [TV_API] Erreur méthode API:', error);
+        console.error('❌ [DEBUG] Erreur globale dans addMarkersWithTradingViewAPI:', error);
     }
 }
 
