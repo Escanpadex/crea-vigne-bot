@@ -133,8 +133,9 @@ function showPositionSummary() {
 // Fonction: Paramètres MACD adaptés par timeframe
 function getMACDParameters(timeframe) {
     const parameters = {
-        // {{ edit_2 }}: Réduire minCandles pour 4h de 200 à 50 pour gérer les paires récentes (minRequired=45)
-        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 50 },  // Changé de 200 à 50
+        // {{ edit_2_FIXED }}: Corriger minCandles pour 4h - 50 bougies 15m = seulement 12 bougies 4h (insuffisant!)
+        // Pour 4h: minRequired=45, donc besoin de 45*4=180 bougies 15m minimum pour l'agrégation
+        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 200 },  // Restauré à 200 pour avoir assez de données
         '1h': { fast: 30, slow: 50, signal: 20, minCandles: 300 },
         '15m': { fast: 30, slow: 50, signal: 40, minCandles: 350 }
     };
@@ -288,8 +289,8 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         // 🎯 Récupérer les paramètres MACD spécifiques au timeframe
         const macdParams = getMACDParameters(timeframe);
         
-        // 🔄 Récupérer plus de bougies selon les paramètres MACD
-        let klines = await getKlineData(symbol, macdParams.minCandles, timeframe);
+        // 🔄 Récupérer plus de bougies selon les paramètres MACD (avec agrégation automatique pour 4h)
+        let klines = await getKlineDataWithAggregation(symbol, macdParams.minCandles, timeframe);
         
         const minRequired = macdParams.slow + macdParams.signal + 10;
         
@@ -324,7 +325,7 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         
         let macdSignal = 'HOLD';
         let signalStrength = 0;
-        let reason = '';
+        let reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe}) (candles: ${klines.length})`; // Valeur par défaut
         
         if (macdData.macd == null || macdData.signal == null || macdData.histogram == null) {
             reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe}) (candles: ${klines.length})`;
@@ -371,6 +372,11 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
                 signalStrength = 0;
                 reason = `📉 MACD ${timeframe} BAISSIER - MACD: ${macdData.macd.toFixed(6)}, Signal: ${macdData.signal.toFixed(6)}, Histogram: ${currentHistogram.toFixed(6)}, Tendance: ${histogramTrend}`;
             }
+        }
+        
+        // 🔧 SÉCURITÉ: S'assurer que reason n'est jamais vide
+        if (!reason || reason.trim() === '') {
+            reason = `📊 MACD ${timeframe} analysé - Signal: ${macdSignal}, MACD: ${macdData.macd?.toFixed(6) || 'N/A'}, Signal: ${macdData.signal?.toFixed(6) || 'N/A'}, Histogram: ${macdData.histogram?.toFixed(6) || 'N/A'}`;
         }
         
         // 🔧 Debug pour les premières analyses
@@ -434,6 +440,57 @@ function forceAnalysisIfAvailable() {
     }, 1000);
     
     return true;
+}
+
+// 🆕 FONCTION AMÉLIORÉE: Récupérer des données 4h avec agrégation automatique si nécessaire
+async function getKlineDataWithAggregation(symbol, limit, timeframe) {
+    try {
+        // Pour les timeframes autres que 4h, utiliser la fonction standard
+        if (timeframe !== '4h') {
+            return await getKlineData(symbol, limit, timeframe);
+        }
+        
+        // Pour 4h: d'abord essayer de récupérer directement
+        let klines = await getKlineData(symbol, limit, timeframe);
+        
+        // Si on n'a pas assez de données 4h, essayer l'agrégation depuis 15m
+        if (klines.length < limit * 0.8) { // Si on a moins de 80% des données demandées
+            console.log(`⚠️ Données 4h insuffisantes pour ${symbol} (${klines.length}/${limit}) - Tentative d'agrégation depuis 15m`);
+            
+            // Calculer combien de bougies 15m on a besoin pour obtenir 'limit' bougies 4h
+            const needed15mCandles = limit * 4 * 1.2; // 20% de marge
+            const data15m = await getKlineData(symbol, Math.min(needed15mCandles, 1000), '15m');
+            
+            if (data15m.length >= limit * 4) {
+                // Agréger les données 15m en 4h
+                const aggregated4h = [];
+                for (let i = 0; i < data15m.length; i += 4) {
+                    const chunk = data15m.slice(i, i + 4);
+                    if (chunk.length === 4) {
+                        const aggregatedCandle = {
+                            timestamp: chunk[0].timestamp,
+                            open: chunk[0].open,
+                            high: Math.max(...chunk.map(c => c.high)),
+                            low: Math.min(...chunk.map(c => c.low)),
+                            close: chunk[chunk.length - 1].close,
+                            volume: chunk.reduce((sum, c) => sum + c.volume, 0)
+                        };
+                        aggregated4h.push(aggregatedCandle);
+                    }
+                }
+                
+                console.log(`✅ Agrégation réussie pour ${symbol}: ${data15m.length} bougies 15m → ${aggregated4h.length} bougies 4h`);
+                return aggregated4h.slice(-limit); // Retourner les 'limit' dernières bougies
+            }
+        }
+        
+        return klines;
+        
+    } catch (error) {
+        console.error(`❌ Erreur récupération données avec agrégation ${symbol} ${timeframe}:`, error);
+        // Fallback vers la fonction standard
+        return await getKlineData(symbol, limit, timeframe);
+    }
 }
 
 // Exported for use in backtesting and main
