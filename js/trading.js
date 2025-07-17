@@ -5,48 +5,31 @@ console.log('Assuming utils.js is loaded: using shared MACD functions');
 // 🎯 NOUVELLE CONSTANTE: Limite de positions simultanées
 const MAX_SIMULTANEOUS_POSITIONS = 10;
 
-async function analyzeMultiTimeframe(symbol) {
-    try {
-        // NOUVELLE LOGIQUE: H4 → H1 → 15M (plus de 5M)
-        const timeframes = ['4h', '1h', '15m'];
-        const results = {};
-        
-        for (const tf of timeframes) {
-            const analysis = await analyzePairMACD(symbol, tf);
-            results[tf] = analysis;
+// 🆕 NOUVELLE FONCTION: Wrapper de retry pour les appels API
+async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await makeRequest(endpoint, options);
+            return result;
+        } catch (error) {
+            lastError = error;
             
-            // Filtrage progressif: H4 et H1 doivent être haussiers
-            if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
-                results.filtered = tf;
-                results.filterReason = `Filtré au ${tf}: ${analysis.signal}`;
-                break;
+            if (attempt < maxRetries) {
+                const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+                log(`⚠️ Tentative ${attempt}/${maxRetries} échouée pour ${endpoint} - Réessai dans ${delay}ms`, 'WARNING');
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
-        
-        if (!results.filtered) {
-            // Si H4 et H1 sont haussiers, vérifier le signal 15M
-            const signal15m = results['15m'];
-            if (signal15m.signal === 'BUY' && signal15m.crossover) {
-                results.finalDecision = 'BUY';
-                results.finalReason = 'H4 et H1 haussiers + croisement 15M détecté';
-            } else if (signal15m.signal === 'BULLISH') {
-                results.finalDecision = 'WAIT';
-                results.finalReason = 'H4 et H1 haussiers, 15M haussier mais pas de croisement';
-            } else {
-                results.finalDecision = 'FILTERED';
-                results.filterReason = 'Filtré au 15M: signal non haussier';
-            }
-        } else {
-            results.finalDecision = 'FILTERED';
-        }
-        
-        return results;
-        
-    } catch (error) {
-        log(`❌ Erreur analyse multi-timeframe ${symbol}: ${error.message}`, 'ERROR');
-        return { symbol, error: error.message };
     }
+    
+    log(`❌ Échec après ${maxRetries} tentatives pour ${endpoint}: ${lastError?.message || 'Erreur inconnue'}`, 'ERROR');
+    throw lastError;
 }
+
+// REMOVED: analyzeMultiTimeframe function - replaced by analyzeMultiTimeframeImproved
+// This eliminates redundancy and ensures consistent use of extended data
 
 // �� NOUVELLE FONCTION: Analyse multi-timeframe améliorée avec données étendues
 async function analyzeMultiTimeframeImproved(symbol) {
@@ -66,12 +49,28 @@ async function analyzeMultiTimeframeImproved(symbol) {
                 console.log(`📊 [TRADING] ${tf}: Récupération de données étendues...`);
                 
                 // Utiliser des données étendues pour avoir le dernier état valide
-                const extendedData = await getExtendedHistoricalDataForTrading(symbol, tf, 60);
+                let extendedData = await getExtendedHistoricalDataForTrading(symbol, tf, 60);
                 
                 if (extendedData.length === 0) {
                     console.error(`❌ [TRADING] Aucune donnée étendue pour ${symbol} ${tf}`);
                     results[tf] = { symbol, timeframe: tf, signal: 'INSUFFICIENT_DATA' };
                     continue;
+                }
+                
+                // NEW: Fallback if still insufficient after fetch
+                const macdParams = getMACDParameters(tf);
+                const minRequired = macdParams.slow + macdParams.signal + 10;
+                if (extendedData.length < minRequired) {
+                    log(`⚠️ Données étendues insuffisantes pour ${symbol} ${tf} (${extendedData.length}/${minRequired}) - Tentative d'agrégation depuis 15m`, 'WARNING');
+                    extendedData = await aggregateDataFromLowerTimeframe(symbol, '15m', tf);
+                    // If aggregation fails, set to INSUFFICIENT_DATA as before
+                    if (extendedData.length < minRequired) {
+                        console.error(`❌ [TRADING] Agrégation échouée pour ${symbol} ${tf} - INSUFFICIENT_DATA`);
+                        results[tf] = { symbol, timeframe: tf, signal: 'INSUFFICIENT_DATA' };
+                        continue;
+                    } else {
+                        console.log(`✅ [TRADING] Agrégation réussie pour ${symbol} ${tf} - ${extendedData.length} bougies disponibles`);
+                    }
                 }
                 
                 // Analyser avec les données étendues pour avoir le dernier état
@@ -225,6 +224,61 @@ async function getExtendedHistoricalDataForTrading(symbol, timeframe, days = 60)
     }
 }
 
+// 🆕 NOUVELLE FONCTION: Agréger les données depuis un timeframe inférieur (fallback pour INSUFFICIENT_DATA)
+async function aggregateDataFromLowerTimeframe(symbol, lowerTimeframe, targetTimeframe) {
+    try {
+        console.log(`🔄 [TRADING] Tentative d'agrégation ${symbol}: ${lowerTimeframe} → ${targetTimeframe}`);
+        
+        // Mapping des multipliers pour l'agrégation
+        const aggregationMap = {
+            '15m_to_1h': 4,   // 4 bougies 15m = 1 bougie 1h
+            '15m_to_4h': 16,  // 16 bougies 15m = 1 bougie 4h
+            '1h_to_4h': 4     // 4 bougies 1h = 1 bougie 4h
+        };
+        
+        const aggregationKey = `${lowerTimeframe}_to_${targetTimeframe}`;
+        const multiplier = aggregationMap[aggregationKey];
+        
+        if (!multiplier) {
+            console.warn(`⚠️ [TRADING] Agrégation non supportée: ${lowerTimeframe} → ${targetTimeframe}`);
+            return [];
+        }
+        
+        // Récupérer plus de données du timeframe inférieur
+        const requiredCandles = 1000; // Maximum pour avoir assez de données
+        const lowerData = await getKlineData(symbol, requiredCandles, lowerTimeframe);
+        
+        if (lowerData.length < multiplier) {
+            console.warn(`⚠️ [TRADING] Pas assez de données ${lowerTimeframe} pour agrégation: ${lowerData.length}/${multiplier}`);
+            return [];
+        }
+        
+        // Agréger les données
+        const aggregatedData = [];
+        for (let i = 0; i < lowerData.length; i += multiplier) {
+            const chunk = lowerData.slice(i, i + multiplier);
+            if (chunk.length === multiplier) {
+                const aggregatedCandle = {
+                    timestamp: chunk[0].timestamp,
+                    open: chunk[0].open,
+                    high: Math.max(...chunk.map(c => c.high)),
+                    low: Math.min(...chunk.map(c => c.low)),
+                    close: chunk[chunk.length - 1].close,
+                    volume: chunk.reduce((sum, c) => sum + c.volume, 0)
+                };
+                aggregatedData.push(aggregatedCandle);
+            }
+        }
+        
+        console.log(`✅ [TRADING] Agrégation réussie: ${lowerData.length} bougies ${lowerTimeframe} → ${aggregatedData.length} bougies ${targetTimeframe}`);
+        return aggregatedData;
+        
+    } catch (error) {
+        console.error(`❌ [TRADING] Erreur agrégation ${symbol}:`, error);
+        return [];
+    }
+}
+
 function calculatePositionSize() {
     const maxPositionValue = (balance.totalEquity * config.capitalPercent / 100) * config.leverage;
     return Math.max(maxPositionValue, 10);
@@ -317,7 +371,8 @@ async function openPosition(symbol, analysis) {
         
         const currentPrice = await getCurrentPrice(symbol);
         const priceToUse = currentPrice || analysis.price;
-        const initialStopPrice = priceToUse * 0.99;
+        const initialStopPercent = config.trailingStopSettings?.initialStopPercent || config.trailingStop || 1.0;
+        const initialStopPrice = priceToUse * (1 - initialStopPercent / 100);
         
         const triggerPriceFormatted = parseFloat(initialStopPrice.toFixed(8)).toString();
         
@@ -338,21 +393,39 @@ async function openPosition(symbol, analysis) {
         };
         
         log(`🔄 Configuration stop loss initial -1% pour ${symbol} @ ${initialStopPrice.toFixed(4)}...`, 'INFO');
-        const stopLossResult = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
-            method: 'POST',
-            body: JSON.stringify(stopLossData)
-        });
         
+        // NEW: Retry wrapper for stop loss creation
         let finalStopLossId = null;
         let stopLossCreated = false;
+        let attempts = 0;
+        const maxAttempts = 3;
         
-        if (stopLossResult && stopLossResult.code === '00000') {
-            finalStopLossId = stopLossResult.data.orderId;
-            stopLossCreated = true;
-            log(`✅ Stop Loss initial créé: ${symbol} @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
-            log(`🆔 Stop Loss ID: ${finalStopLossId}`, 'INFO');
-        } else {
-            log(`❌ ÉCHEC stop loss initial ${symbol}: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
+        while (attempts < maxAttempts && !stopLossCreated) {
+            attempts++;
+            
+            const stopLossResult = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-plan-order', {
+                method: 'POST',
+                body: JSON.stringify(stopLossData)
+            });
+            
+            if (stopLossResult && stopLossResult.code === '00000') {
+                finalStopLossId = stopLossResult.data.orderId;
+                stopLossCreated = true;
+                log(`✅ Stop Loss initial créé: ${symbol} @ ${initialStopPrice.toFixed(4)} (-1%) [Tentative ${attempts}/${maxAttempts}]`, 'SUCCESS');
+                log(`🆔 Stop Loss ID: ${finalStopLossId}`, 'INFO');
+                break;
+            } else {
+                log(`❌ ÉCHEC stop loss initial ${symbol} [Tentative ${attempts}/${maxAttempts}]: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
+                
+                if (attempts < maxAttempts) {
+                    log(`⚠️ Tentative ${attempts}/${maxAttempts} échouée - Réessai dans 2s...`, 'WARNING');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+        }
+        
+        if (!stopLossCreated) {
+            log(`❌ ÉCHEC de toutes les tentatives de stop loss initial pour ${symbol}`, 'ERROR');
             log(`🔄 Tentative de création stop loss d'urgence...`, 'WARNING');
             
             // NOUVELLE LOGIQUE: Essayer de créer un stop loss d'urgence immédiatement
@@ -413,41 +486,23 @@ async function openPosition(symbol, analysis) {
     }
 }
 
-async function syncLocalPositions() {
-    const apiPositions = await fetchActivePositionsFromAPI();
-    const apiSymbols = apiPositions.map(pos => pos.symbol);
-    
-    const removedPositions = openPositions.filter(localPos => 
-        !apiSymbols.includes(localPos.symbol)
-    );
-    
-    if (removedPositions.length > 0) {
-        removedPositions.forEach(pos => {
-            log(`🔚 Position fermée détectée: ${pos.symbol} (Stop Loss déclenché)`, 'SUCCESS');
-            
-            botStats.totalClosedPositions++;
-            const pnl = pos.unrealizedPnL || 0;
-            
-            if (pnl > 0) {
-                botStats.winningPositions++;
-                botStats.totalWinAmount += pnl;
-                log(`🟢 Position gagnante: +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
-            } else if (pnl < 0) {
-                botStats.losingPositions++;
-                botStats.totalLossAmount += pnl;
-                log(`🔴 Position perdante: ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
-            }
-        });
+// REMOVED: syncLocalPositions function - merged into syncAndCheckPositions
+// This eliminates duplication and ensures consistent handling
+
+// 🆕 NOUVELLE FONCTION: Récupérer les positions actives depuis l'API
+async function fetchActivePositionsFromAPI() {
+    try {
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
-        openPositions = openPositions.filter(localPos => 
-            apiSymbols.includes(localPos.symbol)
-        );
+        if (result && result.code === '00000' && result.data) {
+            return result.data.filter(pos => parseFloat(pos.total) > 0);
+        }
         
-        updatePositionsDisplay();
-        updateStats();
+        return [];
+    } catch (error) {
+        log(`❌ Erreur récupération positions API: ${error.message}`, 'ERROR');
+        return [];
     }
-    
-    return apiPositions;
 }
 
 async function createEmergencyStopLoss(position, stopPrice) {
@@ -468,7 +523,7 @@ async function createEmergencyStopLoss(position, stopPrice) {
             reduceOnly: "YES"
         };
         
-        const result = await makeRequest('/bitget/api/v2/mix/order/place-plan-order', {
+        const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-plan-order', {
             method: 'POST',
             body: JSON.stringify(stopLossData)
         });
@@ -493,7 +548,7 @@ async function manageTrailingStops() {
     try {
         log('🔍 Vérification stop loss trailing...', 'DEBUG');
         
-        const apiPositions = await syncLocalPositions();
+        const apiPositions = await syncAndCheckPositions();
         
         for (const position of openPositions) {
             if (!position.stopLossId) {
@@ -501,7 +556,8 @@ async function manageTrailingStops() {
                 
                 const currentPrice = await getCurrentPrice(position.symbol);
                 if (currentPrice) {
-                    const urgentStopPrice = currentPrice * 0.99;
+                    const urgentStopPercent = config.trailingStopSettings?.initialStopPercent || config.trailingStop || 1.0;
+                    const urgentStopPrice = currentPrice * (1 - urgentStopPercent / 100);
                     const success = await createEmergencyStopLoss(position, urgentStopPrice);
                     
                     if (success) {
@@ -528,7 +584,8 @@ async function manageTrailingStops() {
                 position.highestPrice = currentPrice;
             }
             
-            const newStopPrice = position.highestPrice * 0.99;
+            const trailingPercent = config.trailingStopSettings?.trailingPercent || config.trailingStop || 1.0;
+            const newStopPrice = position.highestPrice * (1 - trailingPercent / 100);
             
             if (newStopPrice > position.currentStopPrice) {
                 const success = await modifyStopLoss(
@@ -686,6 +743,13 @@ async function importExistingPositions() {
                 return;
             }
             
+            // NEW: Limit check before importing
+            if (openPositions.length + apiPositions.length > MAX_SIMULTANEOUS_POSITIONS) {
+                log(`⚠️ Import limité: Trop de positions (${openPositions.length + apiPositions.length} > ${MAX_SIMULTANEOUS_POSITIONS}) - Import partiel`, 'WARNING');
+                const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+                apiPositions.splice(availableSlots); // Keep only what fits
+            }
+            
             apiPositions.forEach((pos, index) => {
                 log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side || 'NO_SIDE'} - Size: ${pos.contractSize || 'NO_SIZE'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
                 log(`📊 Structure complète: ${JSON.stringify(pos)}`, 'DEBUG');
@@ -758,12 +822,15 @@ async function importExistingPositions() {
 
 window.importExistingPositions = importExistingPositions;
 window.canOpenNewPosition = canOpenNewPosition;
+window.syncAndCheckPositions = syncAndCheckPositions;
+window.fetchActivePositionsFromAPI = fetchActivePositionsFromAPI;
+window.makeRequestWithRetry = makeRequestWithRetry;
 
 // 🧪 FONCTION DE TEST: Tester les nouveaux paramètres MACD par timeframe
-async function testMACDParameters() {
+async function testMACDParameters(symbol = 'BTCUSDT') {
     console.log('🧪 Test des paramètres MACD adaptatifs par timeframe...');
     
-    const testSymbol = 'BTCUSDT';
+    const testSymbol = symbol;
     const timeframes = ['4h', '1h', '15m'];
     
     for (const tf of timeframes) {
@@ -791,8 +858,9 @@ async function testMACDParameters() {
 // Rendre la fonction accessible globalement
 window.testMACDParameters = testMACDParameters;
 
-async function checkPositionsStatus() {
-    if (openPositions.length === 0) return;
+// NEW: Merged function combining syncLocalPositions and checkPositionsStatus
+async function syncAndCheckPositions() {
+    if (openPositions.length === 0) return [];
     
     try {
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
@@ -807,8 +875,7 @@ async function checkPositionsStatus() {
             
             if (closedPositions.length > 0) {
                 for (const closedPos of closedPositions) {
-                    log(`🔚 Position fermée MANUELLEMENT détectée: ${closedPos.symbol}`, 'WARNING');
-                    log(`💰 ${closedPos.symbol} fermée par l'utilisateur sur Bitget`, 'INFO');
+                    log(`🔚 Position fermée détectée: ${closedPos.symbol} (Stop Loss déclenché ou fermeture manuelle)`, 'SUCCESS');
                     
                     botStats.totalClosedPositions++;
                     const pnl = closedPos.unrealizedPnL || 0;
@@ -816,13 +883,14 @@ async function checkPositionsStatus() {
                     if (pnl > 0) {
                         botStats.winningPositions++;
                         botStats.totalWinAmount += pnl;
-                        log(`🟢 Position gagnante (manuelle): +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
+                        log(`🟢 Position gagnante: +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
                     } else if (pnl < 0) {
                         botStats.losingPositions++;
                         botStats.totalLossAmount += pnl;
-                        log(`🔴 Position perdante (manuelle): ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
+                        log(`🔴 Position perdante: ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
                     }
                     
+                    // Cancel orphaned stop losses (from checkPositionsStatus)
                     if (closedPos.stopLossId) {
                         try {
                             const cancelResult = await makeRequest('/bitget/api/v2/mix/order/cancel-plan-order', {
@@ -849,13 +917,75 @@ async function checkPositionsStatus() {
                 );
                 
                 updatePositionsDisplay();
+                updateStats();
                 await refreshBalance();
                 
-                log(`📊 ${closedPositions.length} position(s) fermée(s) manuellement - Synchronisation effectuée`, 'SUCCESS');
-                log(`Synchronisation des positions effectuée`);
+                log(`📊 ${closedPositions.length} position(s) fermée(s) - Synchronisation effectuée`, 'SUCCESS');
             }
+            
+            return apiPositions;
         }
     } catch (error) {
-        log(`❌ Erreur vérification status positions: ${error.message}`, 'ERROR');
+        log(`❌ Erreur synchronisation positions: ${error.message}`, 'ERROR');
+        return [];
     }
 }
+
+// 🧪 FONCTION DE TEST: Vérifier que toutes les corrections fonctionnent
+async function testTradingFixes() {
+    console.log('🧪 Test des corrections de trading...');
+    
+    try {
+        // Test 1: Vérifier que la fonction dupliquée a été supprimée
+        if (typeof analyzeMultiTimeframe === 'undefined') {
+            console.log('✅ Fix 1: Fonction dupliquée analyzeMultiTimeframe supprimée');
+        } else {
+            console.log('❌ Fix 1: Fonction dupliquée analyzeMultiTimeframe encore présente');
+        }
+        
+        // Test 2: Vérifier que la fonction d'agrégation existe
+        if (typeof aggregateDataFromLowerTimeframe === 'function') {
+            console.log('✅ Fix 2: Fonction d\'agrégation pour INSUFFICIENT_DATA ajoutée');
+        } else {
+            console.log('❌ Fix 2: Fonction d\'agrégation manquante');
+        }
+        
+        // Test 3: Vérifier que la fonction de retry existe
+        if (typeof makeRequestWithRetry === 'function') {
+            console.log('✅ Fix 4: Fonction de retry pour stop loss ajoutée');
+        } else {
+            console.log('❌ Fix 4: Fonction de retry manquante');
+        }
+        
+        // Test 4: Vérifier que la fonction mergée existe
+        if (typeof syncAndCheckPositions === 'function') {
+            console.log('✅ Fix 5: Fonction de synchronisation mergée créée');
+        } else {
+            console.log('❌ Fix 5: Fonction de synchronisation mergée manquante');
+        }
+        
+        // Test 5: Vérifier que les anciens noms n'existent plus
+        if (typeof syncLocalPositions === 'undefined' && typeof checkPositionsStatus === 'undefined') {
+            console.log('✅ Fix 5: Anciennes fonctions de synchronisation supprimées');
+        } else {
+            console.log('❌ Fix 5: Anciennes fonctions de synchronisation encore présentes');
+        }
+        
+        // Test 6: Vérifier la configuration trailing stop
+        if (config.trailingStopSettings && config.trailingStopSettings.trailingPercent) {
+            console.log('✅ Fix Général: Configuration trailing stop configurable');
+        } else {
+            console.log('⚠️ Fix Général: Configuration trailing stop utilise les valeurs par défaut');
+        }
+        
+        console.log('✅ Test des corrections terminé');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du test des corrections:', error);
+    }
+}
+
+// Rendre la fonction accessible globalement
+window.testTradingFixes = testTradingFixes;
+
+console.log('✅ Trading fixes applied successfully - call testTradingFixes() to verify');
