@@ -133,7 +133,8 @@ function showPositionSummary() {
 // Fonction: Paramètres MACD adaptés par timeframe
 function getMACDParameters(timeframe) {
     const parameters = {
-        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 200 },
+        // {{ edit_2 }}: Réduire minCandles pour 4h de 200 à 50 pour gérer les paires récentes (minRequired=45)
+        '4h': { fast: 12, slow: 26, signal: 9, minCandles: 50 },  // Changé de 200 à 50
         '1h': { fast: 30, slow: 50, signal: 20, minCandles: 300 },
         '15m': { fast: 30, slow: 50, signal: 40, minCandles: 350 }
     };
@@ -288,11 +289,23 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         const macdParams = getMACDParameters(timeframe);
         
         // 🔄 Récupérer plus de bougies selon les paramètres MACD
-        const klines = await getKlineData(symbol, macdParams.minCandles, timeframe);
+        let klines = await getKlineData(symbol, macdParams.minCandles, timeframe);
         
-        // Vérifier si on a assez de données pour l'analyse MACD
         const minRequired = macdParams.slow + macdParams.signal + 10;
-        if (klines.length < minRequired) {
+        
+        // {{ edit_3 }}: Si données insuffisantes, tenter un fallback avec plus de données ou agrégation (inspiré de la mémoire)
+        if (klines.length < minRequired && timeframe === '4h') {
+            log(`⚠️ Données 4h insuffisantes pour ${symbol} (${klines.length}/${minRequired}) - Tentative de récupération étendue`, 'WARNING');
+            klines = await getExtendedHistoricalDataForTrading(symbol, '4h', 60);  // Fonction de trading.js pour données étendues
+            if (klines.length < minRequired) {
+                // Fallback final : Agrégation depuis 15m
+                klines = await aggregateDataFromLowerTimeframe(symbol, '15m', '4h');
+                if (klines.length < minRequired) {
+                    return { symbol, signal: 'HOLD', strength: 0, reason: `Données insuffisantes même après fallback: ${klines.length}/${minRequired}`, timeframe };
+                }
+            }
+            log(`✅ Fallback réussi pour ${symbol} 4h: ${klines.length} bougies disponibles`, 'SUCCESS');
+        } else if (klines.length < minRequired) {
             return { 
                 symbol, 
                 signal: 'HOLD', 
