@@ -90,7 +90,7 @@ async function analyzeMultiTimeframeImproved(symbol) {
             if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
                 results.filtered = tf;
                 results.filterReason = `Filtré au ${tf}: dernier signal ${analysis.signal}`;
-                console.log(`❌ [TRADING] Filtré au ${tf}: ${analysis.signal}`);
+                console.log(`❌ [TRADING] Filtré au ${tf}: ${analysis.signal} - ${analysis.reason}`);
                 break;
             }
         }
