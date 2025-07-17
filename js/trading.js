@@ -2,6 +2,9 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
+// 🎯 NOUVELLE CONSTANTE: Limite de positions simultanées
+const MAX_SIMULTANEOUS_POSITIONS = 10;
+
 async function analyzeMultiTimeframe(symbol) {
     try {
         // NOUVELLE LOGIQUE: H4 → H1 → 15M (plus de 5M)
@@ -231,23 +234,47 @@ function hasOpenPosition(symbol) {
     return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
 }
 
-async function openPosition(symbol, analysis) {
+// 🆕 NOUVELLE FONCTION: Vérifier si on peut ouvrir une nouvelle position
+function canOpenNewPosition(symbol) {
+    // Vérifier si on a déjà une position sur ce symbole
     if (hasOpenPosition(symbol)) {
-        log(`⚠️ Position déjà ouverte sur ${symbol}`, 'WARNING');
-        return false;
+        return { canOpen: false, reason: 'Position déjà ouverte sur ce symbole' };
     }
     
+    // Vérifier la limite de positions simultanées
+    if (openPositions.length >= MAX_SIMULTANEOUS_POSITIONS) {
+        return { canOpen: false, reason: `Limite de ${MAX_SIMULTANEOUS_POSITIONS} positions simultanées atteinte` };
+    }
+    
+    // Vérifier le cooldown
     if (isPairInCooldown(symbol)) {
         const remainingMinutes = getRemainingCooldown(symbol);
-        log(`⏰ ${symbol} en cooldown encore ${remainingMinutes} minutes`, 'WARNING');
+        return { canOpen: false, reason: `${symbol} en cooldown encore ${remainingMinutes} minutes` };
+    }
+    
+    // Vérifier le capital disponible
+    const positionValue = calculatePositionSize();
+    if (positionValue < 10) {
+        return { canOpen: false, reason: 'Capital insuffisant pour ouvrir une position' };
+    }
+    
+    return { canOpen: true, reason: 'Conditions remplies pour ouvrir une position' };
+}
+
+async function openPosition(symbol, analysis) {
+    // 🎯 NOUVELLE VÉRIFICATION: Utiliser la fonction de vérification centralisée
+    const canOpen = canOpenNewPosition(symbol);
+    
+    if (!canOpen.canOpen) {
+        log(`⚠️ ${symbol}: ${canOpen.reason}`, 'WARNING');
         return false;
     }
     
+    // Log informatif sur le nombre de positions disponibles
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    log(`📊 Ouverture position ${symbol} - ${availableSlots} slots disponibles sur ${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
+    
     const positionValue = calculatePositionSize();
-    if (positionValue < 10) {
-        log(`⚠️ Capital insuffisant pour ouvrir position sur ${symbol}`, 'WARNING');
-        return false;
-    }
     
     try {
         await setLeverage(symbol, config.leverage);
@@ -282,6 +309,7 @@ async function openPosition(symbol, analysis) {
         }
         
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
+        log(`📊 Positions ouvertes: ${openPositions.length + 1}/${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
         
         addPairToCooldown(symbol);
         
@@ -556,11 +584,23 @@ function updatePositionsDisplay() {
     const container = document.getElementById('positionsContainer');
     
     if (openPositions.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #666; padding: 15px; font-size: 12px;">Aucune position ouverte</div>';
+        container.innerHTML = `<div style="text-align: center; color: #666; padding: 15px; font-size: 12px;">Aucune position ouverte - ${MAX_SIMULTANEOUS_POSITIONS} positions max autorisées</div>`;
         return;
     }
     
-    container.innerHTML = '';
+    // Afficher le compteur de positions en haut
+    const positionCounterHtml = `
+        <div style="background: #f0f8ff; padding: 8px; margin-bottom: 8px; border-radius: 4px; text-align: center; font-size: 12px; color: #2c5aa0;">
+            <strong>📊 Positions ouvertes: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}</strong>
+            ${openPositions.length >= MAX_SIMULTANEOUS_POSITIONS ? 
+                '<span style="color: #ff6b6b; margin-left: 10px;">⚠️ LIMITE ATTEINTE</span>' : 
+                `<span style="color: #51cf66; margin-left: 10px;">✅ ${MAX_SIMULTANEOUS_POSITIONS - openPositions.length} slots disponibles</span>`
+            }
+        </div>
+    `;
+    
+    container.innerHTML = positionCounterHtml;
+    
     openPositions.forEach(position => {
         const item = document.createElement('div');
         item.className = 'position-item';
@@ -717,6 +757,7 @@ async function importExistingPositions() {
 }
 
 window.importExistingPositions = importExistingPositions;
+window.canOpenNewPosition = canOpenNewPosition;
 
 // 🧪 FONCTION DE TEST: Tester les nouveaux paramètres MACD par timeframe
 async function testMACDParameters() {

@@ -32,11 +32,23 @@ function formatNumber(num) {
 }
 
 function updateStats() {
+    const MAX_SIMULTANEOUS_POSITIONS = 10; // Même valeur que dans trading.js
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    
     document.getElementById('totalSignals').textContent = botStats.totalSignals;
-    document.getElementById('totalOpenPositions').textContent = openPositions.length;
+    document.getElementById('totalOpenPositions').textContent = `${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
     document.getElementById('totalClosedPositions').textContent = botStats.totalClosedPositions;
     document.getElementById('winningPositions').textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
     document.getElementById('losingPositions').textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
+    
+    // 🎯 NOUVEAU: Log informatif sur les positions disponibles (seulement quand le bot tourne)
+    if (typeof botRunning !== 'undefined' && botRunning && availableSlots > 0) {
+        // Log seulement toutes les 5 minutes pour éviter le spam
+        if (!window.lastPositionInfoLog || Date.now() - window.lastPositionInfoLog > 300000) {
+            log(`📊 Positions disponibles: ${availableSlots}/${MAX_SIMULTANEOUS_POSITIONS} slots libres`, 'INFO');
+            window.lastPositionInfoLog = Date.now();
+        }
+    }
 }
 
 // NEW: Update version timestamp
@@ -78,6 +90,44 @@ function saveKeys() {
 } 
 
 // 🎯 Shared MACD Utility Functions (extracted for consistency between backtesting and trading)
+
+// 🎯 NOUVELLE FONCTION: Afficher un résumé des positions disponibles
+function showPositionSummary() {
+    const MAX_SIMULTANEOUS_POSITIONS = 10;
+    const currentPositions = openPositions.length;
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - currentPositions;
+    
+    console.log('📊 ========== RÉSUMÉ DES POSITIONS ==========');
+    console.log(`🔢 Positions ouvertes: ${currentPositions}/${MAX_SIMULTANEOUS_POSITIONS}`);
+    console.log(`✅ Slots disponibles: ${availableSlots}`);
+    console.log(`⚠️ Limite atteinte: ${availableSlots === 0 ? 'OUI' : 'NON'}`);
+    
+    if (currentPositions > 0) {
+        console.log('\n📋 Positions ouvertes:');
+        openPositions.forEach((position, index) => {
+            const pnl = position.unrealizedPnL || 0;
+            const pnlSign = pnl >= 0 ? '+' : '';
+            const duration = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
+            
+            console.log(`  ${index + 1}. ${position.symbol} - ${pnlSign}${pnl.toFixed(2)}$ - ${duration}min`);
+        });
+    }
+    
+    if (availableSlots > 0) {
+        console.log(`\n🚀 Le bot peut ouvrir ${availableSlots} nouvelle(s) position(s)`);
+    } else {
+        console.log('\n🛑 Limite atteinte - Le bot attend qu\'une position se ferme');
+    }
+    
+    console.log('==========================================');
+    
+    return {
+        total: MAX_SIMULTANEOUS_POSITIONS,
+        current: currentPositions,
+        available: availableSlots,
+        limitReached: availableSlots === 0
+    };
+}
 
 // Fonction: Paramètres MACD adaptés par timeframe
 function getMACDParameters(timeframe) {
@@ -343,7 +393,38 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
     }
 }
 
+// 🎯 NOUVELLE FONCTION: Forcer le relancement de l'analyse si des positions sont disponibles
+function forceAnalysisIfAvailable() {
+    const MAX_SIMULTANEOUS_POSITIONS = 10;
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    
+    if (!botRunning) {
+        console.log('❌ Le bot n\'est pas en cours d\'exécution');
+        return false;
+    }
+    
+    if (availableSlots <= 0) {
+        console.log('⚠️ Aucun slot disponible - Limite de positions atteinte');
+        return false;
+    }
+    
+    console.log(`🚀 Forçage de l'analyse - ${availableSlots} slots disponibles`);
+    
+    // Relancer l'analyse
+    setTimeout(() => {
+        if (typeof tradingLoop === 'function') {
+            tradingLoop();
+        } else {
+            console.log('❌ Fonction tradingLoop non disponible');
+        }
+    }, 1000);
+    
+    return true;
+}
+
 // Exported for use in backtesting and main
 window.analyzePairMACD = analyzePairMACD;
 window.calculateMACD = calculateMACD;
-window.getMACDParameters = getMACDParameters; 
+window.getMACDParameters = getMACDParameters;
+window.showPositionSummary = showPositionSummary;
+window.forceAnalysisIfAvailable = forceAnalysisIfAvailable; 
