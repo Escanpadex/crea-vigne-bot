@@ -25,6 +25,7 @@ function clearLogs() {
 }
 
 function formatNumber(num) {
+    if (num === null || num === undefined || isNaN(num)) return '0.00';
     if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
     if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
     if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
@@ -275,7 +276,7 @@ function debugMACDAnalysis(symbol, macdData, signal, timeframe) {
     console.log(`   MACD > Signal: ${macdData.macd > macdData.signal}`);
     
     if (macdData.previousMacd !== null) {
-        console.log(`   Previous MACD: ${macdData.previousMacd.toFixed(6)}`);
+        console.log(`   Previous MACD: ${macdData.previousMacd?.toFixed(6) || 'null'}`);
         console.log(`   Previous Signal: ${macdData.previousSignal?.toFixed(6) || 'null'}`);
         console.log(`   Previous Histogram: ${macdData.previousHistogram?.toFixed(6) || 'null'}`);
     }
@@ -312,7 +313,7 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         let signalStrength = 0;
         let reason = '';
         
-        if (macdData.macd === null || macdData.signal === null) {
+        if (macdData.macd === null || macdData.signal === null || macdData.histogram === null) {
             reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe})`;
         } else {
             // 🚨 NOUVELLE LOGIQUE CORRIGÉE : Analyse de tendance plus stricte
