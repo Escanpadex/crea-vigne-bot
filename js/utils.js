@@ -226,7 +226,7 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         }
     }
     
-    if (currentMacd === null || currentSignal === null) {
+    if (currentMacd == null || currentSignal == null) {
         return { macd: currentMacd, signal: currentSignal, histogram: null, crossover: false };
     }
     
@@ -236,10 +236,10 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
     
     let strictCrossover = false;
     
-    if (previousMacd !== null && previousSignal !== null) {
+    if (previousMacd != null && previousSignal != null) {
         const wasBelow = previousMacd <= previousSignal;
         const nowAbove = currentMacd > currentSignal;
-        const histogramImproving = previousHistogram !== null && currentHistogram > previousHistogram;
+        const histogramImproving = previousHistogram != null && currentHistogram > previousHistogram;
         
         strictCrossover = wasBelow && nowAbove && histogramImproving;
     }
@@ -275,7 +275,7 @@ function debugMACDAnalysis(symbol, macdData, signal, timeframe) {
     console.log(`   Signal déterminé: ${signal}`);
     console.log(`   MACD > Signal: ${macdData.macd > macdData.signal}`);
     
-    if (macdData.previousMacd !== null) {
+    if (macdData.previousMacd != null) {
         console.log(`   Previous MACD: ${macdData.previousMacd?.toFixed(6) || 'null'}`);
         console.log(`   Previous Signal: ${macdData.previousSignal?.toFixed(6) || 'null'}`);
         console.log(`   Previous Histogram: ${macdData.previousHistogram?.toFixed(6) || 'null'}`);
@@ -313,8 +313,8 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         let signalStrength = 0;
         let reason = '';
         
-        if (macdData.macd === null || macdData.signal === null || macdData.histogram === null) {
-            reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe})`;
+        if (macdData.macd == null || macdData.signal == null || macdData.histogram == null) {
+            reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe}) (candles: ${klines.length})`;
         } else {
             // 🚨 NOUVELLE LOGIQUE CORRIGÉE : Analyse de tendance plus stricte
             const currentHistogram = macdData.histogram;
@@ -323,7 +323,7 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
             
             // Vérifier la tendance de l'histogramme sur 3 périodes
             let histogramTrend = 'NEUTRAL';
-            if (previousHistogram !== null && previousHistogram2 !== null) {
+            if (previousHistogram != null && previousHistogram2 != null) {
                 const trend1 = currentHistogram > previousHistogram;
                 const trend2 = previousHistogram > previousHistogram2;
                 

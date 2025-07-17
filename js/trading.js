@@ -153,10 +153,10 @@ async function analyzePairMACDWithData(symbol, timeframe, klineData) {
         let signalStrength = 0;
         let reason = '';
         
-        if (macdData.macd !== null && macdData.signal !== null && macdData.histogram !== null) {
-            const crossover = macdData.previousMacd !== null && macdData.previousSignal !== null && 
+        if (macdData.macd != null && macdData.signal != null && macdData.histogram != null) {
+            const crossover = macdData.previousMacd != null && macdData.previousSignal != null && 
                              macdData.previousMacd <= macdData.previousSignal && macdData.macd > macdData.signal;
-            const histogramImproving = macdData.previousHistogram !== null && macdData.previousHistogram2 !== null && 
+            const histogramImproving = macdData.previousHistogram != null && macdData.previousHistogram2 != null && 
                                       macdData.histogram > macdData.previousHistogram && macdData.previousHistogram > macdData.previousHistogram2;
             
             if (crossover && macdData.histogram > 0 && histogramImproving) {
