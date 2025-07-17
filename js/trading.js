@@ -151,7 +151,7 @@ async function analyzePairMACDWithData(symbol, timeframe, klineData) {
         
         let macdSignal = 'HOLD';
         let signalStrength = 0;
-        let reason = '';
+        let reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe}) (candles: ${klineData.length})`;
         
         if (macdData.macd != null && macdData.signal != null && macdData.histogram != null) {
             const crossover = macdData.previousMacd != null && macdData.previousSignal != null && 
@@ -180,6 +180,11 @@ async function analyzePairMACDWithData(symbol, timeframe, klineData) {
                 signalStrength = 50;
                 reason = `MACD neutre (${timeframe})`;
             }
+        } else {
+            // 🎯 Cas où les données MACD sont nulles/invalides
+            macdSignal = 'INSUFFICIENT_DATA';
+            signalStrength = 0;
+            reason = `❌ Données MACD invalides pour ${symbol} (${timeframe}) - MACD: ${macdData.macd}, Signal: ${macdData.signal}, Histogram: ${macdData.histogram}`;
         }
         
         return {
