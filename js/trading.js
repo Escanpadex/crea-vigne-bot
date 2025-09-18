@@ -2,8 +2,8 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
-// 🎯 NOUVELLE CONSTANTE: Limite de positions simultanées
-const MAX_SIMULTANEOUS_POSITIONS = 10;
+// 🎯 NOUVELLE STRATÉGIE: Limite de positions simultanées (2 trades maximum)
+const MAX_SIMULTANEOUS_POSITIONS = 2;
 
 // 🆕 NOUVELLE FONCTION: Wrapper de retry pour les appels API
 async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
@@ -28,10 +28,81 @@ async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
     throw lastError;
 }
 
-// REMOVED: analyzeMultiTimeframe function - replaced by analyzeMultiTimeframeImproved
-// This eliminates redundancy and ensures consistent use of extended data
+// 🎯 NOUVELLE STRATÉGIE: Variables globales pour la nouvelle stratégie
+let positivePairs = []; // Paires avec évolution positive 24h
+let lastPairAnalysis = 0; // Timestamp de la dernière analyse des paires
+let positionCooldowns = new Map(); // Cooldowns après fermeture de position
 
-// �� NOUVELLE FONCTION: Analyse multi-timeframe améliorée avec données étendues
+// 🆕 NOUVELLE FONCTION: Récupérer les paires avec évolution positive sur 24h
+async function getPositivePairs() {
+    try {
+        log('🔍 Récupération des paires avec évolution positive 24h...', 'INFO');
+        
+        const result = await makeRequest('/bitget/api/v2/spot/market/tickers?symbol=USDT');
+        
+        if (!result || result.code !== '00000' || !result.data) {
+            log('❌ Erreur récupération des tickers', 'ERROR');
+            return [];
+        }
+        
+        const tickers = result.data;
+        const positive24hPairs = tickers
+            .filter(ticker => {
+                const change24h = parseFloat(ticker.changeUtc24h || 0);
+                const volume = parseFloat(ticker.quoteVolume || 0);
+                
+                // Filtrer: évolution positive + volume minimum pour éviter les paires illiquides
+                return change24h > 0 && volume > 100000 && ticker.symbol.endsWith('USDT');
+            })
+            .map(ticker => ({
+                symbol: ticker.symbol.replace('USDT', 'USDT'), // Format pour futures
+                change24h: parseFloat(ticker.changeUtc24h),
+                volume24h: parseFloat(ticker.quoteVolume),
+                price: parseFloat(ticker.close)
+            }))
+            .sort((a, b) => b.change24h - a.change24h); // Trier par performance décroissante
+        
+        log(`✅ ${positive24hPairs.length} paires positives trouvées sur 24h`, 'SUCCESS');
+        
+        // Log des 10 meilleures paires
+        if (positive24hPairs.length > 0) {
+            log(`🔥 Top 10 paires positives:`, 'INFO');
+            positive24hPairs.slice(0, 10).forEach((pair, index) => {
+                log(`   ${index + 1}. ${pair.symbol}: +${pair.change24h.toFixed(2)}% (Vol: ${formatNumber(pair.volume24h)})`, 'INFO');
+            });
+        }
+        
+        return positive24hPairs;
+        
+    } catch (error) {
+        log(`❌ Erreur récupération paires positives: ${error.message}`, 'ERROR');
+        return [];
+    }
+}
+
+// 🆕 NOUVELLE FONCTION: Sélectionner une paire aléatoire parmi les positives
+function selectRandomPositivePair(excludeSymbols = []) {
+    const availablePairs = positivePairs.filter(pair => 
+        !excludeSymbols.includes(pair.symbol) && 
+        !hasOpenPosition(pair.symbol) &&
+        !isPairInCooldown(pair.symbol)
+    );
+    
+    if (availablePairs.length === 0) {
+        log('⚠️ Aucune paire positive disponible pour trading', 'WARNING');
+        return null;
+    }
+    
+    // Sélection aléatoire pondérée par la performance 24h
+    const randomIndex = Math.floor(Math.random() * Math.min(availablePairs.length, 20)); // Top 20 pour plus de diversité
+    const selectedPair = availablePairs[randomIndex];
+    
+    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h)`, 'SUCCESS');
+    
+    return selectedPair;
+}
+
+// REMOVED: analyzeMultiTimeframeImproved function - replaced by new positive pairs strategy
 async function analyzeMultiTimeframeImproved(symbol) {
     try {
         console.log(`🔍 [TRADING] Analyse multi-timeframe améliorée pour ${symbol}`);
@@ -153,7 +224,8 @@ async function analyzePairMACDWithData(symbol, timeframe, klineData) {
         let signalStrength = 0;
         let reason = `⏳ Calcul MACD en cours... Données insuffisantes pour ${symbol} (${timeframe}) (candles: ${klineData.length})`;
         
-        if (macdData.macd != null && macdData.signal != null && macdData.histogram != null) {
+        if (macdData.macd != null && macdData.signal != null && macdData.histogram != null && 
+            !isNaN(macdData.macd) && !isNaN(macdData.signal) && !isNaN(macdData.histogram)) {
             const crossover = macdData.previousMacd != null && macdData.previousSignal != null && 
                              macdData.previousMacd <= macdData.previousSignal && macdData.macd > macdData.signal;
             const histogramImproving = macdData.previousHistogram != null && macdData.previousHistogram2 != null && 
@@ -287,8 +359,13 @@ async function aggregateDataFromLowerTimeframe(symbol, lowerTimeframe, targetTim
 }
 
 function calculatePositionSize() {
-    const maxPositionValue = (balance.totalEquity * config.capitalPercent / 100) * config.leverage;
-    return Math.max(maxPositionValue, 10);
+    // 🎯 NOUVELLE STRATÉGIE: 50% du solde avec levier x2
+    const availableBalance = balance.totalEquity || balance.available || 1000; // Fallback si balance pas disponible
+    const positionValue = availableBalance * 0.5; // 50% du solde
+    
+    log(`💰 Calcul position: Solde disponible ${availableBalance.toFixed(2)}$ → Position ${positionValue.toFixed(2)}$ (50% + levier x2)`, 'INFO');
+    
+    return Math.max(positionValue, 10); // Minimum 10$
 }
 
 function hasOpenPosition(symbol) {
@@ -322,7 +399,7 @@ function canOpenNewPosition(symbol) {
     return { canOpen: true, reason: 'Conditions remplies pour ouvrir une position' };
 }
 
-async function openPosition(symbol, analysis) {
+async function openPosition(symbol, selectedPair) {
     // 🎯 NOUVELLE VÉRIFICATION: Utiliser la fonction de vérification centralisée
     const canOpen = canOpenNewPosition(symbol);
     
@@ -338,14 +415,16 @@ async function openPosition(symbol, analysis) {
     const positionValue = calculatePositionSize();
     
     try {
-        await setLeverage(symbol, config.leverage);
+        // 🎯 NOUVELLE STRATÉGIE: Toujours levier x2
+        await setLeverage(symbol, 2);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const quantity = (positionValue / analysis.price).toFixed(6);
+        const currentPrice = selectedPair.price;
+        const quantity = (positionValue / currentPrice).toFixed(6);
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-        log(`💰 Prix: ${analysis.price} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT`, 'INFO');
-        log(`🎯 Signal détecté: ${analysis.reason}`, 'INFO');
+        log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x2)`, 'INFO');
+        log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
         const orderData = {
             symbol: symbol,
@@ -372,88 +451,12 @@ async function openPosition(symbol, analysis) {
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
         log(`📊 Positions ouvertes: ${openPositions.length + 1}/${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
         
-        addPairToCooldown(symbol);
+        // 🎯 NOUVELLE STRATÉGIE: Pas de cooldown à l'ouverture, seulement à la fermeture
         
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const currentPrice = await getCurrentPrice(symbol);
-        const priceToUse = currentPrice || analysis.price;
-        const initialStopPercent = config.trailingStopSettings?.initialStopPercent || config.trailingStop || 1.0;
-        const initialStopPrice = priceToUse * (1 - initialStopPercent / 100);
-        
-        const triggerPriceFormatted = parseFloat(initialStopPrice.toFixed(8)).toString();
-        
-        const stopLossData = {
-            planType: "normal_plan",
-            symbol: symbol,
-            productType: "USDT-FUTURES",
-            marginMode: "isolated",
-            marginCoin: "USDT",
-            size: quantity.toString(),
-            triggerPrice: triggerPriceFormatted,
-            triggerType: "mark_price",
-            side: "sell",
-            tradeSide: "close",
-            orderType: "market",
-            clientOid: `stop_${Date.now()}_${symbol}`,
-            reduceOnly: "YES"
-        };
-        
-        log(`🔄 Configuration stop loss initial -1% pour ${symbol} @ ${initialStopPrice.toFixed(4)}...`, 'INFO');
-        
-        // NEW: Retry wrapper for stop loss creation
-        let finalStopLossId = null;
-        let stopLossCreated = false;
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (attempts < maxAttempts && !stopLossCreated) {
-            attempts++;
-            
-            const stopLossResult = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-plan-order', {
-                method: 'POST',
-                body: JSON.stringify(stopLossData)
-            });
-            
-            if (stopLossResult && stopLossResult.code === '00000') {
-                finalStopLossId = stopLossResult.data.orderId;
-                stopLossCreated = true;
-                log(`✅ Stop Loss initial créé: ${symbol} @ ${initialStopPrice.toFixed(4)} (-1%) [Tentative ${attempts}/${maxAttempts}]`, 'SUCCESS');
-                log(`🆔 Stop Loss ID: ${finalStopLossId}`, 'INFO');
-                break;
-            } else {
-                log(`❌ ÉCHEC stop loss initial ${symbol} [Tentative ${attempts}/${maxAttempts}]: ${stopLossResult?.msg || 'Erreur API'}`, 'ERROR');
-                
-                if (attempts < maxAttempts) {
-                    log(`⚠️ Tentative ${attempts}/${maxAttempts} échouée - Réessai dans 2s...`, 'WARNING');
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-            }
-        }
-        
-        if (!stopLossCreated) {
-            log(`❌ ÉCHEC de toutes les tentatives de stop loss initial pour ${symbol}`, 'ERROR');
-            log(`🔄 Tentative de création stop loss d'urgence...`, 'WARNING');
-            
-            // NOUVELLE LOGIQUE: Essayer de créer un stop loss d'urgence immédiatement
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Attendre 2s
-            
-            const tempPosition = {
-                symbol: symbol,
-                quantity: quantity
-            };
-            
-            const emergencySuccess = await createEmergencyStopLoss(tempPosition, initialStopPrice);
-            
-            if (emergencySuccess && tempPosition.stopLossId) {
-                finalStopLossId = tempPosition.stopLossId;
-                stopLossCreated = true;
-                log(`🆘 Stop Loss d'urgence créé avec succès: ${symbol} @ ${initialStopPrice.toFixed(4)}`, 'SUCCESS');
-            } else {
-                log(`❌ IMPOSSIBLE de créer un stop loss pour ${symbol} - POSITION À RISQUE !`, 'ERROR');
-                // On continue quand même mais on marque la position comme à risque
-            }
-        }
+        // 🎯 NOUVELLE STRATÉGIE: Pas de stop loss automatique, surveillance PnL à +2%
+        log(`🎯 Position ouverte sans stop loss - Surveillance PnL active pour fermeture à +2%`, 'INFO');
         
         const position = {
             id: Date.now(),
@@ -461,27 +464,24 @@ async function openPosition(symbol, analysis) {
             side: 'LONG',
             size: positionValue,
             quantity: quantity,
-            entryPrice: analysis.price,
+            entryPrice: currentPrice,
             status: 'OPEN',
             timestamp: new Date().toISOString(),
             orderId: orderResult.data.orderId,
-            stopLossId: finalStopLossId,
-            currentStopPrice: initialStopPrice,
-            highestPrice: analysis.price,
-            reason: analysis.reason
+            stopLossId: null, // Pas de stop loss dans la nouvelle stratégie
+            currentStopPrice: null,
+            highestPrice: currentPrice,
+            reason: `Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`,
+            change24h: selectedPair.change24h,
+            targetPnL: 2.0 // Objectif +2%
         };
         
         openPositions.push(position);
         botStats.totalPositions++;
         
-        log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${analysis.price.toFixed(4)}`, 'SUCCESS');
-        log(`🎯 Raison: ${analysis.reason}`, 'INFO');
-        
-        if (finalStopLossId) {
-            log(`🔒 Stop Loss actif @ ${initialStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
-        } else {
-            log(`⚠️ Position ouverte SANS stop loss - RISQUE ÉLEVÉ !`, 'WARNING');
-        }
+        log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${currentPrice.toFixed(4)}`, 'SUCCESS');
+        log(`🎯 Objectif: Fermeture automatique à +2% de PnL`, 'INFO');
+        log(`📈 Performance 24h: +${selectedPair.change24h.toFixed(2)}%`, 'INFO');
         
         updatePositionsDisplay();
         await refreshBalance();
@@ -549,63 +549,59 @@ async function createEmergencyStopLoss(position, stopPrice) {
     }
 }
 
-async function manageTrailingStops() {
+// 🎯 NOUVELLE FONCTION: Surveillance PnL et fermeture automatique à +2%
+async function monitorPnLAndClose() {
     if (!botRunning || openPositions.length === 0) return;
     
     try {
-        log('🔍 Vérification stop loss trailing...', 'DEBUG');
-        
-        const apiPositions = await syncAndCheckPositions();
-        
         for (const position of openPositions) {
-            if (!position.stopLossId) {
-                log(`⚠️ ${position.symbol}: Pas de stop loss configuré - Création automatique...`, 'WARNING');
-                
-                const currentPrice = await getCurrentPrice(position.symbol);
-                if (currentPrice) {
-                    const urgentStopPercent = config.trailingStopSettings?.initialStopPercent || config.trailingStop || 1.0;
-                    const urgentStopPrice = currentPrice * (1 - urgentStopPercent / 100);
-                    const success = await createEmergencyStopLoss(position, urgentStopPrice);
-                    
-                    if (success) {
-                        log(`🆘 Stop Loss d'urgence créé pour ${position.symbol} @ ${urgentStopPrice.toFixed(4)} (-1%)`, 'SUCCESS');
-                        position.currentStopPrice = urgentStopPrice;
-                        position.highestPrice = currentPrice;
-                    } else {
-                        log(`❌ Échec création stop loss d'urgence pour ${position.symbol}`, 'ERROR');
-                        continue;
-                    }
-                } else {
-                    log(`❌ Impossible de récupérer le prix pour ${position.symbol}`, 'ERROR');
-                    continue;
-                }
-            }
-            
             const currentPrice = await getCurrentPrice(position.symbol);
             if (!currentPrice) {
                 log(`⚠️ ${position.symbol}: Impossible de récupérer le prix`, 'WARNING');
                 continue;
             }
             
+            // Calculer le PnL en pourcentage
+            const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            position.currentPrice = currentPrice;
+            position.pnlPercent = pnlPercent;
+            
+            // Mettre à jour le prix le plus haut
             if (currentPrice > position.highestPrice) {
                 position.highestPrice = currentPrice;
             }
             
-            const trailingPercent = config.trailingStopSettings?.trailingPercent || config.trailingStop || 1.0;
-            const newStopPrice = position.highestPrice * (1 - trailingPercent / 100);
-            
-            if (newStopPrice > position.currentStopPrice) {
-                const success = await modifyStopLoss(
-                    position.symbol, 
-                    position.stopLossId, 
-                    newStopPrice, 
-                    position.quantity
-                );
+            // 🎯 FERMETURE AUTOMATIQUE À +2%
+            if (pnlPercent >= position.targetPnL) {
+                log(`🎯 ${position.symbol}: Objectif atteint +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
                 
-                if (success) {
-                    position.currentStopPrice = newStopPrice;
-                    const gainPercent = ((newStopPrice - position.entryPrice) / position.entryPrice * 100);
-                    log(`📈 ${position.symbol}: Stop ajusté → ${newStopPrice.toFixed(4)} (${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`, 'SUCCESS');
+                const closed = await closePositionAtMarket(position);
+                if (closed) {
+                    log(`✅ Position fermée avec succès: ${position.symbol} (+${pnlPercent.toFixed(2)}%)`, 'SUCCESS');
+                    
+                    // Ajouter cooldown d'1 minute
+                    addPositionCooldown(position.symbol);
+                    
+                    // Mettre à jour les stats
+                    botStats.totalClosedPositions++;
+                    if (pnlPercent > 0) {
+                        botStats.winningPositions++;
+                        botStats.totalWinAmount += (position.size * pnlPercent / 100);
+                    }
+                    
+                    // Supprimer de la liste des positions ouvertes
+                    const index = openPositions.findIndex(p => p.id === position.id);
+                    if (index !== -1) {
+                        openPositions.splice(index, 1);
+                    }
+                } else {
+                    log(`❌ Échec fermeture position ${position.symbol}`, 'ERROR');
+                }
+            } else {
+                // Log de suivi (moins fréquent pour éviter le spam)
+                if (Date.now() - (position.lastPnLLog || 0) > 30000) { // Toutes les 30 secondes
+                    log(`📊 ${position.symbol}: PnL ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (Objectif: +${position.targetPnL}%)`, 'DEBUG');
+                    position.lastPnLLog = Date.now();
                 }
             }
             
@@ -615,8 +611,65 @@ async function manageTrailingStops() {
         updatePositionsDisplay();
         
     } catch (error) {
-        log(`❌ Erreur gestion stop loss: ${error.message}`, 'ERROR');
+        log(`❌ Erreur surveillance PnL: ${error.message}`, 'ERROR');
     }
+}
+
+// 🆕 NOUVELLE FONCTION: Fermer une position au marché
+async function closePositionAtMarket(position) {
+    try {
+        const orderData = {
+            symbol: position.symbol,
+            productType: "USDT-FUTURES",
+            marginMode: "isolated",
+            marginCoin: "USDT",
+            size: position.quantity.toString(),
+            side: "sell",
+            tradeSide: "close",
+            orderType: "market",
+            clientOid: `close_${Date.now()}_${position.symbol}`
+        };
+        
+        log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
+        
+        const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
+            method: 'POST',
+            body: JSON.stringify(orderData)
+        });
+        
+        if (result && result.code === '00000') {
+            log(`✅ Ordre de fermeture placé: ${position.symbol} - ID: ${result.data.orderId}`, 'SUCCESS');
+            return true;
+        } else {
+            log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || 'Erreur inconnue'}`, 'ERROR');
+            return false;
+        }
+        
+    } catch (error) {
+        log(`❌ Exception fermeture position ${position.symbol}: ${error.message}`, 'ERROR');
+        return false;
+    }
+}
+
+// 🆕 NOUVELLE FONCTION: Ajouter un cooldown après fermeture de position
+function addPositionCooldown(symbol) {
+    const cooldownEnd = Date.now() + (60 * 1000); // 1 minute
+    positionCooldowns.set(symbol, cooldownEnd);
+    log(`⏰ Cooldown activé pour ${symbol}: 1 minute`, 'INFO');
+}
+
+// 🆕 NOUVELLE FONCTION: Vérifier si une paire est en cooldown
+function isPairInCooldown(symbol) {
+    const cooldownEnd = positionCooldowns.get(symbol);
+    if (!cooldownEnd) return false;
+    
+    const now = Date.now();
+    if (now >= cooldownEnd) {
+        positionCooldowns.delete(symbol);
+        return false;
+    }
+    
+    return true;
 }
 
 async function updatePositionsPnL() {

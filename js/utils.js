@@ -33,7 +33,7 @@ function formatNumber(num) {
 }
 
 function updateStats() {
-    const MAX_SIMULTANEOUS_POSITIONS = 10; // Même valeur que dans trading.js
+    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
     const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
     
     document.getElementById('totalSignals').textContent = botStats.totalSignals;
@@ -94,7 +94,7 @@ function saveKeys() {
 
 // 🎯 NOUVELLE FONCTION: Afficher un résumé des positions disponibles
 function showPositionSummary() {
-    const MAX_SIMULTANEOUS_POSITIONS = 10;
+    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
     const currentPositions = openPositions.length;
     const availableSlots = MAX_SIMULTANEOUS_POSITIONS - currentPositions;
     
@@ -158,12 +158,21 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         
         let sum = 0;
         for (let i = 0; i < period; i++) {
+            if (isNaN(data[i]) || data[i] == null) {
+                console.warn(`⚠️ Valeur invalide dans calculateEMA à l'index ${i}: ${data[i]}`);
+                return new Array(data.length).fill(null);
+            }
             sum += data[i];
         }
         emaArray[period - 1] = sum / period;
         
         for (let i = period; i < data.length; i++) {
-            emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
+            if (isNaN(data[i]) || data[i] == null) {
+                console.warn(`⚠️ Valeur invalide dans calculateEMA à l'index ${i}: ${data[i]}`);
+                emaArray[i] = null;
+            } else {
+                emaArray[i] = data[i] * k + emaArray[i - 1] * (1 - k);
+            }
         }
         
         return emaArray;
@@ -228,8 +237,8 @@ function calculateMACD(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 
         }
     }
     
-    if (currentMacd == null || currentSignal == null) {
-        return { macd: currentMacd, signal: currentSignal, histogram: null, crossover: false };
+    if (currentMacd == null || currentSignal == null || isNaN(currentMacd) || isNaN(currentSignal)) {
+        return { macd: null, signal: null, histogram: null, crossover: false };
     }
     
     const currentHistogram = currentMacd - currentSignal;
@@ -317,6 +326,19 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
         }
         
         const closePrices = klines.map(k => k.close);
+        
+        // 🔧 Validation des données de prix
+        const invalidPrices = closePrices.filter(price => price == null || isNaN(price) || price <= 0);
+        if (invalidPrices.length > 0) {
+            return { 
+                symbol, 
+                signal: 'HOLD', 
+                strength: 0, 
+                reason: `❌ Données de prix invalides détectées: ${invalidPrices.length}/${closePrices.length} prix invalides`, 
+                timeframe 
+            };
+        }
+        
         const currentPrice = closePrices[closePrices.length - 1];
         const volume24h = klines.slice(-288).reduce((sum, k) => sum + k.volume, 0);
         
@@ -415,7 +437,7 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
 
 // 🎯 NOUVELLE FONCTION: Forcer le relancement de l'analyse si des positions sont disponibles
 function forceAnalysisIfAvailable() {
-    const MAX_SIMULTANEOUS_POSITIONS = 10;
+    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
     const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
     
     if (!botRunning) {
