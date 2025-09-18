@@ -63,10 +63,17 @@ async function testConnection() {
             log('⚠️ Aucune paire disponible trouvée', 'WARNING');
         }
         
-        // 4. Démarrer la synchronisation automatique des positions
+        // 4. 🔧 NOUVEAU: Importer les positions existantes dès la connexion
+        if (typeof window.importExistingPositions === 'function') {
+            log('📥 Importation des positions existantes...', 'INFO');
+            await window.importExistingPositions();
+            log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
+        }
+        
+        // 5. Démarrer la synchronisation automatique des positions
         startAutoSyncPositions();
         
-        // 5. Rafraîchissement automatique du solde
+        // 6. Rafraîchissement automatique du solde
         if (typeof startAutoBalanceRefresh === 'function') {
             startAutoBalanceRefresh();
         }
