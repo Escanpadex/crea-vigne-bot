@@ -54,25 +54,27 @@ async function getPositivePairs() {
         const positive24hPairs = tickers
             .filter(ticker => {
                 // 🔧 CORRECTION: Utiliser les bonnes propriétés pour les futures
-                const change24h = parseFloat(ticker.chg24h || ticker.changeUtc24h || 0);
-                const volume = parseFloat(ticker.baseVolume || ticker.quoteVolume || 0);
+                // change24h et changeUtc24h sont en format décimal (0.01411 = 1.411%)
+                const change24hDecimal = parseFloat(ticker.change24h || ticker.changeUtc24h || 0);
+                const change24hPercent = change24hDecimal * 100; // Convertir en pourcentage
+                const volume = parseFloat(ticker.quoteVolume || ticker.usdtVolume || ticker.baseVolume || 0);
                 
                 // 🔧 AMÉLIORATION: Réduire le volume minimum et ajouter plus de logs
-                const isPositive = change24h > 0;
-                const hasVolume = volume > 10000; // Réduire de 100k à 10k USDT
+                const isPositive = change24hPercent > 0.1; // Au moins +0.1% pour éviter le bruit
+                const hasVolume = volume > 100000; // Volume en USDT
                 const isUSDT = ticker.symbol && ticker.symbol.includes('USDT');
                 
                 if (isPositive && hasVolume && isUSDT) {
-                    log(`✅ Paire valide: ${ticker.symbol} (+${change24h.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
+                    log(`✅ Paire valide: ${ticker.symbol} (+${change24hPercent.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
                 }
                 
                 return isPositive && hasVolume && isUSDT;
             })
             .map(ticker => ({
                 symbol: ticker.symbol, // Garder le format original
-                change24h: parseFloat(ticker.chg24h || ticker.changeUtc24h || 0),
-                volume24h: parseFloat(ticker.baseVolume || ticker.quoteVolume || 0),
-                price: parseFloat(ticker.last || ticker.close || 0)
+                change24h: parseFloat(ticker.change24h || ticker.changeUtc24h || 0) * 100, // Convertir en pourcentage
+                volume24h: parseFloat(ticker.quoteVolume || ticker.usdtVolume || ticker.baseVolume || 0),
+                price: parseFloat(ticker.lastPr || ticker.last || ticker.close || 0)
             }))
             .sort((a, b) => b.change24h - a.change24h); // Trier par performance décroissante
         
@@ -114,17 +116,18 @@ async function getPositivePairs() {
                 
                 const spotPositivePairs = spotTickers
                     .filter(ticker => {
-                        const change24h = parseFloat(ticker.changeUtc24h || ticker.chg24h || 0);
+                        const change24hDecimal = parseFloat(ticker.changeUtc24h || ticker.change24h || 0);
+                        const change24hPercent = change24hDecimal * 100;
                         const volume = parseFloat(ticker.quoteVolume || ticker.baseVolume || 0);
-                        const isPositive = change24h > 0;
-                        const hasVolume = volume > 10000;
+                        const isPositive = change24hPercent > 0.1;
+                        const hasVolume = volume > 100000;
                         const isUSDT = ticker.symbol && ticker.symbol.endsWith('USDT');
                         
                         return isPositive && hasVolume && isUSDT;
                     })
                     .map(ticker => ({
                         symbol: ticker.symbol,
-                        change24h: parseFloat(ticker.changeUtc24h || ticker.chg24h || 0),
+                        change24h: parseFloat(ticker.changeUtc24h || ticker.change24h || 0) * 100,
                         volume24h: parseFloat(ticker.quoteVolume || ticker.baseVolume || 0),
                         price: parseFloat(ticker.close || ticker.last || 0)
                     }))
