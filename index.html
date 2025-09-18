@@ -46,21 +46,28 @@
                         <div>
                             <h4 style="margin: 0 0 15px 0; color: #4a5568; font-size: 16px; border-left: 4px solid #48bb78; padding-left: 12px;">📊 Stratégie de Trading</h4>
                             
-                            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                                <div style="text-align: center; margin-bottom: 15px;">
-                                    <strong style="color: #2d5a2d; font-size: 14px;">Paires Positives 24h</strong><br>
-                                    <span style="color: #666; font-size: 12px;">Sélection aléatoire sur évolutions positives</span>
+                            <!-- Positions Actives - Design Sexy -->
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);">
+                                <!-- Header avec icône animée -->
+                                <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 18px;">
+                                    <div style="background: rgba(255,255,255,0.2); border-radius: 50%; padding: 8px; margin-right: 10px;">
+                                        <span style="font-size: 18px;">⚡</span>
+                                    </div>
+                                    <div>
+                                        <h3 style="color: white; margin: 0; font-size: 16px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                                            Positions Actives
+                                        </h3>
+                                        <div style="color: rgba(255,255,255,0.8); font-size: 12px; text-align: center;">
+                                            <span id="positionCount">0</span>/2 emplacements utilisés
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <!-- Positions Actives -->
-                                <div id="activePositionsContainer" style="margin-top: 15px;">
-                                    <div style="font-size: 13px; font-weight: bold; color: #4a5568; margin-bottom: 8px; text-align: center;">
-                                        🔄 Positions Actives (<span id="positionCount">0</span>/2)
-                                    </div>
-                                    <div id="positionsList" style="font-size: 11px; color: #666;">
-                                        <div style="text-align: center; color: #999; font-style: italic;">
-                                            Aucune position active
-                                        </div>
+                                <!-- Liste des positions -->
+                                <div id="positionsList" style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; backdrop-filter: blur(10px);">
+                                    <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic; padding: 20px;">
+                                        <span style="font-size: 14px;">💤 Aucune position active</span><br>
+                                        <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
                                     </div>
                                 </div>
                             </div>
