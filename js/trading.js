@@ -39,31 +39,44 @@ async function getPositivePairs() {
     try {
         log('🔍 Récupération des paires avec évolution positive 24h...', 'INFO');
         
-        const result = await makeRequest('/bitget/api/v2/spot/market/tickers?symbol=USDT');
+        // 🔧 CORRECTION: Utiliser l'API futures au lieu de spot
+        const result = await makeRequest('/bitget/api/v2/mix/market/tickers?productType=USDT-FUTURES');
         
         if (!result || result.code !== '00000' || !result.data) {
-            log('❌ Erreur récupération des tickers', 'ERROR');
+            log('❌ Erreur récupération des tickers futures', 'ERROR');
+            log(`📊 Réponse API: ${JSON.stringify(result)}`, 'DEBUG');
             return [];
         }
         
         const tickers = result.data;
+        log(`📊 ${tickers.length} tickers futures récupérés`, 'INFO');
+        
         const positive24hPairs = tickers
             .filter(ticker => {
-                const change24h = parseFloat(ticker.changeUtc24h || 0);
-                const volume = parseFloat(ticker.quoteVolume || 0);
+                // 🔧 CORRECTION: Utiliser les bonnes propriétés pour les futures
+                const change24h = parseFloat(ticker.chg24h || ticker.changeUtc24h || 0);
+                const volume = parseFloat(ticker.baseVolume || ticker.quoteVolume || 0);
                 
-                // Filtrer: évolution positive + volume minimum pour éviter les paires illiquides
-                return change24h > 0 && volume > 100000 && ticker.symbol.endsWith('USDT');
+                // 🔧 AMÉLIORATION: Réduire le volume minimum et ajouter plus de logs
+                const isPositive = change24h > 0;
+                const hasVolume = volume > 10000; // Réduire de 100k à 10k USDT
+                const isUSDT = ticker.symbol && ticker.symbol.includes('USDT');
+                
+                if (isPositive && hasVolume && isUSDT) {
+                    log(`✅ Paire valide: ${ticker.symbol} (+${change24h.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
+                }
+                
+                return isPositive && hasVolume && isUSDT;
             })
             .map(ticker => ({
-                symbol: ticker.symbol.replace('USDT', 'USDT'), // Format pour futures
-                change24h: parseFloat(ticker.changeUtc24h),
-                volume24h: parseFloat(ticker.quoteVolume),
-                price: parseFloat(ticker.close)
+                symbol: ticker.symbol, // Garder le format original
+                change24h: parseFloat(ticker.chg24h || ticker.changeUtc24h || 0),
+                volume24h: parseFloat(ticker.baseVolume || ticker.quoteVolume || 0),
+                price: parseFloat(ticker.last || ticker.close || 0)
             }))
             .sort((a, b) => b.change24h - a.change24h); // Trier par performance décroissante
         
-        log(`✅ ${positive24hPairs.length} paires positives trouvées sur 24h`, 'SUCCESS');
+        log(`✅ ${positive24hPairs.length} paires futures positives trouvées sur 24h`, 'SUCCESS');
         
         // Log des 10 meilleures paires
         if (positive24hPairs.length > 0) {
@@ -71,12 +84,59 @@ async function getPositivePairs() {
             positive24hPairs.slice(0, 10).forEach((pair, index) => {
                 log(`   ${index + 1}. ${pair.symbol}: +${pair.change24h.toFixed(2)}% (Vol: ${formatNumber(pair.volume24h)})`, 'INFO');
             });
+        } else {
+            log('⚠️ Aucune paire positive trouvée - Vérification des données...', 'WARNING');
+            // Log de quelques exemples pour debug
+            if (tickers.length > 0) {
+                log('📊 Exemples de tickers reçus:', 'DEBUG');
+                tickers.slice(0, 5).forEach((ticker, index) => {
+                    const change24h = parseFloat(ticker.chg24h || ticker.changeUtc24h || 0);
+                    const volume = parseFloat(ticker.baseVolume || ticker.quoteVolume || 0);
+                    log(`   ${index + 1}. ${ticker.symbol}: ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% (Vol: ${formatNumber(volume)})`, 'DEBUG');
+                });
+            }
         }
         
         return positive24hPairs;
         
     } catch (error) {
-        log(`❌ Erreur récupération paires positives: ${error.message}`, 'ERROR');
+        log(`❌ Erreur récupération paires positives (Futures): ${error.message}`, 'ERROR');
+        console.error('Détails erreur:', error);
+        
+        // 🔧 FALLBACK: Essayer l'API spot si l'API futures échoue
+        try {
+            log('🔄 Tentative de fallback vers API spot...', 'WARNING');
+            const spotResult = await makeRequest('/bitget/api/v2/spot/market/tickers');
+            
+            if (spotResult && spotResult.code === '00000' && spotResult.data) {
+                const spotTickers = spotResult.data;
+                log(`📊 ${spotTickers.length} tickers spot récupérés en fallback`, 'INFO');
+                
+                const spotPositivePairs = spotTickers
+                    .filter(ticker => {
+                        const change24h = parseFloat(ticker.changeUtc24h || ticker.chg24h || 0);
+                        const volume = parseFloat(ticker.quoteVolume || ticker.baseVolume || 0);
+                        const isPositive = change24h > 0;
+                        const hasVolume = volume > 10000;
+                        const isUSDT = ticker.symbol && ticker.symbol.endsWith('USDT');
+                        
+                        return isPositive && hasVolume && isUSDT;
+                    })
+                    .map(ticker => ({
+                        symbol: ticker.symbol,
+                        change24h: parseFloat(ticker.changeUtc24h || ticker.chg24h || 0),
+                        volume24h: parseFloat(ticker.quoteVolume || ticker.baseVolume || 0),
+                        price: parseFloat(ticker.close || ticker.last || 0)
+                    }))
+                    .sort((a, b) => b.change24h - a.change24h);
+                
+                log(`✅ Fallback réussi: ${spotPositivePairs.length} paires spot positives trouvées`, 'SUCCESS');
+                return spotPositivePairs;
+            }
+        } catch (fallbackError) {
+            log(`❌ Erreur fallback spot: ${fallbackError.message}`, 'ERROR');
+        }
+        
         return [];
     }
 }
