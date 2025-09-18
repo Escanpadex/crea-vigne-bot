@@ -17,11 +17,20 @@ function updateStats() {
     const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
     const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
     
-    document.getElementById('totalSignals').textContent = botStats.totalSignals;
-    document.getElementById('totalOpenPositions').textContent = `${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
-    document.getElementById('totalClosedPositions').textContent = botStats.totalClosedPositions;
-    document.getElementById('winningPositions').textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
-    document.getElementById('losingPositions').textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
+    // 🛡️ SÉCURITÉ: Vérifier que les éléments existent avant de les modifier
+    const elements = {
+        totalSignals: document.getElementById('totalSignals'),
+        totalOpenPositions: document.getElementById('totalOpenPositions'),
+        totalClosedPositions: document.getElementById('totalClosedPositions'),
+        winningPositions: document.getElementById('winningPositions'),
+        losingPositions: document.getElementById('losingPositions')
+    };
+    
+    if (elements.totalSignals) elements.totalSignals.textContent = botStats.totalSignals;
+    if (elements.totalOpenPositions) elements.totalOpenPositions.textContent = `${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
+    if (elements.totalClosedPositions) elements.totalClosedPositions.textContent = botStats.totalClosedPositions;
+    if (elements.winningPositions) elements.winningPositions.textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
+    if (elements.losingPositions) elements.losingPositions.textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
     
     // 🎯 NOUVEAU: Log informatif sur les positions disponibles (seulement quand le bot tourne)
     if (typeof botRunning !== 'undefined' && botRunning && availableSlots > 0) {

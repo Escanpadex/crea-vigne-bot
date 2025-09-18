@@ -45,7 +45,9 @@ async function testConnection() {
     
     if (result && result.code === '00000') {
         document.getElementById('connectionStatus').classList.add('online');
-        document.getElementById('connectionText').textContent = 'Connecté (Futures)';
+        // 🛡️ SÉCURITÉ: Vérifier que l'élément existe
+        const connectionTextEl = document.getElementById('connectionText');
+        if (connectionTextEl) connectionTextEl.textContent = 'Connecté (Futures)';
         log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
         
@@ -93,14 +95,20 @@ async function refreshBalance() {
         balance.USDT = parseFloat(account.available || 0);
         balance.totalEquity = parseFloat(account.usdtEquity || account.equity || 0);
         
-        document.getElementById('usdtBalance').textContent = balance.USDT.toFixed(2);
-        document.getElementById('totalEquity').textContent = balance.totalEquity.toFixed(2);
+        // 🛡️ SÉCURITÉ: Vérifier que les éléments existent avant de les modifier
+        const usdtBalanceEl = document.getElementById('usdtBalance');
+        const totalEquityEl = document.getElementById('totalEquity');
+        const usedCapitalEl = document.getElementById('usedCapital');
+        const availableCapitalEl = document.getElementById('availableCapital');
+        
+        if (usdtBalanceEl) usdtBalanceEl.textContent = balance.USDT.toFixed(2);
+        if (totalEquityEl) totalEquityEl.textContent = balance.totalEquity.toFixed(2);
         
         const usedCapital = openPositions.reduce((sum, pos) => sum + pos.size, 0);
         const availableCapital = balance.totalEquity * (config.capitalPercent / 100) * config.leverage - usedCapital;
         
-        document.getElementById('usedCapital').textContent = usedCapital.toFixed(2);
-        document.getElementById('availableCapital').textContent = Math.max(0, availableCapital).toFixed(2);
+        if (usedCapitalEl) usedCapitalEl.textContent = usedCapital.toFixed(2);
+        if (availableCapitalEl) availableCapitalEl.textContent = Math.max(0, availableCapital).toFixed(2);
         
         log('💰 Balance mise à jour', 'INFO');
     } else {
