@@ -828,13 +828,20 @@ async function updatePositionsPnL() {
 
 function updatePositionsDisplay() {
     // 🎯 NOUVELLE FONCTION: Mettre à jour l'affichage des positions actives
+    log(`🔄 updatePositionsDisplay() appelé avec ${openPositions.length} positions`, 'DEBUG');
+    
     const positionCountEl = document.getElementById('positionCount');
     const positionsListEl = document.getElementById('positionsList');
     
-    if (!positionCountEl || !positionsListEl) return;
+    if (!positionCountEl || !positionsListEl) {
+        log('❌ Éléments d\'affichage des positions non trouvés dans le DOM', 'ERROR');
+        log(`positionCountEl: ${positionCountEl ? 'OK' : 'NULL'}, positionsListEl: ${positionsListEl ? 'OK' : 'NULL'}`, 'DEBUG');
+        return;
+    }
     
     // Mettre à jour le compteur
     positionCountEl.textContent = openPositions.length;
+    log(`📊 Compteur mis à jour: ${openPositions.length}`, 'DEBUG');
     
     // Mettre à jour la liste des positions avec un design sexy
     if (openPositions.length === 0) {
@@ -842,8 +849,8 @@ function updatePositionsDisplay() {
             <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic; padding: 20px;">
                 <span style="font-size: 14px;">💤 Aucune position active</span><br>
                 <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
-            </div>
-        `;
+        </div>
+    `;
     } else {
         const positionsHTML = openPositions.map((position, index) => {
             // Calculer le temps écoulé
@@ -902,7 +909,7 @@ function updatePositionsDisplay() {
                             border: 1px solid ${pnlColor}30;
                         ">
                             ${pnlSign}${pnlPercent.toFixed(2)}%
-                        </div>
+            </div>
                     </div>
                     
                     <!-- Détails de la position -->
@@ -910,19 +917,19 @@ function updatePositionsDisplay() {
                         <div style="color: rgba(255,255,255,0.8); font-size: 11px;">
                             <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-right: 5px;">
                                 ⏱️ ${timeDisplay}
-                            </span>
+                </span>
                             <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">
                                 🎯 +${position.targetPnL || 2}%
-                            </span>
-                        </div>
+                </span>
+            </div>
                         
                         <!-- Indicateur de progression -->
                         <div style="color: rgba(255,255,255,0.6); font-size: 10px;">
                             ${isPositive ? '🚀' : '⏳'} ${isPositive ? 'En profit' : 'En cours'}
                         </div>
                     </div>
-                </div>
-            `;
+            </div>
+        `;
         }).join('');
         
         positionsListEl.innerHTML = `
@@ -941,6 +948,7 @@ function updatePositionsDisplay() {
 async function importExistingPositions() {
     try {
         log('🔄 Importation des positions existantes depuis Bitget...', 'INFO');
+        log(`📊 État initial: ${openPositions.length} positions dans openPositions`, 'DEBUG');
         
         if (typeof makeRequest !== 'function') {
             log('❌ Fonction makeRequest non disponible pour l\'importation', 'ERROR');
@@ -956,6 +964,9 @@ async function importExistingPositions() {
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
         log(`📊 Réponse API reçue: ${result ? 'OK' : 'NULL'}`, 'DEBUG');
+        if (result) {
+            log(`📊 Code réponse: ${result.code}, Message: ${result.msg}`, 'DEBUG');
+        }
         
         if (result && result.code === '00000' && result.data) {
             log(`📊 Données brutes reçues: ${result.data.length} positions total`, 'DEBUG');
@@ -1025,16 +1036,28 @@ async function importExistingPositions() {
             
             if (imported > 0) {
                 log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
-                log(`⚠️ Positions importées SANS stop loss - Le système va les protéger automatiquement`, 'WARNING');
+                log(`📊 État final après import: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS} positions actives`, 'INFO');
                 
+                // Log détaillé des positions importées
+                openPositions.forEach((pos, idx) => {
+                    log(`   ${idx + 1}. ${pos.symbol} - ${pos.reason || 'Position importée'}`, 'INFO');
+                });
+                
+                log('🔄 Mise à jour de l\'affichage des positions...', 'DEBUG');
                 updatePositionsDisplay();
                 updateStats();
                 
+                // Vérification que l'affichage a été mis à jour
                 setTimeout(() => {
-                    manageTrailingStops();
-                }, 2000);
+                    const positionCountEl = document.getElementById('positionCount');
+                    if (positionCountEl) {
+                        log(`📊 Affichage mis à jour: ${positionCountEl.textContent} positions affichées`, 'DEBUG');
+                    }
+                }, 500);
+                
             } else {
                 log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
+                log(`📊 État: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS} positions actives`, 'INFO');
             }
         } else {
             log('❌ Erreur lors de l\'importation des positions', 'ERROR');
