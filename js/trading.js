@@ -827,7 +827,58 @@ async function updatePositionsPnL() {
 }
 
 function updatePositionsDisplay() {
-    // UI removed: no-op
+    // 🎯 NOUVELLE FONCTION: Mettre à jour l'affichage des positions actives
+    const positionCountEl = document.getElementById('positionCount');
+    const positionsListEl = document.getElementById('positionsList');
+    
+    if (!positionCountEl || !positionsListEl) return;
+    
+    // Mettre à jour le compteur
+    positionCountEl.textContent = openPositions.length;
+    
+    // Mettre à jour la liste des positions
+    if (openPositions.length === 0) {
+        positionsListEl.innerHTML = `
+            <div style="text-align: center; color: #999; font-style: italic;">
+                Aucune position active
+            </div>
+        `;
+    } else {
+        const positionsHTML = openPositions.map(position => {
+            // Calculer le temps écoulé
+            const openTime = new Date(position.timestamp);
+            const now = new Date();
+            const diffMs = now - openTime;
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const timeDisplay = diffMinutes < 60 
+                ? `${diffMinutes}min`
+                : `${Math.floor(diffMinutes / 60)}h${diffMinutes % 60}min`;
+            
+            // Calculer le PnL actuel
+            const currentPrice = position.currentPrice || position.entryPrice;
+            const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            const pnlColor = pnlPercent >= 0 ? '#22c55e' : '#ef4444';
+            const pnlSign = pnlPercent >= 0 ? '+' : '';
+            
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
+                    <div style="font-weight: bold; color: #374151;">
+                        ${position.symbol}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: ${pnlColor}; font-weight: bold;">
+                            ${pnlSign}${pnlPercent.toFixed(2)}%
+                        </div>
+                        <div style="color: #9ca3af; font-size: 10px;">
+                            ${timeDisplay}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        positionsListEl.innerHTML = positionsHTML;
+    }
 }
 
 async function importExistingPositions() {
