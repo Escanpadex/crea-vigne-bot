@@ -198,6 +198,7 @@ async function setLeverage(symbol, leverage) {
     const leverageData = {
         symbol: symbol,
         productType: "USDT-FUTURES",
+        marginMode: "isolated", // 🔧 CORRECTION: Ajouter marginMode requis
         marginCoin: "USDT",
         leverage: leverage.toString()
     };
