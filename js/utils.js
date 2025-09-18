@@ -1,28 +1,9 @@
 // Utility functions
 console.log('📁 Loading utils.js...');
 
-function log(message, type = 'INFO') {
-    const logs = document.getElementById('logs');
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] [${type}] ${message}<br>`;
-    
-    // Ajouter le nouveau log
-    logs.innerHTML += logMessage;
-    
-    // Limiter à 100 logs maximum
-    const logLines = logs.innerHTML.split('<br>').filter(line => line.trim() !== '');
-    if (logLines.length > 100) {
-        // Garder seulement les 100 derniers logs
-        const recentLogs = logLines.slice(-100);
-        logs.innerHTML = recentLogs.join('<br>') + '<br>';
-    }
-    
-    logs.scrollTop = logs.scrollHeight;
-}
+function log(message, type = 'INFO') { /* logging UI removed */ }
 
-function clearLogs() {
-    document.getElementById('logs').innerHTML = '';
-}
+function clearLogs() { /* no-op: logs removed */ }
 
 function formatNumber(num) {
     if (num === null || num === undefined || isNaN(num)) return '0.00';
