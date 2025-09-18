@@ -37,6 +37,7 @@ let config = {
     leverage: 2,
     trailingStop: 1.0,
     cooldownMinutes: 30,
+    targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
     // NEW: MACD Strategy settings (macdTimeframe supprimé - remplacé par filtrage progressif 4H→1H→15M)
     topVolumeCount: 30,             // Nombre de cryptos à analyser (TOP x)
     // Advanced trailing stop settings

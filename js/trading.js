@@ -489,14 +489,14 @@ async function openPosition(symbol, selectedPair) {
             highestPrice: currentPrice,
             reason: `Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`,
             change24h: selectedPair.change24h,
-            targetPnL: 2.0 // Objectif +2%
+            targetPnL: config.targetPnL // 🆕 Objectif configurable
         };
         
         openPositions.push(position);
         botStats.totalPositions++;
         
         log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${currentPrice.toFixed(4)}`, 'SUCCESS');
-        log(`🎯 Objectif: Fermeture automatique à +2% de PnL`, 'INFO');
+        log(`🎯 Objectif: Fermeture automatique à +${config.targetPnL}% de PnL`, 'INFO');
         log(`📈 Performance 24h: +${selectedPair.change24h.toFixed(2)}%`, 'INFO');
         
         updatePositionsDisplay();
