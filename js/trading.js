@@ -836,15 +836,16 @@ function updatePositionsDisplay() {
     // Mettre à jour le compteur
     positionCountEl.textContent = openPositions.length;
     
-    // Mettre à jour la liste des positions
+    // Mettre à jour la liste des positions avec un design sexy
     if (openPositions.length === 0) {
         positionsListEl.innerHTML = `
-            <div style="text-align: center; color: #999; font-style: italic;">
-                Aucune position active
+            <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic; padding: 20px;">
+                <span style="font-size: 14px;">💤 Aucune position active</span><br>
+                <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
             </div>
         `;
     } else {
-        const positionsHTML = openPositions.map(position => {
+        const positionsHTML = openPositions.map((position, index) => {
             // Calculer le temps écoulé
             const openTime = new Date(position.timestamp);
             const now = new Date();
@@ -857,27 +858,83 @@ function updatePositionsDisplay() {
             // Calculer le PnL actuel
             const currentPrice = position.currentPrice || position.entryPrice;
             const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-            const pnlColor = pnlPercent >= 0 ? '#22c55e' : '#ef4444';
-            const pnlSign = pnlPercent >= 0 ? '+' : '';
+            const isPositive = pnlPercent >= 0;
+            const pnlColor = isPositive ? '#10b981' : '#f59e0b';
+            const pnlBgColor = isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+            const pnlSign = isPositive ? '+' : '';
+            const pnlIcon = isPositive ? '📈' : '📊';
+            
+            // Animation de pulsation pour les gains
+            const pulseAnimation = isPositive && pnlPercent > 1 ? 'animation: pulse 2s infinite;' : '';
             
             return `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
-                    <div style="font-weight: bold; color: #374151;">
-                        ${position.symbol}
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: ${pnlColor}; font-weight: bold;">
+                <div style="
+                    background: rgba(255,255,255,0.15); 
+                    border-radius: 10px; 
+                    padding: 15px; 
+                    margin-bottom: 10px; 
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    transition: all 0.3s ease;
+                    ${pulseAnimation}
+                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                    
+                    <!-- Header de la position -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-size: 16px; margin-right: 8px;">${pnlIcon}</span>
+                            <span style="color: white; font-weight: bold; font-size: 14px;">
+                                ${position.symbol.replace('USDT', '')}
+                            </span>
+                            <span style="color: rgba(255,255,255,0.6); font-size: 10px; margin-left: 5px;">
+                                USDT
+                            </span>
+                        </div>
+                        
+                        <!-- Badge PnL -->
+                        <div style="
+                            background: ${pnlBgColor}; 
+                            color: ${pnlColor}; 
+                            padding: 4px 8px; 
+                            border-radius: 6px; 
+                            font-weight: bold; 
+                            font-size: 12px;
+                            border: 1px solid ${pnlColor}30;
+                        ">
                             ${pnlSign}${pnlPercent.toFixed(2)}%
                         </div>
-                        <div style="color: #9ca3af; font-size: 10px;">
-                            ${timeDisplay}
+                    </div>
+                    
+                    <!-- Détails de la position -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="color: rgba(255,255,255,0.8); font-size: 11px;">
+                            <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-right: 5px;">
+                                ⏱️ ${timeDisplay}
+                            </span>
+                            <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">
+                                🎯 +${position.targetPnL || 2}%
+                            </span>
+                        </div>
+                        
+                        <!-- Indicateur de progression -->
+                        <div style="color: rgba(255,255,255,0.6); font-size: 10px;">
+                            ${isPositive ? '🚀' : '⏳'} ${isPositive ? 'En profit' : 'En cours'}
                         </div>
                     </div>
                 </div>
             `;
         }).join('');
         
-        positionsListEl.innerHTML = positionsHTML;
+        positionsListEl.innerHTML = `
+            <style>
+                @keyframes pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+                }
+            </style>
+            ${positionsHTML}
+        `;
     }
 }
 
