@@ -167,14 +167,18 @@ function startAutoSyncPositions() {
         clearInterval(window.autoSyncInterval);
     }
     
-    // Synchroniser immédiatement
-    checkPositionsStatus();
+    // 🔧 CORRECTION: Utiliser syncAndCheckPositions au lieu de checkPositionsStatus
+    if (typeof syncAndCheckPositions === 'function') {
+        syncAndCheckPositions();
+    }
     
     // Programmer la synchronisation toutes les 2 minutes
     window.autoSyncInterval = setInterval(() => {
         if (openPositions.length > 0) {
             log('🔄 Synchronisation automatique des positions...', 'DEBUG');
-            checkPositionsStatus();
+            if (typeof syncAndCheckPositions === 'function') {
+                syncAndCheckPositions();
+            }
         }
     }, 2 * 60 * 1000); // 2 minutes
 }

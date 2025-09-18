@@ -933,6 +933,14 @@ async function importExistingPositions() {
     }
 }
 
+// 🎯 NOUVELLES FONCTIONS EXPORTÉES pour la stratégie paires positives
+window.getPositivePairs = getPositivePairs;
+window.selectRandomPositivePair = selectRandomPositivePair;
+window.openPosition = openPosition;
+window.monitorPnLAndClose = monitorPnLAndClose;
+window.closePositionAtMarket = closePositionAtMarket;
+
+// 🔧 FONCTIONS UTILITAIRES EXPORTÉES
 window.importExistingPositions = importExistingPositions;
 window.canOpenNewPosition = canOpenNewPosition;
 window.syncAndCheckPositions = syncAndCheckPositions;
