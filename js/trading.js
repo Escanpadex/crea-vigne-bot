@@ -31,7 +31,8 @@ async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
 // 🎯 NOUVELLE STRATÉGIE: Variables globales pour la nouvelle stratégie
 let positivePairs = []; // Paires avec évolution positive 24h
 let lastPairAnalysis = 0; // Timestamp de la dernière analyse des paires
-let positionCooldowns = new Map(); // Cooldowns après fermeture de position
+let positionCooldowns = new Map(); // Cooldowns après fermeture de position (1 minute)
+let tradedPairsCooldown = new Map(); // Cooldowns paires tradées (12 heures)
 
 // 🆕 NOUVELLE FONCTION: Récupérer les paires avec évolution positive sur 24h
 async function getPositivePairs() {
@@ -82,14 +83,22 @@ async function getPositivePairs() {
 
 // 🆕 NOUVELLE FONCTION: Sélectionner une paire aléatoire parmi les positives
 function selectRandomPositivePair(excludeSymbols = []) {
+    // 🎯 AMÉLIORATION: Vérifier d'abord si on a des emplacements disponibles
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    if (availableSlots <= 0) {
+        log(`⚠️ Aucun emplacement disponible (${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}) - Pas de sélection`, 'INFO');
+        return null;
+    }
+    
     const availablePairs = positivePairs.filter(pair => 
         !excludeSymbols.includes(pair.symbol) && 
         !hasOpenPosition(pair.symbol) &&
-        !isPairInCooldown(pair.symbol)
+        !isPairInCooldown(pair.symbol) &&
+        !isTradedPairInCooldown(pair.symbol) // 🆕 Cooldown 12h pour paires déjà tradées
     );
     
     if (availablePairs.length === 0) {
-        log('⚠️ Aucune paire positive disponible pour trading', 'WARNING');
+        log('⚠️ Aucune paire positive disponible pour trading (cooldowns actifs)', 'WARNING');
         return null;
     }
     
@@ -97,7 +106,7 @@ function selectRandomPositivePair(excludeSymbols = []) {
     const randomIndex = Math.floor(Math.random() * Math.min(availablePairs.length, 20)); // Top 20 pour plus de diversité
     const selectedPair = availablePairs[randomIndex];
     
-    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h)`, 'SUCCESS');
+    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h) - ${availableSlots} emplacements disponibles`, 'SUCCESS');
     
     return selectedPair;
 }
@@ -384,10 +393,16 @@ function canOpenNewPosition(symbol) {
         return { canOpen: false, reason: `Limite de ${MAX_SIMULTANEOUS_POSITIONS} positions simultanées atteinte` };
     }
     
-    // Vérifier le cooldown
+    // Vérifier le cooldown (1 minute après fermeture)
     if (isPairInCooldown(symbol)) {
         const remainingMinutes = getRemainingCooldown(symbol);
         return { canOpen: false, reason: `${symbol} en cooldown encore ${remainingMinutes} minutes` };
+    }
+    
+    // 🆕 AMÉLIORATION: Vérifier le cooldown 12h pour paires déjà tradées
+    if (isTradedPairInCooldown(symbol)) {
+        const remainingHours = getRemainingTradedCooldown(symbol);
+        return { canOpen: false, reason: `${symbol} déjà tradé récemment - Cooldown encore ${remainingHours} heures` };
     }
     
     // Vérifier le capital disponible
@@ -451,7 +466,8 @@ async function openPosition(symbol, selectedPair) {
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
         log(`📊 Positions ouvertes: ${openPositions.length + 1}/${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
         
-        // 🎯 NOUVELLE STRATÉGIE: Pas de cooldown à l'ouverture, seulement à la fermeture
+        // 🆕 AMÉLIORATION: Ajouter cooldown 12h pour cette paire (empêcher re-trade immédiat)
+        addTradedPairCooldown(symbol);
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -579,7 +595,7 @@ async function monitorPnLAndClose() {
                 if (closed) {
                     log(`✅ Position fermée avec succès: ${position.symbol} (+${pnlPercent.toFixed(2)}%)`, 'SUCCESS');
                     
-                    // Ajouter cooldown d'1 minute
+                    // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
                     addPositionCooldown(position.symbol);
                     
                     // Mettre à jour les stats
@@ -593,6 +609,17 @@ async function monitorPnLAndClose() {
                     const index = openPositions.findIndex(p => p.id === position.id);
                     if (index !== -1) {
                         openPositions.splice(index, 1);
+                    }
+                    
+                    // 🆕 AMÉLIORATION: Déclencher immédiatement une nouvelle sélection si un emplacement est libre
+                    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+                    if (availableSlots > 0) {
+                        log(`🔄 Position fermée - Déclenchement immédiat d'une nouvelle sélection (${availableSlots} emplacements libres)`, 'INFO');
+                        setTimeout(() => {
+                            if (typeof tradingLoop === 'function') {
+                                tradingLoop();
+                            }
+                        }, 2000); // Attendre 2 secondes pour que le cooldown soit actif
                     }
                 } else {
                     log(`❌ Échec fermeture position ${position.symbol}`, 'ERROR');
@@ -651,14 +678,14 @@ async function closePositionAtMarket(position) {
     }
 }
 
-// 🆕 NOUVELLE FONCTION: Ajouter un cooldown après fermeture de position
+// 🆕 NOUVELLE FONCTION: Ajouter un cooldown après fermeture de position (1 minute)
 function addPositionCooldown(symbol) {
     const cooldownEnd = Date.now() + (60 * 1000); // 1 minute
     positionCooldowns.set(symbol, cooldownEnd);
-    log(`⏰ Cooldown activé pour ${symbol}: 1 minute`, 'INFO');
+    log(`⏰ Cooldown 1min activé pour ${symbol}`, 'INFO');
 }
 
-// 🆕 NOUVELLE FONCTION: Vérifier si une paire est en cooldown
+// 🆕 NOUVELLE FONCTION: Vérifier si une paire est en cooldown (1 minute)
 function isPairInCooldown(symbol) {
     const cooldownEnd = positionCooldowns.get(symbol);
     if (!cooldownEnd) return false;
@@ -670,6 +697,45 @@ function isPairInCooldown(symbol) {
     }
     
     return true;
+}
+
+// 🆕 AMÉLIORATION: Ajouter un cooldown 12h pour les paires déjà tradées
+function addTradedPairCooldown(symbol) {
+    const cooldownEnd = Date.now() + (12 * 60 * 60 * 1000); // 12 heures
+    tradedPairsCooldown.set(symbol, cooldownEnd);
+    log(`⏰ Cooldown 12h activé pour ${symbol} (paire tradée)`, 'INFO');
+}
+
+// 🆕 AMÉLIORATION: Vérifier si une paire tradée est en cooldown 12h
+function isTradedPairInCooldown(symbol) {
+    const cooldownEnd = tradedPairsCooldown.get(symbol);
+    if (!cooldownEnd) return false;
+    
+    const now = Date.now();
+    if (now >= cooldownEnd) {
+        tradedPairsCooldown.delete(symbol);
+        return false;
+    }
+    
+    return true;
+}
+
+// 🆕 AMÉLIORATION: Obtenir le temps restant du cooldown 1 minute
+function getRemainingCooldown(symbol) {
+    const cooldownEnd = positionCooldowns.get(symbol);
+    if (!cooldownEnd) return 0;
+    
+    const remaining = Math.max(0, cooldownEnd - Date.now());
+    return Math.ceil(remaining / 60000); // En minutes
+}
+
+// 🆕 AMÉLIORATION: Obtenir le temps restant du cooldown 12h
+function getRemainingTradedCooldown(symbol) {
+    const cooldownEnd = tradedPairsCooldown.get(symbol);
+    if (!cooldownEnd) return 0;
+    
+    const remaining = Math.max(0, cooldownEnd - Date.now());
+    return Math.ceil(remaining / (60 * 60 * 1000)); // En heures
 }
 
 async function updatePositionsPnL() {
