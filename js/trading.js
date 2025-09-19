@@ -688,8 +688,8 @@ async function monitorPnLAndClose() {
                     log(`❌ Échec fermeture position ${position.symbol}`, 'ERROR');
                 }
             } else {
-                // Log de suivi (moins fréquent pour éviter le spam)
-                if (Date.now() - (position.lastPnLLog || 0) > 30000) { // Toutes les 30 secondes
+                // Log de suivi (moins fréquent pour éviter le spam avec surveillance 1s)
+                if (Date.now() - (position.lastPnLLog || 0) > 60000) { // Toutes les 60 secondes
                     log(`📊 ${position.symbol}: PnL ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (Objectif: +${position.targetPnL}%)`, 'DEBUG');
                     position.lastPnLLog = Date.now();
                 }
@@ -805,24 +805,52 @@ async function updatePositionsPnL() {
     if (openPositions.length === 0) return;
     
     try {
+        log('🔄 Mise à jour des PnL des positions...', 'DEBUG');
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
         if (result && result.code === '00000' && result.data) {
             const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            log(`📊 ${apiPositions.length} positions actives reçues de l'API`, 'DEBUG');
             
+            let updatedCount = 0;
             openPositions.forEach(localPos => {
                 const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
                 if (apiPos) {
-                    localPos.currentPrice = parseFloat(apiPos.markPrice);
-                    localPos.unrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
-                    localPos.pnlPercentage = ((localPos.currentPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
+                    // 🔧 AMÉLIORATION: Mise à jour complète des données
+                    const newPrice = parseFloat(apiPos.markPrice || 0);
+                    const newUnrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
+                    const newPnlPercentage = localPos.entryPrice > 0 ? ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100 : 0;
+                    
+                    // Mettre à jour seulement si les données ont changé
+                    if (Math.abs(localPos.currentPrice - newPrice) > 0.0001 || 
+                        Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01) {
+                        
+                        localPos.currentPrice = newPrice;
+                        localPos.unrealizedPnL = newUnrealizedPnL;
+                        localPos.pnlPercentage = newPnlPercentage;
+                        
+                        // Mettre à jour le prix le plus haut si nécessaire
+                        if (newPrice > (localPos.highestPrice || 0)) {
+                            localPos.highestPrice = newPrice;
+                        }
+                        
+                        updatedCount++;
+                        log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}%`, 'DEBUG');
+                    }
+                } else {
+                    log(`⚠️ Position ${localPos.symbol} non trouvée dans l'API - Position peut-être fermée`, 'WARNING');
                 }
             });
             
-            updatePositionsDisplay();
+            if (updatedCount > 0) {
+                log(`✅ ${updatedCount} position(s) mise(s) à jour`, 'DEBUG');
+                updatePositionsDisplay(); // Mettre à jour l'affichage seulement si nécessaire
+            }
+        } else {
+            log('⚠️ Erreur récupération positions pour mise à jour PnL', 'WARNING');
         }
     } catch (error) {
-        // Mise à jour silencieuse
+        log(`❌ Erreur mise à jour PnL: ${error.message}`, 'ERROR');
     }
 }
 
@@ -853,14 +881,36 @@ function updatePositionsDisplay() {
     `;
     } else {
         const positionsHTML = openPositions.map((position, index) => {
-            // Calculer le temps écoulé
-            const openTime = new Date(position.timestamp);
-            const now = new Date();
-            const diffMs = now - openTime;
-            const diffMinutes = Math.floor(diffMs / 60000);
-            const timeDisplay = diffMinutes < 60 
-                ? `${diffMinutes}min`
-                : `${Math.floor(diffMinutes / 60)}h${diffMinutes % 60}min`;
+            // Calculer le temps écoulé avec gestion des erreurs
+            let timeDisplay = '0min';
+            try {
+                const openTime = new Date(position.timestamp);
+                const now = new Date();
+                
+                // Vérifier que le timestamp est valide
+                if (!isNaN(openTime.getTime())) {
+                    const diffMs = now - openTime;
+                    const diffMinutes = Math.floor(diffMs / 60000);
+                    
+                    if (diffMinutes < 0) {
+                        timeDisplay = '0min'; // Si timestamp futur, afficher 0min
+                    } else if (diffMinutes < 60) {
+                        timeDisplay = `${diffMinutes}min`;
+                    } else if (diffMinutes < 1440) { // Moins de 24h
+                        const hours = Math.floor(diffMinutes / 60);
+                        const remainingMins = diffMinutes % 60;
+                        timeDisplay = remainingMins > 0 ? `${hours}h${remainingMins}min` : `${hours}h`;
+                    } else { // Plus de 24h
+                        const days = Math.floor(diffMinutes / 1440);
+                        const hours = Math.floor((diffMinutes % 1440) / 60);
+                        timeDisplay = hours > 0 ? `${days}j${hours}h` : `${days}j`;
+                    }
+                } else {
+                    log(`⚠️ Timestamp invalide pour ${position.symbol}: ${position.timestamp}`, 'WARNING');
+                }
+            } catch (error) {
+                log(`❌ Erreur calcul temps pour ${position.symbol}: ${error.message}`, 'ERROR');
+            }
             
             // Calculer le PnL actuel
             const currentPrice = position.currentPrice || position.entryPrice;
@@ -1011,10 +1061,10 @@ async function importExistingPositions() {
                         symbol: apiPos.symbol,
                         side: side,
                         size: total, // 🔧 CORRECTION: Utiliser la valeur totale de la position
-                        quantity: total / markPrice, // 🔧 CORRECTION: Calculer la quantité depuis total et prix
+                        quantity: parseFloat(apiPos.size || total / markPrice), // 🔧 AMÉLIORATION: Utiliser apiPos.size si disponible
                         entryPrice: averageOpenPrice,
                         status: 'OPEN',
-                        timestamp: new Date().toISOString(),
+                        timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(), // 🔧 AMÉLIORATION: Utiliser le timestamp réel si disponible
                         orderId: `imported_${Date.now()}`,
                         stopLossId: null,
                         currentStopPrice: null,
@@ -1023,7 +1073,8 @@ async function importExistingPositions() {
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: config.targetPnL || 2.0, // 🔧 AJOUT: Target PnL pour la nouvelle stratégie
-                        reason: '📥 Position importée depuis Bitget'
+                        reason: '📥 Position importée depuis Bitget',
+                        lastPnLLog: 0 // 🔧 AJOUT: Pour éviter le spam de logs PnL
                     };
                     
                     if (position.symbol && position.size > 0 && position.entryPrice > 0) {
@@ -1052,6 +1103,14 @@ async function importExistingPositions() {
                 updatePositionsDisplay();
                 updateStats();
                 
+                // 🔧 AMÉLIORATION: Démarrer immédiatement la mise à jour des prix en temps réel
+                log('📊 Démarrage de la mise à jour des prix en temps réel...', 'INFO');
+                setTimeout(async () => {
+                    await updatePositionsPnL(); // Mise à jour immédiate des PnL
+                    updatePositionsDisplay(); // Refresh de l'affichage avec les nouvelles données
+                    log('✅ Données temps réel mises à jour après import', 'SUCCESS');
+                }, 1000);
+                
                 // Vérification immédiate et différée de l'affichage
                 const positionCountEl = document.getElementById('positionCount');
                 if (positionCountEl) {
@@ -1060,8 +1119,8 @@ async function importExistingPositions() {
                     log('⚠️ Élément positionCount non trouvé - Retry dans 500ms', 'WARNING');
                 }
                 
-                // Double vérification après 500ms
-                setTimeout(() => {
+                // Double vérification après 500ms avec mise à jour des données
+                setTimeout(async () => {
                     const positionCountEl = document.getElementById('positionCount');
                     if (positionCountEl) {
                         log(`📊 Vérification différée: ${positionCountEl.textContent} positions affichées dans l'interface`, 'DEBUG');
@@ -1070,7 +1129,12 @@ async function importExistingPositions() {
                             updatePositionsDisplay();
                         }
                     }
-                }, 500);
+                    
+                    // 🔧 AMÉLIORATION: Seconde mise à jour des données pour s'assurer que tout est à jour
+                    await updatePositionsPnL();
+                    updatePositionsDisplay();
+                    log('🔄 Seconde mise à jour des données effectuée', 'DEBUG');
+                }, 2000); // 2 secondes pour laisser le temps aux données de se stabiliser
                 
             } else {
                 log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
@@ -1368,5 +1432,35 @@ window.debugImportDetailed = async function() {
     }
 };
 
+// 🧪 FONCTION DE DEBUG: Forcer la mise à jour des données temps réel
+window.forceUpdatePositions = async function() {
+    console.log('🔄 Force update des positions...');
+    
+    if (openPositions.length === 0) {
+        console.log('❌ Aucune position à mettre à jour');
+        return;
+    }
+    
+    console.log(`📊 Mise à jour de ${openPositions.length} position(s)...`);
+    
+    try {
+        await updatePositionsPnL();
+        updatePositionsDisplay();
+        console.log('✅ Mise à jour forcée terminée');
+        
+        // Afficher les données actuelles
+        openPositions.forEach((pos, index) => {
+            const pnl = pos.pnlPercentage || 0;
+            const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}%` : `${pnl.toFixed(2)}%`;
+            console.log(`   ${index + 1}. ${pos.symbol}: ${pos.currentPrice?.toFixed(4) || 'N/A'} | ${pnlText}`);
+        });
+        
+    } catch (error) {
+        console.error('❌ Erreur lors de la mise à jour forcée:', error);
+    }
+};
+
 console.log('✅ Trading fixes applied successfully - call testTradingFixes() to verify');
-console.log('🔧 Debug function available: debugImportDetailed() - Force import positions from console');
+console.log('🔧 Debug functions available:');
+console.log('   - debugImportDetailed() - Force import positions from console');
+console.log('   - forceUpdatePositions() - Force update position data from console');
