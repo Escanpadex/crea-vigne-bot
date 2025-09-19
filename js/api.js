@@ -64,10 +64,34 @@ async function testConnection() {
         }
         
         // 4. 🔧 NOUVEAU: Importer les positions existantes dès la connexion
-        if (typeof window.importExistingPositions === 'function') {
-            log('📥 Importation des positions existantes...', 'INFO');
-            await window.importExistingPositions();
-            log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
+        log('📥 Importation des positions existantes...', 'INFO');
+        try {
+            if (typeof window.importExistingPositions === 'function') {
+                await window.importExistingPositions();
+                log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
+                
+                // Forcer la mise à jour de l'affichage après import
+                if (typeof updatePositionsDisplay === 'function') {
+                    updatePositionsDisplay();
+                    log('🔄 Affichage des positions mis à jour après import', 'SUCCESS');
+                }
+            } else {
+                log('⚠️ Fonction importExistingPositions non disponible - Retry dans 2s...', 'WARNING');
+                // Retry après un délai pour laisser le temps aux scripts de se charger
+                setTimeout(async () => {
+                    if (typeof window.importExistingPositions === 'function') {
+                        await window.importExistingPositions();
+                        if (typeof updatePositionsDisplay === 'function') {
+                            updatePositionsDisplay();
+                        }
+                        log(`✅ Import différé réussi: ${openPositions ? openPositions.length : 0} position(s)`, 'SUCCESS');
+                    } else {
+                        log('❌ Fonction importExistingPositions toujours indisponible', 'ERROR');
+                    }
+                }, 2000);
+            }
+        } catch (error) {
+            log(`❌ Erreur lors de l'import des positions: ${error.message}`, 'ERROR');
         }
         
         // 5. Démarrer la synchronisation automatique des positions

@@ -986,7 +986,7 @@ async function importExistingPositions() {
             }
             
             apiPositions.forEach((pos, index) => {
-                log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.side || 'NO_SIDE'} - Size: ${pos.contractSize || 'NO_SIZE'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
+                log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.holdSide || 'NO_SIDE'} - Total: ${pos.total || 'NO_TOTAL'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
                 log(`📊 Structure complète: ${JSON.stringify(pos)}`, 'DEBUG');
             });
             
@@ -996,20 +996,22 @@ async function importExistingPositions() {
                 const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
                 
                 if (!exists) {
-                    const side = apiPos.side ? apiPos.side.toUpperCase() : 'LONG';
-                    const contractSize = parseFloat(apiPos.contractSize || 0);
+                    // 🔧 CORRECTION: Utiliser les bons champs de l'API Bitget
+                    const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
+                    const total = parseFloat(apiPos.total || 0); // Valeur totale de la position
                     const markPrice = parseFloat(apiPos.markPrice || 0);
                     const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                    const marginSize = parseFloat(apiPos.marginSize || 0); // Marge utilisée
                     
-                    log(`🔍 Données position ${apiPos.symbol}: side=${apiPos.side}, contractSize=${apiPos.contractSize}, markPrice=${apiPos.markPrice}`, 'DEBUG');
+                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: Math.abs(contractSize * markPrice),
-                        quantity: Math.abs(contractSize),
+                        size: total, // 🔧 CORRECTION: Utiliser la valeur totale de la position
+                        quantity: total / markPrice, // 🔧 CORRECTION: Calculer la quantité depuis total et prix
                         entryPrice: averageOpenPrice,
                         status: 'OPEN',
                         timestamp: new Date().toISOString(),
@@ -1020,6 +1022,7 @@ async function importExistingPositions() {
                         currentPrice: markPrice,
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                        targetPnL: config.targetPnL || 2.0, // 🔧 AJOUT: Target PnL pour la nouvelle stratégie
                         reason: '📥 Position importée depuis Bitget'
                     };
                     
@@ -1027,7 +1030,7 @@ async function importExistingPositions() {
                         openPositions.push(position);
                         imported++;
                         
-                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)}`, 'SUCCESS');
+                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT)`, 'SUCCESS');
                     } else {
                         log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides`, 'WARNING');
                     }
@@ -1040,24 +1043,44 @@ async function importExistingPositions() {
                 
                 // Log détaillé des positions importées
                 openPositions.forEach((pos, idx) => {
-                    log(`   ${idx + 1}. ${pos.symbol} - ${pos.reason || 'Position importée'}`, 'INFO');
+                    const pnl = pos.pnlPercentage || 0;
+                    const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}%` : `${pnl.toFixed(2)}%`;
+                    log(`   ${idx + 1}. ${pos.symbol} ${pos.side} ${pos.size.toFixed(2)}$ @ ${pos.entryPrice.toFixed(4)} (${pnlText})`, 'INFO');
                 });
                 
                 log('🔄 Mise à jour de l\'affichage des positions...', 'DEBUG');
                 updatePositionsDisplay();
                 updateStats();
                 
-                // Vérification que l'affichage a été mis à jour
+                // Vérification immédiate et différée de l'affichage
+                const positionCountEl = document.getElementById('positionCount');
+                if (positionCountEl) {
+                    log(`📊 Affichage immédiatement mis à jour: ${positionCountEl.textContent} positions affichées`, 'SUCCESS');
+                } else {
+                    log('⚠️ Élément positionCount non trouvé - Retry dans 500ms', 'WARNING');
+                }
+                
+                // Double vérification après 500ms
                 setTimeout(() => {
                     const positionCountEl = document.getElementById('positionCount');
                     if (positionCountEl) {
-                        log(`📊 Affichage mis à jour: ${positionCountEl.textContent} positions affichées`, 'DEBUG');
+                        log(`📊 Vérification différée: ${positionCountEl.textContent} positions affichées dans l'interface`, 'DEBUG');
+                        if (positionCountEl.textContent != openPositions.length.toString()) {
+                            log('⚠️ Désynchronisation détectée - Force refresh...', 'WARNING');
+                            updatePositionsDisplay();
+                        }
                     }
                 }, 500);
                 
             } else {
                 log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
                 log(`📊 État: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS} positions actives`, 'INFO');
+                
+                // Même si aucune position n'est importée, s'assurer que l'affichage est correct
+                if (openPositions.length > 0) {
+                    updatePositionsDisplay();
+                    log('🔄 Affichage des positions existantes mis à jour', 'DEBUG');
+                }
             }
         } else {
             log('❌ Erreur lors de l\'importation des positions', 'ERROR');
@@ -1243,4 +1266,107 @@ async function testTradingFixes() {
 // Rendre la fonction accessible globalement
 window.testTradingFixes = testTradingFixes;
 
+// 🧪 FONCTION DE DEBUG: Fonction pratique pour forcer l'import des positions depuis la console
+window.debugImportDetailed = async function() {
+    console.log('🔍 Debug import détaillé...');
+    
+    // Vider les positions pour test propre
+    openPositions.length = 0;
+    
+    try {
+        // Appel API direct
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        
+        if (result && result.code === '00000' && result.data) {
+            console.log(`📊 ${result.data.length} positions reçues de l'API`);
+            
+            // Filtrage
+            const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            console.log(`📊 ${apiPositions.length} positions après filtrage (total > 0)`);
+            
+            if (apiPositions.length === 0) {
+                console.log('❌ Aucune position après filtrage !');
+                return;
+            }
+            
+            let imported = 0;
+            
+            for (const apiPos of apiPositions) {
+                console.log(`\n🔍 Traitement de ${apiPos.symbol}:`);
+                
+                // Vérifier si elle existe déjà
+                const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
+                console.log(`   Existe déjà: ${exists ? 'OUI' : 'NON'}`);
+                
+                if (!exists) {
+                    // Calculer les valeurs
+                    const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
+                    const total = parseFloat(apiPos.total || 0);
+                    const markPrice = parseFloat(apiPos.markPrice || 0);
+                    const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
+                    const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                    
+                    console.log(`   Side: ${side}`);
+                    console.log(`   Total: ${total}`);
+                    console.log(`   MarkPrice: ${markPrice}`);
+                    console.log(`   AverageOpenPrice: ${averageOpenPrice}`);
+                    console.log(`   UnrealizedPL: ${unrealizedPL}`);
+                    
+                    const position = {
+                        id: Date.now() + Math.random(),
+                        symbol: apiPos.symbol,
+                        side: side,
+                        size: total,
+                        quantity: total / markPrice,
+                        entryPrice: averageOpenPrice,
+                        status: 'OPEN',
+                        timestamp: new Date().toISOString(),
+                        orderId: `imported_${Date.now()}`,
+                        stopLossId: null,
+                        currentStopPrice: null,
+                        highestPrice: markPrice,
+                        currentPrice: markPrice,
+                        unrealizedPnL: unrealizedPL,
+                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                        targetPnL: config.targetPnL || 2.0,
+                        reason: '📥 Position importée depuis Bitget'
+                    };
+                    
+                    // Test de validation
+                    const isValid = position.symbol && position.size > 0 && position.entryPrice > 0;
+                    console.log(`   Validation:`);
+                    console.log(`     symbol: ${position.symbol ? 'OK' : 'MANQUANT'}`);
+                    console.log(`     size > 0: ${position.size > 0 ? 'OK' : 'ÉCHEC'} (${position.size})`);
+                    console.log(`     entryPrice > 0: ${position.entryPrice > 0 ? 'OK' : 'ÉCHEC'} (${position.entryPrice})`);
+                    console.log(`     RÉSULTAT: ${isValid ? 'VALIDE' : 'INVALIDE'}`);
+                    
+                    if (isValid) {
+                        openPositions.push(position);
+                        imported++;
+                        console.log(`   ✅ Position ajoutée !`);
+                    } else {
+                        console.log(`   ❌ Position rejetée !`);
+                    }
+                }
+            }
+            
+            console.log(`\n📊 RÉSULTAT FINAL: ${imported} positions importées`);
+            console.log(`📊 openPositions.length: ${openPositions.length}`);
+            
+            // Mettre à jour l'affichage
+            if (typeof updatePositionsDisplay === 'function') {
+                updatePositionsDisplay();
+                console.log('🔄 Affichage mis à jour');
+            }
+            
+        } else {
+            console.log('❌ Erreur API ou pas de données');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur:', error);
+    }
+};
+
 console.log('✅ Trading fixes applied successfully - call testTradingFixes() to verify');
+console.log('🔧 Debug function available: debugImportDetailed() - Force import positions from console');
