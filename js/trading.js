@@ -894,9 +894,18 @@ function updatePositionsDisplay() {
     // Mettre à jour la liste des positions avec un design sexy
     if (openPositions.length === 0) {
         positionsListEl.innerHTML = `
-            <div style="text-align: center; color: rgba(255,255,255,0.7); font-style: italic; padding: 20px;">
-                <span style="font-size: 14px;">💤 Aucune position active</span><br>
-                <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
+            <div style="
+                text-align: center; 
+                color: #d1d5db; 
+                font-style: italic; 
+                padding: 30px 20px;
+                background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+                border-radius: 12px;
+                border: 2px dashed #6b7280;
+                font-weight: 500;
+            ">
+                <span style="font-size: 16px; color: #ffffff;">💤 Aucune position active</span><br>
+                <span style="font-size: 12px; margin-top: 8px; display: block; color: #9ca3af;">En attente d'opportunités...</span>
         </div>
     `;
     } else {
@@ -991,37 +1000,38 @@ function updatePositionsDisplay() {
             
             return `
                 <div style="
-                    background: rgba(255,255,255,0.15); 
-                    border-radius: 10px; 
-                    padding: 15px; 
-                    margin-bottom: 10px; 
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.2);
+                    background: ${isPositive ? 'linear-gradient(135deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #404040 100%)'}; 
+                    border-radius: 12px; 
+                    padding: 16px; 
+                    margin-bottom: 12px; 
+                    border: 2px solid ${isPositive ? '#10b981' : '#6b7280'};
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                     transition: all 0.3s ease;
                     ${pulseAnimation}
-                " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'">
                     
                     <!-- Header de la position -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <div style="display: flex; align-items: center;">
-                            <span style="font-size: 16px; margin-right: 8px;">${pnlIcon}</span>
-                            <span style="color: white; font-weight: bold; font-size: 14px;">
+                            <span style="font-size: 18px; margin-right: 10px;">${pnlIcon}</span>
+                            <span style="color: #ffffff; font-weight: bold; font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
                                 ${position.symbol.replace('USDT', '')}
                             </span>
-                            <span style="color: rgba(255,255,255,0.6); font-size: 10px; margin-left: 5px;">
+                            <span style="color: #d1d5db; font-size: 12px; margin-left: 6px; font-weight: 500;">
                                 USDT
                             </span>
                         </div>
                         
                         <!-- Badge PnL -->
                         <div style="
-                            background: ${pnlBgColor};
-                            color: ${pnlColor};
-                            padding: 4px 8px;
-                            border-radius: 6px;
+                            background: ${isPositive ? '#10b981' : '#ef4444'};
+                            color: #ffffff;
+                            padding: 6px 12px;
+                            border-radius: 8px;
                             font-weight: bold;
-                            font-size: 12px;
-                            border: 1px solid ${pnlColor}30;
+                            font-size: 13px;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                         ">
                             ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(2)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(2) + '%'})
             </div>
@@ -1029,17 +1039,17 @@ function updatePositionsDisplay() {
                     
                     <!-- Détails de la position -->
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="color: rgba(255,255,255,0.8); font-size: 11px;">
-                            <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; margin-right: 5px;">
+                        <div style="color: #e5e7eb; font-size: 12px;">
+                            <span style="display: inline-block; background: rgba(0,0,0,0.3); color: #ffffff; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
                                 ⏱️ ${timeDisplay}
                 </span>
-                            <span style="display: inline-block; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">
+                            <span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
                                 🎯 +${position.targetPnL || 2}%
                 </span>
             </div>
                         
                         <!-- Indicateur de progression -->
-                        <div style="color: rgba(255,255,255,0.6); font-size: 10px;">
+                        <div style="color: ${isPositive ? '#34d399' : '#9ca3af'}; font-size: 11px; font-weight: 600;">
                             ${isPositive ? '🚀' : '⏳'} ${isPositive ? 'En profit' : 'En cours'}
                         </div>
                     </div>
