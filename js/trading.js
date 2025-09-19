@@ -804,18 +804,22 @@ function getRemainingTradedCooldown(symbol) {
     return Math.ceil(remaining / (60 * 60 * 1000)); // En heures
 }
 
-async function updatePositionsPnL() {
+async function updatePositionsPnL(verbose = false) {
     if (openPositions.length === 0) return;
     
     try {
-        log('🔄 Mise à jour des PnL des positions...', 'DEBUG');
+        // Log seulement en mode verbose pour éviter le spam
+        if (verbose) log('🔄 Mise à jour des PnL des positions...', 'DEBUG');
+        
         const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
         
         if (result && result.code === '00000' && result.data) {
             const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
-            log(`📊 ${apiPositions.length} positions actives reçues de l'API`, 'DEBUG');
+            if (verbose) log(`📊 ${apiPositions.length} positions actives reçues de l'API`, 'DEBUG');
             
             let updatedCount = 0;
+            let hasSignificantChanges = false;
+            
             openPositions.forEach(localPos => {
                 const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
                 if (apiPos) {
@@ -828,9 +832,13 @@ async function updatePositionsPnL() {
                     const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice);
                     const priceChanged = !currentPriceDefined || Math.abs(localPos.currentPrice - newPrice) > 0.0001;
                     const pnlChanged = Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01;
+                    
+                    // Détecter les changements significatifs (>0.5% PnL)
+                    if (Math.abs(newPnlPercentage - (localPos.pnlPercentage || 0)) > 0.5) {
+                        hasSignificantChanges = true;
+                    }
 
                     if (priceChanged || pnlChanged || !currentPriceDefined) {
-
                         localPos.currentPrice = newPrice;
                         localPos.unrealizedPnL = newUnrealizedPnL;
                         localPos.pnlPercentage = newPnlPercentage;
@@ -841,8 +849,8 @@ async function updatePositionsPnL() {
                         }
 
                         updatedCount++;
-                        // Log en mode debug seulement
-                        if (positionUpdateDebug) {
+                        // Log seulement pour les changements significatifs ou en mode verbose
+                        if (verbose || hasSignificantChanges || !currentPriceDefined || positionUpdateDebug) {
                             log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}% (${newUnrealizedPnL >= 0 ? '+' : ''}$${newUnrealizedPnL.toFixed(2)}) ${!currentPriceDefined ? '(INITIAL)' : '(UPDATE)'}`, 'DEBUG');
                         }
                     }
@@ -852,7 +860,10 @@ async function updatePositionsPnL() {
             });
             
             if (updatedCount > 0) {
-                log(`✅ ${updatedCount} position(s) mise(s) à jour`, 'DEBUG');
+                // Log seulement si changements significatifs ou en mode verbose
+                if (verbose || hasSignificantChanges) {
+                    log(`✅ ${updatedCount} position(s) mise(s) à jour${hasSignificantChanges ? ' avec changements significatifs' : ''}`, 'DEBUG');
+                }
                 updatePositionsDisplay(); // Mettre à jour l'affichage seulement si nécessaire
             }
         } else {

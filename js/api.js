@@ -203,27 +203,53 @@ async function scanTop30Volume() {
 
 // 🔄 NOUVELLE FONCTION: Synchronisation automatique des positions
 function startAutoSyncPositions() {
-    log('🔄 Démarrage de la synchronisation automatique des positions (toutes les 2 minutes)', 'INFO');
+    log('🔄 Démarrage de la synchronisation automatique des positions (toutes les 4 secondes)', 'INFO');
     
     // Arrêter l'ancien intervalle s'il existe
     if (window.autoSyncInterval) {
         clearInterval(window.autoSyncInterval);
     }
     
-    // 🔧 CORRECTION: Utiliser syncAndCheckPositions au lieu de checkPositionsStatus
+    // 🔧 CORRECTION: Mise à jour immédiate des données temps réel
     if (typeof syncAndCheckPositions === 'function') {
         syncAndCheckPositions();
     }
+    if (typeof window.updatePositionsPnL === 'function') {
+        window.updatePositionsPnL();
+    }
     
-    // Programmer la synchronisation toutes les 2 minutes
-    window.autoSyncInterval = setInterval(() => {
+    let syncCounter = 0;
+    
+    // Programmer la synchronisation toutes les 4 secondes
+    window.autoSyncInterval = setInterval(async () => {
         if (openPositions.length > 0) {
-            log('🔄 Synchronisation automatique des positions...', 'DEBUG');
-            if (typeof syncAndCheckPositions === 'function') {
-                syncAndCheckPositions();
+            syncCounter++;
+            
+            // Mise à jour des données temps réel (prix/PnL) à chaque fois
+            if (typeof window.updatePositionsPnL === 'function') {
+                await window.updatePositionsPnL();
+            }
+            
+            // Synchronisation complète (vérification fermetures) toutes les 15 fois (1 minute)
+            if (syncCounter % 15 === 0) {
+                log('🔄 Synchronisation complète des positions...', 'DEBUG');
+                if (typeof syncAndCheckPositions === 'function') {
+                    await syncAndCheckPositions();
+                }
             }
         }
-    }, 2 * 60 * 1000); // 2 minutes
+    }, 4 * 1000); // 4 secondes
+}
+
+// 🛑 FONCTION: Arrêter la synchronisation automatique des positions
+function stopAutoSyncPositions() {
+    if (window.autoSyncInterval) {
+        clearInterval(window.autoSyncInterval);
+        window.autoSyncInterval = null;
+        log('🛑 Synchronisation automatique des positions arrêtée', 'INFO');
+        return true;
+    }
+    return false;
 }
 
 // Fonction updateTop30Display supprimée - remplacée par updateMacdAnalysisDisplay
