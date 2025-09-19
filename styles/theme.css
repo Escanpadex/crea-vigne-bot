@@ -1,0 +1,110 @@
+/* Accessible theme tokens and UI components overrides */
+
+:root {
+    --bg: #0A0E17;
+    --text: #EAF6FB;
+    --muted: #9FB6C2;
+    --surface: #101624;
+    --surface-2: #151B2B;
+    --card-bg: #101624;
+    --card-border: #1B2438;
+    --border: #1B2438;
+    --primary: #00D4FF;
+    --primary-contrast: #0A0E17;
+    --success: #00F5A0;
+    --warning: #FFC857;
+    --danger: #F72119;
+    --info: #6BE6FF;
+    --chip-tint-primary: rgba(0, 212, 255, 0.08);
+    --chip-tint-success: rgba(0, 245, 160, 0.10);
+    --elev1: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* Card override to dark, high-contrast */
+.card {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--card-border) !important;
+    color: var(--text) !important;
+    box-shadow: var(--elev1) !important;
+}
+
+.card h3, .card h4, .card h5 { color: var(--text) !important; }
+.card p, .card span, .card div { color: var(--muted); }
+.card strong { color: var(--text); }
+
+/* Inputs */
+input, select {
+    border: 2px solid var(--border) !important;
+    background: var(--surface) !important;
+    color: var(--text) !important;
+}
+input:focus, select:focus { border-color: var(--primary) !important; }
+
+/* Buttons */
+.btn {
+    background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%) !important;
+    color: var(--primary-contrast) !important;
+}
+.btn:hover { filter: brightness(1.05); }
+.btn:disabled { background: #4b5563 !important; color: #cbd5e1 !important; }
+.btn-danger { background: var(--danger) !important; color: #ffffff !important; }
+.btn-success { background: var(--success) !important; color: #0A0E17 !important; }
+.btn-ghost { background: transparent !important; color: var(--text) !important; border: 1px solid var(--border) !important; padding: 6px 10px; font-size: 12px; }
+.btn-ghost:hover { border-color: var(--primary) !important; color: var(--primary) !important; filter: none; }
+.btn-wide { min-width: 150px; }
+
+/* Grid utility */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 992px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Topbar */
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+.topbar-title { font-size: 18px; font-weight: bold; color: var(--text); }
+.topbar-actions { display: flex; align-items: center; gap: 15px; }
+
+/* Chips */
+.chip { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 8px 12px; border: 1px solid var(--card-border); background: var(--surface); color: var(--text); }
+.chip-balance { background: var(--chip-tint-primary); border-color: rgba(0, 212, 255, 0.25); }
+.chip-connection { background: var(--chip-tint-success); border-color: rgba(0, 245, 160, 0.35); }
+.chip .label { font-size: 12px; color: var(--info); }
+.chip .value { font-weight: bold; color: var(--text); font-size: 13px; }
+.chip .unit { font-size: 11px; color: #cbd5e1; }
+
+/* Section titles */
+.section-title { margin: 0 0 15px 0; color: var(--text); font-size: 16px; border-left: 4px solid var(--primary); padding-left: 12px; }
+.section-success { border-color: var(--success); }
+.section-info { border-color: var(--primary); }
+
+/* Panels */
+.panel { background: var(--surface-2); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; box-shadow: var(--elev1); }
+.panel-accent { background: linear-gradient(180deg, #142236 0%, #101624 100%); }
+.panel-warning { background: rgba(255, 200, 87, 0.08); border-color: rgba(255, 200, 87, 0.35); }
+.panel-info { background: rgba(0, 212, 255, 0.08); border-color: rgba(0, 212, 255, 0.3); }
+.panel-inner { background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px; }
+.panel-header { display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+
+/* Footer */
+.section-footer { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--card-border); }
+
+/* Logs and misc */
+.logs { background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--card-border) !important; }
+.price-display { color: var(--primary) !important; }
+.indicator.buy { background: var(--success) !important; color: #0A0E17 !important; }
+.indicator.sell { background: var(--danger) !important; color: #ffffff !important; }
+.indicator.hold { background: var(--warning) !important; color: #212529 !important; }
+.pnl-positive { color: var(--success) !important; }
+.pnl-negative { color: var(--danger) !important; }
+
+/* Range input styling */
+input[type="range"] { -webkit-appearance: none; height: 6px; background: var(--card-border); border-radius: 999px; outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); border: 2px solid #0b1524; }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--primary); border: 2px solid #0b1524; }
+.range-compact { width: 120px; }
+.stat-strong { font-weight: bold; min-width: 35px; display: inline-block; }
+
+
