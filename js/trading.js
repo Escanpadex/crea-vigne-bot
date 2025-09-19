@@ -926,24 +926,48 @@ function updatePositionsDisplay() {
             let pnlPercent = 0;
             let pnlDollar = 0;
 
-            if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
-                // Utiliser directement pnlPercentage si disponible (plus précis)
-                pnlPercent = position.pnlPercentage;
-                // Calculer le PnL en dollars depuis le pourcentage
-                pnlDollar = (position.size * pnlPercent) / 100;
-            } else {
-                // Calcul de secours si pnlPercentage n'est pas disponible
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                pnlDollar = (position.size * pnlPercent) / 100;
-            }
+            // 🔧 CORRECTION: Logique de calcul PnL améliorée
+            let dataSource = 'UNKNOWN';
 
-            // Utiliser directement unrealizedPnL si disponible (plus précis depuis l'API)
+            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
-                // Recalculer le pourcentage depuis le PnL dollar si nécessaire
-                if (position.size > 0) {
+                dataSource = 'API_UNREALIZED_PNL';
+                // Calculer le pourcentage depuis le PnL dollar si possible
+                if (position.size && position.size > 0) {
                     pnlPercent = (pnlDollar / position.size) * 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    // Estimation basée sur la quantité et le prix d'entrée
+                    const positionValue = position.quantity * position.entryPrice;
+                    pnlPercent = positionValue > 0 ? (pnlDollar / positionValue) * 100 : 0;
                 }
+            }
+            // 2. Sinon utiliser pnlPercentage depuis l'API
+            else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                pnlPercent = position.pnlPercentage;
+                dataSource = 'API_PERCENTAGE';
+                // Calculer le PnL en dollars
+                if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    pnlDollar = (position.quantity * position.entryPrice * pnlPercent) / 100;
+                }
+            }
+            // 3. Calcul de secours basé sur les prix actuels
+            else {
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                dataSource = 'CALCULATED';
+                if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    pnlDollar = (position.quantity * position.entryPrice * pnlPercent) / 100;
+                }
+            }
+
+            // Log discret pour debug (toutes les 60 secondes par position)
+            if (!position.lastPnlCalcLog || Date.now() - position.lastPnlCalcLog > 60000) {
+                console.log(`💰 ${position.symbol}: PnL calculé depuis ${dataSource} - $${pnlDollar?.toFixed(2)} (${pnlPercent?.toFixed(2)}%)`);
+                position.lastPnlCalcLog = Date.now();
             }
             const isPositive = pnlPercent >= 0;
             const pnlColor = isPositive ? '#10b981' : '#f59e0b';
@@ -988,7 +1012,7 @@ function updatePositionsDisplay() {
                             font-size: 12px;
                             border: 1px solid ${pnlColor}30;
                         ">
-                            ${pnlSign}$${pnlDollar.toFixed(2)} (${pnlSign}${pnlPercent.toFixed(2)}%)
+                            ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(2)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(2) + '%'})
             </div>
                     </div>
                     
@@ -1528,6 +1552,8 @@ console.log('   - checkPositionsData() - Check current position data');
 console.log('   - testPositionUpdates() - Test complete position update cycle');
 console.log('   - testAPIData() - Test API data consistency');
 console.log('   - togglePositionDebug() - Toggle position update debug logs');
+console.log('   - checkUpdateIntervals() - Check if update intervals are working');
+console.log('   - forceAllUpdates() - Force manual update of all data');
 
 // 🧪 FONCTION DE DEBUG: Tester la cohérence des données API
 window.testAPIData = async function() {
@@ -1619,5 +1645,65 @@ window.togglePositionDebug = function() {
         console.log('📊 Les logs de mise à jour des positions seront maintenant affichés');
     } else {
         console.log('🔇 Les logs de mise à jour des positions sont maintenant masqués');
+    }
+};
+
+// 🧪 FONCTION DE DEBUG: Vérifier si les intervalles de mise à jour fonctionnent
+window.checkUpdateIntervals = function() {
+    console.log('🔍 Vérification des intervalles de mise à jour:');
+
+    const intervals = [
+        { name: 'positionsDisplayInterval', interval: positionsDisplayInterval, frequency: '1s' },
+        { name: 'statsInterval', interval: statsInterval, frequency: '5s' },
+        { name: 'pnlMonitoringInterval', interval: pnlMonitoringInterval, frequency: '1s' },
+        { name: 'tradingLoopInterval', interval: tradingLoopInterval, frequency: '60s' }
+    ];
+
+    intervals.forEach(({ name, interval, frequency }) => {
+        if (interval) {
+            console.log(`✅ ${name}: ACTIF (${frequency})`);
+        } else {
+            console.log(`❌ ${name}: INACTIF`);
+        }
+    });
+
+    console.log(`\n📊 Compteurs:`);
+    console.log(`   Interface: ${window.displayUpdateCounter || 0} cycles`);
+    console.log(`   Stats: ${window.statsUpdateCounter || 0} cycles`);
+
+    console.log(`\n🤖 Bot status: ${botRunning ? 'RUNNING' : 'STOPPED'}`);
+    console.log(`📈 Positions actives: ${openPositions.length}`);
+};
+
+// 🧪 FONCTION DE DEBUG: Forcer manuellement toutes les mises à jour
+window.forceAllUpdates = async function() {
+    console.log('🔄 FORCE UPDATE: Exécution manuelle de tous les cycles de mise à jour...');
+
+    try {
+        // 1. Mise à jour des PnL
+        console.log('📊 1/4 Mise à jour PnL...');
+        await updatePositionsPnL();
+
+        // 2. Mise à jour des statistiques
+        console.log('📈 2/4 Mise à jour statistiques...');
+        updateStats();
+
+        // 3. Mise à jour de l'affichage
+        console.log('🎨 3/4 Mise à jour affichage...');
+        updatePositionsDisplay();
+
+        // 4. Surveillance PnL (comme l'intervalle automatique)
+        console.log('🎯 4/4 Surveillance PnL...');
+        await monitorPnLAndClose();
+
+        console.log('✅ Toutes les mises à jour forcées terminées !');
+
+        // Vérifier le résultat
+        setTimeout(() => {
+            checkPositionsData();
+        }, 1000);
+
+    } catch (error) {
+        console.error('❌ Erreur lors des mises à jour forcées:', error);
     }
 };
