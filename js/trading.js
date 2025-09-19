@@ -1228,6 +1228,7 @@ window.closePositionAtMarket = closePositionAtMarket;
 window.importExistingPositions = importExistingPositions;
 window.canOpenNewPosition = canOpenNewPosition;
 window.syncAndCheckPositions = syncAndCheckPositions;
+window.updatePositionsPnL = updatePositionsPnL;
 window.fetchActivePositionsFromAPI = fetchActivePositionsFromAPI;
 window.makeRequestWithRetry = makeRequestWithRetry;
 

@@ -107,7 +107,18 @@ async function testConnection() {
         }
         
         // 5. Démarrer la synchronisation automatique des positions
+        log('🚀 Lancement de la synchronisation automatique des positions...', 'INFO');
         startAutoSyncPositions();
+        
+        // Vérifier que l'intervalle est bien créé
+        setTimeout(() => {
+            if (window.autoSyncInterval) {
+                log('✅ Synchronisation automatique des positions ACTIVE', 'SUCCESS');
+                log('🔄 Les positions se mettront à jour toutes les 4 secondes', 'INFO');
+            } else {
+                log('❌ Échec du démarrage de la synchronisation automatique', 'ERROR');
+            }
+        }, 1000);
         
         // 6. Rafraîchissement automatique du solde
         if (typeof startAutoBalanceRefresh === 'function') {
@@ -211,11 +222,11 @@ function startAutoSyncPositions() {
     }
     
     // 🔧 CORRECTION: Mise à jour immédiate des données temps réel
-    if (typeof syncAndCheckPositions === 'function') {
-        syncAndCheckPositions();
+    if (typeof window.syncAndCheckPositions === 'function') {
+        window.syncAndCheckPositions();
     }
     if (typeof window.updatePositionsPnL === 'function') {
-        window.updatePositionsPnL();
+        window.updatePositionsPnL(true); // Mode verbose pour le debug initial
     }
     
     let syncCounter = 0;
@@ -233,8 +244,8 @@ function startAutoSyncPositions() {
             // Synchronisation complète (vérification fermetures) toutes les 15 fois (1 minute)
             if (syncCounter % 15 === 0) {
                 log('🔄 Synchronisation complète des positions...', 'DEBUG');
-                if (typeof syncAndCheckPositions === 'function') {
-                    await syncAndCheckPositions();
+                if (typeof window.syncAndCheckPositions === 'function') {
+                    await window.syncAndCheckPositions();
                 }
             }
         }
@@ -251,6 +262,37 @@ function stopAutoSyncPositions() {
     }
     return false;
 }
+
+// 🔍 FONCTION DE DIAGNOSTIC: Vérifier l'état de la synchronisation automatique
+window.checkAutoSyncStatus = function() {
+    console.log('🔍 DIAGNOSTIC - État de la synchronisation automatique:');
+    
+    if (window.autoSyncInterval) {
+        console.log('✅ Intervalle de synchronisation: ACTIF');
+        console.log('⏰ Fréquence: Toutes les 4 secondes');
+        console.log('🎯 Fonction updatePositionsPnL:', typeof window.updatePositionsPnL);
+        console.log('🎯 Fonction syncAndCheckPositions:', typeof window.syncAndCheckPositions);
+        console.log(`📊 Positions à synchroniser: ${openPositions?.length || 0}`);
+        
+        if (openPositions?.length > 0) {
+            console.log('📈 Prochaine mise à jour dans maximum 4 secondes...');
+            // Test de mise à jour immédiate
+            if (typeof window.updatePositionsPnL === 'function') {
+                console.log('🔄 Test de mise à jour immédiate...');
+                window.updatePositionsPnL(true).then(() => {
+                    console.log('✅ Test de mise à jour terminé - vérifiez si l\'affichage a changé');
+                }).catch(err => {
+                    console.error('❌ Erreur lors du test:', err);
+                });
+            }
+        } else {
+            console.log('ℹ️ Aucune position à synchroniser');
+        }
+    } else {
+        console.log('❌ Intervalle de synchronisation: INACTIF');
+        console.log('💡 Solution: Cliquez sur "Connecter" pour le relancer');
+    }
+};
 
 // Fonction updateTop30Display supprimée - remplacée par updateMacdAnalysisDisplay
 // L'affichage des données est maintenant géré par la nouvelle interface MACD
