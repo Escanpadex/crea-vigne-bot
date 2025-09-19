@@ -34,6 +34,9 @@ let lastPairAnalysis = 0; // Timestamp de la dernière analyse des paires
 let positionCooldowns = new Map(); // Cooldowns après fermeture de position (1 minute)
 let tradedPairsCooldown = new Map(); // Cooldowns paires tradées (12 heures)
 
+// 🔧 DEBUG: Mode debug pour les mises à jour de positions
+let positionUpdateDebug = false; // Désactivé par défaut pour éviter le spam
+
 // 🆕 NOUVELLE FONCTION: Récupérer les paires avec évolution positive sur 24h
 async function getPositivePairs() {
     try {
@@ -838,7 +841,10 @@ async function updatePositionsPnL() {
                         }
 
                         updatedCount++;
-                        log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}% ${!currentPriceDefined ? '(INITIAL)' : '(UPDATE)'}`, 'DEBUG');
+                        // Log en mode debug seulement
+                        if (positionUpdateDebug) {
+                            log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}% (${newUnrealizedPnL >= 0 ? '+' : ''}$${newUnrealizedPnL.toFixed(2)}) ${!currentPriceDefined ? '(INITIAL)' : '(UPDATE)'}`, 'DEBUG');
+                        }
                     }
                 } else {
                     log(`⚠️ Position ${localPos.symbol} non trouvée dans l'API - Position peut-être fermée`, 'WARNING');
@@ -918,13 +924,26 @@ function updatePositionsDisplay() {
             // Calculer le PnL actuel avec gestion des données manquantes
             const currentPrice = position.currentPrice || position.entryPrice;
             let pnlPercent = 0;
+            let pnlDollar = 0;
 
             if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
                 // Utiliser directement pnlPercentage si disponible (plus précis)
                 pnlPercent = position.pnlPercentage;
+                // Calculer le PnL en dollars depuis le pourcentage
+                pnlDollar = (position.size * pnlPercent) / 100;
             } else {
                 // Calcul de secours si pnlPercentage n'est pas disponible
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                pnlDollar = (position.size * pnlPercent) / 100;
+            }
+
+            // Utiliser directement unrealizedPnL si disponible (plus précis depuis l'API)
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
+                pnlDollar = position.unrealizedPnL;
+                // Recalculer le pourcentage depuis le PnL dollar si nécessaire
+                if (position.size > 0) {
+                    pnlPercent = (pnlDollar / position.size) * 100;
+                }
             }
             const isPositive = pnlPercent >= 0;
             const pnlColor = isPositive ? '#10b981' : '#f59e0b';
@@ -961,15 +980,15 @@ function updatePositionsDisplay() {
                         
                         <!-- Badge PnL -->
                         <div style="
-                            background: ${pnlBgColor}; 
-                            color: ${pnlColor}; 
-                            padding: 4px 8px; 
-                            border-radius: 6px; 
-                            font-weight: bold; 
+                            background: ${pnlBgColor};
+                            color: ${pnlColor};
+                            padding: 4px 8px;
+                            border-radius: 6px;
+                            font-weight: bold;
                             font-size: 12px;
                             border: 1px solid ${pnlColor}30;
                         ">
-                            ${pnlSign}${pnlPercent.toFixed(2)}%
+                            ${pnlSign}$${pnlDollar.toFixed(2)} (${pnlSign}${pnlPercent.toFixed(2)}%)
             </div>
                     </div>
                     
@@ -1485,7 +1504,19 @@ window.checkPositionsData = function() {
         console.log(`   currentPrice: ${pos.currentPrice} (${typeof pos.currentPrice})`);
         console.log(`   pnlPercentage: ${pos.pnlPercentage} (${typeof pos.pnlPercentage})`);
         console.log(`   unrealizedPnL: ${pos.unrealizedPnL} (${typeof pos.unrealizedPnL})`);
+        console.log(`   size: ${pos.size} (${typeof pos.size})`);
         console.log(`   timestamp: ${pos.timestamp}`);
+
+        // Calculs de vérification
+        if (pos.currentPrice && pos.entryPrice) {
+            const calcPercent = ((pos.currentPrice - pos.entryPrice) / pos.entryPrice) * 100;
+            const calcDollar = pos.size * (calcPercent / 100);
+            console.log(`   🔍 Vérification calculs:`);
+            console.log(`      Calculé %: ${calcPercent >= 0 ? '+' : ''}${calcPercent.toFixed(2)}%`);
+            console.log(`      Calculé $: ${calcDollar >= 0 ? '+' : ''}$${calcDollar.toFixed(2)}`);
+            console.log(`      API %: ${pos.pnlPercentage ? pos.pnlPercentage.toFixed(2) + '%' : 'N/A'}`);
+            console.log(`      API $: ${pos.unrealizedPnL ? '$' + pos.unrealizedPnL.toFixed(2) : 'N/A'}`);
+        }
     });
 };
 
@@ -1495,6 +1526,52 @@ console.log('   - debugImportDetailed() - Force import positions from console');
 console.log('   - forceUpdatePositions() - Force update position data from console');
 console.log('   - checkPositionsData() - Check current position data');
 console.log('   - testPositionUpdates() - Test complete position update cycle');
+console.log('   - testAPIData() - Test API data consistency');
+console.log('   - togglePositionDebug() - Toggle position update debug logs');
+
+// 🧪 FONCTION DE DEBUG: Tester la cohérence des données API
+window.testAPIData = async function() {
+    console.log('🧪 TEST: Cohérence des données API...');
+
+    try {
+        // Récupérer les données directement depuis l'API
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+
+        if (result && result.code === '00000' && result.data) {
+            const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+            console.log(`📊 API retourne ${apiPositions.length} positions actives`);
+
+            // Comparer avec les positions locales
+            openPositions.forEach(localPos => {
+                const apiPos = apiPositions.find(api => api.symbol === localPos.symbol);
+                if (apiPos) {
+                    console.log(`\n🔍 Comparaison ${localPos.symbol}:`);
+                    console.log(`   API - Prix: ${parseFloat(apiPos.markPrice || 0).toFixed(4)}, PnL: ${parseFloat(apiPos.unrealizedPL || 0).toFixed(2)}$`);
+                    console.log(`   Local - Prix: ${localPos.currentPrice?.toFixed(4) || 'N/A'}, PnL: ${localPos.unrealizedPnL?.toFixed(2) || 'N/A'}$`);
+
+                    const apiPrice = parseFloat(apiPos.markPrice || 0);
+                    const apiPnl = parseFloat(apiPos.unrealizedPL || 0);
+
+                    const priceMatch = Math.abs((localPos.currentPrice || 0) - apiPrice) < 0.0001;
+                    const pnlMatch = Math.abs((localPos.unrealizedPnL || 0) - apiPnl) < 0.01;
+
+                    console.log(`   ✅ Prix cohérent: ${priceMatch ? 'OUI' : 'NON'}`);
+                    console.log(`   ✅ PnL cohérent: ${pnlMatch ? 'OUI' : 'NON'}`);
+
+                    if (!priceMatch || !pnlMatch) {
+                        console.log(`   ❌ INCOHÉRENCE DÉTECTÉE!`);
+                    }
+                } else {
+                    console.log(`❌ Position ${localPos.symbol} non trouvée dans l'API`);
+                }
+            });
+        } else {
+            console.log('❌ Impossible de récupérer les données API');
+        }
+    } catch (error) {
+        console.error('❌ Erreur test API:', error);
+    }
+};
 
 // 🧪 FONCTION DE TEST RAPIDE: Tester la mise à jour complète des positions
 window.testPositionUpdates = async function() {
@@ -1532,4 +1609,15 @@ window.testPositionUpdates = async function() {
     }
 
     return hasValidData;
+};
+
+// 🧪 FONCTION DE DEBUG: Activer/désactiver les logs de debug des positions
+window.togglePositionDebug = function() {
+    positionUpdateDebug = !positionUpdateDebug;
+    console.log(`🔧 Mode debug positions: ${positionUpdateDebug ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`);
+    if (positionUpdateDebug) {
+        console.log('📊 Les logs de mise à jour des positions seront maintenant affichés');
+    } else {
+        console.log('🔇 Les logs de mise à jour des positions sont maintenant masqués');
+    }
 };
