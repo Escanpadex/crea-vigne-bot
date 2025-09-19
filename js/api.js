@@ -70,6 +70,12 @@ async function testConnection() {
                 await window.importExistingPositions();
                 log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
                 
+                // Forcer la mise à jour des données temps réel après import
+                if (typeof window.updatePositionsPnL === 'function') {
+                    await window.updatePositionsPnL();
+                    log('📊 Données temps réel mises à jour après import', 'SUCCESS');
+                }
+
                 // Forcer la mise à jour de l'affichage après import
                 if (typeof updatePositionsDisplay === 'function') {
                     updatePositionsDisplay();
@@ -81,6 +87,12 @@ async function testConnection() {
                 setTimeout(async () => {
                     if (typeof window.importExistingPositions === 'function') {
                         await window.importExistingPositions();
+
+                        // Mise à jour des données temps réel
+                        if (typeof window.updatePositionsPnL === 'function') {
+                            await window.updatePositionsPnL();
+                        }
+
                         if (typeof updatePositionsDisplay === 'function') {
                             updatePositionsDisplay();
                         }

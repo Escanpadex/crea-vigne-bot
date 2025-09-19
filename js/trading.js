@@ -821,21 +821,24 @@ async function updatePositionsPnL() {
                     const newUnrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
                     const newPnlPercentage = localPos.entryPrice > 0 ? ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100 : 0;
                     
-                    // Mettre à jour seulement si les données ont changé
-                    if (Math.abs(localPos.currentPrice - newPrice) > 0.0001 || 
-                        Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01) {
-                        
+                    // 🔧 CORRECTION: Toujours mettre à jour si currentPrice n'est pas défini ou si les données ont changé significativement
+                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice);
+                    const priceChanged = !currentPriceDefined || Math.abs(localPos.currentPrice - newPrice) > 0.0001;
+                    const pnlChanged = Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01;
+
+                    if (priceChanged || pnlChanged || !currentPriceDefined) {
+
                         localPos.currentPrice = newPrice;
                         localPos.unrealizedPnL = newUnrealizedPnL;
                         localPos.pnlPercentage = newPnlPercentage;
-                        
+
                         // Mettre à jour le prix le plus haut si nécessaire
                         if (newPrice > (localPos.highestPrice || 0)) {
                             localPos.highestPrice = newPrice;
                         }
-                        
+
                         updatedCount++;
-                        log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}%`, 'DEBUG');
+                        log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}% ${!currentPriceDefined ? '(INITIAL)' : '(UPDATE)'}`, 'DEBUG');
                     }
                 } else {
                     log(`⚠️ Position ${localPos.symbol} non trouvée dans l'API - Position peut-être fermée`, 'WARNING');
@@ -912,9 +915,17 @@ function updatePositionsDisplay() {
                 log(`❌ Erreur calcul temps pour ${position.symbol}: ${error.message}`, 'ERROR');
             }
             
-            // Calculer le PnL actuel
+            // Calculer le PnL actuel avec gestion des données manquantes
             const currentPrice = position.currentPrice || position.entryPrice;
-            const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            let pnlPercent = 0;
+
+            if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                // Utiliser directement pnlPercentage si disponible (plus précis)
+                pnlPercent = position.pnlPercentage;
+            } else {
+                // Calcul de secours si pnlPercentage n'est pas disponible
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            }
             const isPositive = pnlPercent >= 0;
             const pnlColor = isPositive ? '#10b981' : '#f59e0b';
             const pnlBgColor = isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)';
@@ -1102,14 +1113,12 @@ async function importExistingPositions() {
                 log('🔄 Mise à jour de l\'affichage des positions...', 'DEBUG');
                 updatePositionsDisplay();
                 updateStats();
-                
-                // 🔧 AMÉLIORATION: Démarrer immédiatement la mise à jour des prix en temps réel
-                log('📊 Démarrage de la mise à jour des prix en temps réel...', 'INFO');
-                setTimeout(async () => {
-                    await updatePositionsPnL(); // Mise à jour immédiate des PnL
-                    updatePositionsDisplay(); // Refresh de l'affichage avec les nouvelles données
-                    log('✅ Données temps réel mises à jour après import', 'SUCCESS');
-                }, 1000);
+
+                // 🔧 CORRECTION: Mise à jour IMMÉDIATE des PnL après import (sans délai)
+                log('📊 Mise à jour immédiate des prix en temps réel...', 'INFO');
+                await updatePositionsPnL(); // Mise à jour SYNCHRONE des PnL
+                updatePositionsDisplay(); // Refresh immédiat de l'affichage
+                log('✅ Données temps réel mises à jour après import', 'SUCCESS');
                 
                 // Vérification immédiate et différée de l'affichage
                 const positionCountEl = document.getElementById('positionCount');
@@ -1435,32 +1444,92 @@ window.debugImportDetailed = async function() {
 // 🧪 FONCTION DE DEBUG: Forcer la mise à jour des données temps réel
 window.forceUpdatePositions = async function() {
     console.log('🔄 Force update des positions...');
-    
+
     if (openPositions.length === 0) {
         console.log('❌ Aucune position à mettre à jour');
         return;
     }
-    
+
     console.log(`📊 Mise à jour de ${openPositions.length} position(s)...`);
-    
+    console.log('🔍 État actuel des positions:');
+    openPositions.forEach((pos, index) => {
+        console.log(`   ${index + 1}. ${pos.symbol}: currentPrice=${pos.currentPrice || 'UNDEFINED'}, pnlPercentage=${pos.pnlPercentage || 'UNDEFINED'}`);
+    });
+
     try {
         await updatePositionsPnL();
         updatePositionsDisplay();
         console.log('✅ Mise à jour forcée terminée');
-        
-        // Afficher les données actuelles
+
+        // Afficher les données après mise à jour
+        console.log('📈 État après mise à jour:');
         openPositions.forEach((pos, index) => {
             const pnl = pos.pnlPercentage || 0;
             const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}%` : `${pnl.toFixed(2)}%`;
             console.log(`   ${index + 1}. ${pos.symbol}: ${pos.currentPrice?.toFixed(4) || 'N/A'} | ${pnlText}`);
         });
-        
+
     } catch (error) {
         console.error('❌ Erreur lors de la mise à jour forcée:', error);
     }
+};
+
+// 🧪 FONCTION DE DEBUG: Vérifier les données des positions importées
+window.checkPositionsData = function() {
+    console.log('🔍 Vérification des données des positions:');
+    console.log(`📊 Nombre de positions: ${openPositions.length}`);
+
+    openPositions.forEach((pos, index) => {
+        console.log(`\n📍 Position ${index + 1}: ${pos.symbol}`);
+        console.log(`   entryPrice: ${pos.entryPrice} (${typeof pos.entryPrice})`);
+        console.log(`   currentPrice: ${pos.currentPrice} (${typeof pos.currentPrice})`);
+        console.log(`   pnlPercentage: ${pos.pnlPercentage} (${typeof pos.pnlPercentage})`);
+        console.log(`   unrealizedPnL: ${pos.unrealizedPnL} (${typeof pos.unrealizedPnL})`);
+        console.log(`   timestamp: ${pos.timestamp}`);
+    });
 };
 
 console.log('✅ Trading fixes applied successfully - call testTradingFixes() to verify');
 console.log('🔧 Debug functions available:');
 console.log('   - debugImportDetailed() - Force import positions from console');
 console.log('   - forceUpdatePositions() - Force update position data from console');
+console.log('   - checkPositionsData() - Check current position data');
+console.log('   - testPositionUpdates() - Test complete position update cycle');
+
+// 🧪 FONCTION DE TEST RAPIDE: Tester la mise à jour complète des positions
+window.testPositionUpdates = async function() {
+    console.log('🧪 TEST: Mise à jour complète des positions...');
+
+    if (openPositions.length === 0) {
+        console.log('❌ Aucune position à tester');
+        return;
+    }
+
+    console.log('🔍 Avant mise à jour:');
+    checkPositionsData();
+
+    console.log('\n⏳ Mise à jour en cours...');
+    await updatePositionsPnL();
+    updatePositionsDisplay();
+
+    console.log('\n✅ Après mise à jour:');
+    checkPositionsData();
+
+    // Vérifier que les données sont maintenant définies
+    const hasValidData = openPositions.every(pos =>
+        typeof pos.currentPrice === 'number' &&
+        typeof pos.pnlPercentage === 'number' &&
+        !isNaN(pos.currentPrice) &&
+        !isNaN(pos.pnlPercentage)
+    );
+
+    console.log(`\n🎯 RÉSULTAT: ${hasValidData ? '✅ DONNÉES VALIDES' : '❌ DONNÉES MANQUANTES'}`);
+
+    if (hasValidData) {
+        console.log('🎉 Les positions affichent maintenant les vraies données temps réel !');
+    } else {
+        console.log('⚠️ Les données ne sont toujours pas mises à jour correctement');
+    }
+
+    return hasValidData;
+};
