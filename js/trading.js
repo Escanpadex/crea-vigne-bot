@@ -2098,6 +2098,77 @@ window.forceAutoRefresh = async function() {
     }
 };
 
+// 🧪 FONCTION DE TEST: Vérifier la nouvelle interface améliorée
+window.testNewInterface = function() {
+    console.log('🧪 Test de la nouvelle interface améliorée...');
+    
+    // Vérifier que tous les nouveaux éléments existent
+    const elements = {
+        botPositionsCount: document.getElementById('botPositionsCount'),
+        manualPositionsCount: document.getElementById('manualPositionsCount'),
+        botStatusDot: document.getElementById('botStatusDot'),
+        totalEquity: document.getElementById('totalEquity'),
+        usedCapital: document.getElementById('usedCapital'),
+        availableCapital: document.getElementById('availableCapital')
+    };
+    
+    let missingElements = [];
+    let foundElements = [];
+    
+    for (const [name, element] of Object.entries(elements)) {
+        if (element) {
+            foundElements.push(name);
+        } else {
+            missingElements.push(name);
+        }
+    }
+    
+    console.log(`✅ Éléments trouvés: ${foundElements.join(', ')}`);
+    if (missingElements.length > 0) {
+        console.log(`❌ Éléments manquants: ${missingElements.join(', ')}`);
+    }
+    
+    // Tester la mise à jour des stats
+    if (typeof updateStats === 'function') {
+        console.log('🔄 Test de mise à jour des statistiques...');
+        updateStats();
+        console.log('✅ updateStats() exécuté avec succès');
+    } else {
+        console.log('❌ Fonction updateStats non disponible');
+    }
+    
+    // Vérifier les styles CSS
+    const configSection = document.querySelector('.config-section');
+    const statusSection = document.querySelector('.status-section');
+    const statsSection = document.querySelector('.stats-section');
+    const capitalSection = document.querySelector('.capital-section');
+    
+    const sections = {
+        'Configuration': configSection,
+        'Statut': statusSection,
+        'Performance': statsSection,
+        'Capital': capitalSection
+    };
+    
+    console.log('🎨 Vérification des sections CSS:');
+    for (const [name, section] of Object.entries(sections)) {
+        if (section) {
+            console.log(`   ✅ Section ${name}: OK`);
+        } else {
+            console.log(`   ❌ Section ${name}: Manquante`);
+        }
+    }
+    
+    console.log('🎯 Test terminé - Interface nouvelle génération prête !');
+    
+    return {
+        elementsFound: foundElements.length,
+        elementsMissing: missingElements.length,
+        sectionsFound: Object.values(sections).filter(s => s).length,
+        allGood: missingElements.length === 0 && Object.values(sections).every(s => s)
+    };
+};
+
 // 🧪 FONCTION DE TEST: Vérifier la séparation bot/manuel dans les limites
 window.testBotPositionLimits = function() {
     console.log('🧪 Test des limites de positions bot vs manuelles...');

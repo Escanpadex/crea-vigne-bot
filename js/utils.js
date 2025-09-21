@@ -14,29 +14,54 @@ function formatNumber(num) {
 }
 
 function updateStats() {
-    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    // 🔧 FONCTION AMÉLIORÉE: Mise à jour des statistiques avec nouvelle interface
+    const MAX_SIMULTANEOUS_POSITIONS = 2;
+    
+    // Calculer les positions par type
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositions.length;
     
     // 🛡️ SÉCURITÉ: Vérifier que les éléments existent avant de les modifier
     const elements = {
+        // Anciens éléments (compatibilité)
         totalSignals: document.getElementById('totalSignals'),
         totalOpenPositions: document.getElementById('totalOpenPositions'),
         totalClosedPositions: document.getElementById('totalClosedPositions'),
         winningPositions: document.getElementById('winningPositions'),
-        losingPositions: document.getElementById('losingPositions')
+        losingPositions: document.getElementById('losingPositions'),
+        
+        // Nouveaux éléments (interface améliorée)
+        botPositionsCount: document.getElementById('botPositionsCount'),
+        manualPositionsCount: document.getElementById('manualPositionsCount'),
+        botStatusDot: document.getElementById('botStatusDot')
     };
     
+    // Mise à jour anciens éléments
     if (elements.totalSignals) elements.totalSignals.textContent = botStats.totalSignals;
-    if (elements.totalOpenPositions) elements.totalOpenPositions.textContent = `${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
+    if (elements.totalOpenPositions) elements.totalOpenPositions.textContent = openPositions.length;
     if (elements.totalClosedPositions) elements.totalClosedPositions.textContent = botStats.totalClosedPositions;
     if (elements.winningPositions) elements.winningPositions.textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
     if (elements.losingPositions) elements.losingPositions.textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
     
-    // 🎯 NOUVEAU: Log informatif sur les positions disponibles (seulement quand le bot tourne)
+    // Mise à jour nouveaux éléments
+    if (elements.botPositionsCount) elements.botPositionsCount.textContent = `${botPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
+    if (elements.manualPositionsCount) elements.manualPositionsCount.textContent = manualPositions.length.toString();
+    
+    // Mise à jour du statut dot
+    if (elements.botStatusDot) {
+        if (typeof botRunning !== 'undefined' && botRunning) {
+            elements.botStatusDot.classList.add('active');
+        } else {
+            elements.botStatusDot.classList.remove('active');
+        }
+    }
+    
+    // 🎯 Log informatif sur les positions disponibles (seulement quand le bot tourne)
     if (typeof botRunning !== 'undefined' && botRunning && availableSlots > 0) {
         // Log seulement toutes les 5 minutes pour éviter le spam
         if (!window.lastPositionInfoLog || Date.now() - window.lastPositionInfoLog > 300000) {
-            log(`📊 Positions disponibles: ${availableSlots}/${MAX_SIMULTANEOUS_POSITIONS} slots libres`, 'INFO');
+            log(`📊 Slots bot disponibles: ${availableSlots}/${MAX_SIMULTANEOUS_POSITIONS} (+ ${manualPositions.length} manuelles)`, 'INFO');
             window.lastPositionInfoLog = Date.now();
         }
     }
