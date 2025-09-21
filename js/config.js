@@ -38,6 +38,13 @@ let config = {
     trailingStop: 1.0,
     cooldownMinutes: 30,
     targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
+    // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
+    displaySettings: {
+        maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)
+        compactDisplayThreshold: 10,    // Seuil pour passer en affichage compact (défaut: 10)
+        autoRefreshInterval: 1000,      // Intervalle de mise à jour de l'affichage (ms)
+        showHiddenPositionsCount: true  // Afficher le nombre de positions masquées
+    },
     // NEW: MACD Strategy settings (macdTimeframe supprimé - remplacé par filtrage progressif 4H→1H→15M)
     topVolumeCount: 30,             // Nombre de cryptos à analyser (TOP x)
     // Advanced trailing stop settings

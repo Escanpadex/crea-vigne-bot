@@ -875,7 +875,7 @@ async function updatePositionsPnL(verbose = false) {
 }
 
 function updatePositionsDisplay() {
-    // 🎯 NOUVELLE FONCTION: Mettre à jour l'affichage des positions actives
+    // 🎯 FONCTION AMÉLIORÉE: Mettre à jour l'affichage de TOUTES les positions (pas de limite)
     log(`🔄 updatePositionsDisplay() appelé avec ${openPositions.length} positions`, 'DEBUG');
     
     const positionCountEl = document.getElementById('positionCount');
@@ -887,11 +887,11 @@ function updatePositionsDisplay() {
         return;
     }
     
-    // Mettre à jour le compteur
+    // Mettre à jour le compteur (sans limite)
     positionCountEl.textContent = openPositions.length;
-    log(`📊 Compteur mis à jour: ${openPositions.length}`, 'DEBUG');
+    log(`📊 Compteur mis à jour: ${openPositions.length} positions`, 'DEBUG');
     
-    // Mettre à jour la liste des positions avec un design sexy
+    // Mettre à jour la liste des positions avec un design optimisé pour de nombreuses positions
     if (openPositions.length === 0) {
         positionsListEl.innerHTML = `
             <div style="
@@ -909,7 +909,15 @@ function updatePositionsDisplay() {
         </div>
     `;
     } else {
-        const positionsHTML = openPositions.map((position, index) => {
+        // 🎯 CONFIGURATION: Utiliser les paramètres configurables pour l'affichage
+        const useCompactDisplay = openPositions.length > (config.displaySettings?.compactDisplayThreshold || 10);
+        const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
+        const displayedPositions = openPositions.slice(0, maxDisplayed);
+        const hiddenCount = openPositions.length - maxDisplayed;
+        
+        log(`📊 Affichage ${displayedPositions.length} positions (${useCompactDisplay ? 'compact' : 'normal'})${hiddenCount > 0 ? `, ${hiddenCount} masquées` : ''}`, 'DEBUG');
+        
+        const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
             let timeDisplay = '0min';
             try {
@@ -998,17 +1006,61 @@ function updatePositionsDisplay() {
             // Animation de pulsation pour les gains
             const pulseAnimation = isPositive && pnlPercent > 1 ? 'animation: pulse 2s infinite;' : '';
             
-            return `
-                <div style="
-                    background: ${isPositive ? 'linear-gradient(135deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #404040 100%)'}; 
-                    border-radius: 12px; 
-                    padding: 16px; 
-                    margin-bottom: 12px; 
-                    border: 2px solid ${isPositive ? '#10b981' : '#6b7280'};
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    transition: all 0.3s ease;
-                    ${pulseAnimation}
-                " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'">
+            // 🎯 AFFICHAGE ADAPTATIF: Compact si beaucoup de positions, normal sinon
+            if (useCompactDisplay) {
+                // AFFICHAGE COMPACT pour beaucoup de positions
+                return `
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        background: ${isPositive ? 'linear-gradient(90deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(90deg, #2a2a2a 0%, #404040 100%)'}; 
+                        border-radius: 8px; 
+                        padding: 8px 12px; 
+                        margin-bottom: 6px; 
+                        border-left: 4px solid ${isPositive ? '#10b981' : '#6b7280'};
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                        transition: all 0.2s ease;
+                        ${pulseAnimation}
+                    " onmouseover="this.style.transform='scale(1.01)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.2)'">
+                        
+                        <!-- Info compacte -->
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="color: #ffffff; font-weight: bold; font-size: 14px;">
+                                ${pnlIcon} ${position.symbol.replace('USDT', '')}
+                            </span>
+                            <span style="color: #d1d5db; font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">
+                                ${timeDisplay}
+                            </span>
+                        </div>
+                        
+                        <!-- PnL compact -->
+                        <div style="
+                            background: ${isPositive ? '#10b981' : '#ef4444'};
+                            color: #ffffff;
+                            padding: 4px 8px;
+                            border-radius: 6px;
+                            font-weight: bold;
+                            font-size: 12px;
+                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                        ">
+                            ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
+                        </div>
+                    </div>
+                `;
+            } else {
+                // AFFICHAGE NORMAL pour peu de positions
+                return `
+                    <div style="
+                        background: ${isPositive ? 'linear-gradient(135deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #404040 100%)'}; 
+                        border-radius: 12px; 
+                        padding: 16px; 
+                        margin-bottom: 12px; 
+                        border: 2px solid ${isPositive ? '#10b981' : '#6b7280'};
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                        transition: all 0.3s ease;
+                        ${pulseAnimation}
+                    " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'">
                     
                     <!-- Header de la position -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -1053,9 +1105,31 @@ function updatePositionsDisplay() {
                             ${isPositive ? '🚀' : '⏳'} ${isPositive ? 'En profit' : 'En cours'}
                         </div>
                     </div>
-            </div>
-        `;
+                </div>
+            `;
+            }
         }).join('');
+        
+        // 🎯 AMÉLIORATION: Ajouter un indicateur si des positions sont masquées (configurable)
+        const showHiddenCount = config.displaySettings?.showHiddenPositionsCount !== false; // true par défaut
+        const hiddenPositionsIndicator = (hiddenCount > 0 && showHiddenCount) ? `
+            <div style="
+                text-align: center;
+                background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+                border-radius: 8px;
+                padding: 8px 12px;
+                margin-top: 8px;
+                border: 1px solid #6b7280;
+                color: #d1d5db;
+                font-size: 12px;
+                font-weight: 500;
+            ">
+                📊 ${hiddenCount} position(s) supplémentaire(s) masquée(s) pour optimiser l'affichage
+                <br><small style="color: #9ca3af; margin-top: 4px; display: block;">
+                    Total: ${openPositions.length} positions actives
+                </small>
+            </div>
+        ` : '';
         
         positionsListEl.innerHTML = `
             <style>
@@ -1066,6 +1140,7 @@ function updatePositionsDisplay() {
                 }
             </style>
             ${positionsHTML}
+            ${hiddenPositionsIndicator}
         `;
     }
 }
@@ -1728,4 +1803,118 @@ window.forceAllUpdates = async function() {
     } catch (error) {
         console.error('❌ Erreur lors des mises à jour forcées:', error);
     }
+};
+
+// 🧪 FONCTION DE TEST: Créer plusieurs positions de test pour tester l'affichage
+window.createTestPositions = function(count = 15) {
+    console.log(`🧪 Création de ${count} positions de test pour tester l'affichage...`);
+    
+    // Sauvegarder les vraies positions
+    const realPositions = [...openPositions];
+    
+    // Vider et créer des positions de test
+    openPositions.length = 0;
+    
+    const testSymbols = [
+        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOTUSDT', 'LINKUSDT', 'LTCUSDT', 'BCHUSDT',
+        'ATOMUSDT', 'FILUSDT', 'TRXUSDT', 'ETCUSDT', 'XLMUSDT', 'VETUSDT', 'FTMUSDT', 'MANAUSDT', 'SANDUSDT', 'AXSUSDT',
+        'ICPUSDT', 'THETAUSDT', 'ALGOUSDT', 'EGLDUSDT', 'NEARUSDT', 'FLOWUSDT', 'KLAYUSDT', 'CHZUSDT', 'ENJUSDT', 'GALAUSDT'
+    ];
+    
+    for (let i = 0; i < Math.min(count, testSymbols.length); i++) {
+        const symbol = testSymbols[i];
+        const entryPrice = 1000 + Math.random() * 50000; // Prix d'entrée aléatoire
+        const currentPrice = entryPrice * (0.95 + Math.random() * 0.1); // ±5% du prix d'entrée
+        const size = 100 + Math.random() * 500; // Taille aléatoire
+        const pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+        const unrealizedPnL = size * (pnlPercent / 100);
+        
+        const position = {
+            id: Date.now() + i,
+            symbol: symbol,
+            side: 'LONG',
+            size: size,
+            quantity: size / entryPrice,
+            entryPrice: entryPrice,
+            currentPrice: currentPrice,
+            status: 'OPEN',
+            timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(), // Temps aléatoire dans les dernières 24h
+            orderId: `test_${i}`,
+            stopLossId: null,
+            currentStopPrice: null,
+            highestPrice: Math.max(entryPrice, currentPrice),
+            unrealizedPnL: unrealizedPnL,
+            pnlPercentage: pnlPercent,
+            targetPnL: config.targetPnL || 2.0,
+            reason: `🧪 Position de test #${i + 1}`,
+            change24h: Math.random() * 10 - 2, // ±2% à +8%
+            lastPnLLog: 0
+        };
+        
+        openPositions.push(position);
+    }
+    
+    console.log(`✅ ${openPositions.length} positions de test créées`);
+    console.log(`📊 Affichage: ${openPositions.length > 10 ? 'COMPACT' : 'NORMAL'} (seuil: ${config.displaySettings?.compactDisplayThreshold || 10})`);
+    console.log(`📋 Limite affichage: ${config.displaySettings?.maxPositionsDisplayed || 50} positions max`);
+    
+    // Mettre à jour l'affichage
+    updatePositionsDisplay();
+    
+    console.log('🎯 Positions de test créées ! Vérifiez l\'interface.');
+    console.log('💡 Utilisez clearTestPositions() pour nettoyer et restoreRealPositions() pour restaurer les vraies positions');
+    
+    // Sauvegarder les vraies positions pour restauration
+    window._realPositions = realPositions;
+    
+    return openPositions;
+};
+
+// 🧪 FONCTION DE TEST: Nettoyer les positions de test
+window.clearTestPositions = function() {
+    console.log('🧹 Nettoyage des positions de test...');
+    openPositions.length = 0;
+    updatePositionsDisplay();
+    console.log('✅ Positions de test supprimées');
+};
+
+// 🧪 FONCTION DE TEST: Restaurer les vraies positions
+window.restoreRealPositions = function() {
+    if (window._realPositions) {
+        console.log(`🔄 Restauration de ${window._realPositions.length} vraies positions...`);
+        openPositions.length = 0;
+        openPositions.push(...window._realPositions);
+        updatePositionsDisplay();
+        delete window._realPositions;
+        console.log('✅ Vraies positions restaurées');
+    } else {
+        console.log('⚠️ Aucune vraie position sauvegardée à restaurer');
+    }
+};
+
+// 🧪 FONCTION DE TEST: Tester les différents seuils d'affichage
+window.testDisplayModes = function() {
+    console.log('🧪 Test des différents modes d\'affichage...');
+    
+    console.log('\n1️⃣ Test affichage NORMAL (5 positions)');
+    createTestPositions(5);
+    
+    setTimeout(() => {
+        console.log('\n2️⃣ Test affichage COMPACT (15 positions)');
+        createTestPositions(15);
+        
+        setTimeout(() => {
+            console.log('\n3️⃣ Test affichage avec LIMITE (60 positions)');
+            createTestPositions(60);
+            
+            setTimeout(() => {
+                console.log('\n4️⃣ Test EXTRÊME (100 positions)');
+                createTestPositions(100);
+                
+                setTimeout(() => {
+                    console.log('\n✅ Tests terminés ! Utilisez restoreRealPositions() pour restaurer');
+                }, 3000);
+            }, 3000);
+        }, 3000);
+    }, 3000);
 };
