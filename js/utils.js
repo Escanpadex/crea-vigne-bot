@@ -107,41 +107,50 @@ function saveKeys() {
 
 // 🎯 Shared MACD Utility Functions (extracted for consistency between backtesting and trading)
 
-// 🎯 NOUVELLE FONCTION: Afficher un résumé des positions disponibles
+// 🔧 FONCTION CORRIGÉE: Afficher un résumé des positions (sans limite d'affichage)
 function showPositionSummary() {
-    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
+    const MAX_BOT_POSITIONS = 2; // Limite pour le bot seulement
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
     const currentPositions = openPositions.length;
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - currentPositions;
+    const availableSlots = MAX_BOT_POSITIONS - botPositions.length;
     
     console.log('📊 ========== RÉSUMÉ DES POSITIONS ==========');
-    console.log(`🔢 Positions ouvertes: ${currentPositions}/${MAX_SIMULTANEOUS_POSITIONS}`);
-    console.log(`✅ Slots disponibles: ${availableSlots}`);
-    console.log(`⚠️ Limite atteinte: ${availableSlots === 0 ? 'OUI' : 'NON'}`);
+    console.log(`🔢 Total positions: ${currentPositions} (🤖 ${botPositions.length}/2 bot + 👤 ${manualPositions.length} manuelles)`);
+    console.log(`✅ Slots bot disponibles: ${availableSlots}`);
+    console.log(`⚠️ Limite bot atteinte: ${availableSlots === 0 ? 'OUI' : 'NON'}`);
     
     if (currentPositions > 0) {
-        console.log('\n📋 Positions ouvertes:');
+        console.log('\n📋 Toutes les positions ouvertes:');
         openPositions.forEach((position, index) => {
             const pnl = position.unrealizedPnL || 0;
             const pnlSign = pnl >= 0 ? '+' : '';
             const duration = Math.floor((Date.now() - new Date(position.timestamp).getTime()) / 60000);
+            const type = position.isBotManaged ? '🤖' : '👤';
             
-            console.log(`  ${index + 1}. ${position.symbol} - ${pnlSign}${pnl.toFixed(2)}$ - ${duration}min`);
+            console.log(`  ${index + 1}. ${type} ${position.symbol} - ${pnlSign}${pnl.toFixed(2)}$ - ${duration}min`);
         });
     }
     
     if (availableSlots > 0) {
-        console.log(`\n🚀 Le bot peut ouvrir ${availableSlots} nouvelle(s) position(s)`);
+        console.log(`\n🚀 Le bot peut ouvrir ${availableSlots} nouvelle(s) position(s) automatique(s)`);
     } else {
-        console.log('\n🛑 Limite atteinte - Le bot attend qu\'une position se ferme');
+        console.log('\n🛑 Le bot a atteint sa limite - Attend qu\'une position bot se ferme');
+    }
+    
+    if (manualPositions.length > 0) {
+        console.log(`📝 ${manualPositions.length} position(s) manuelle(s) affichée(s) (pas de limite)`);
     }
     
     console.log('==========================================');
     
     return {
-        total: MAX_SIMULTANEOUS_POSITIONS,
-        current: currentPositions,
-        available: availableSlots,
-        limitReached: availableSlots === 0
+        totalBot: MAX_BOT_POSITIONS,
+        currentBot: botPositions.length,
+        currentManual: manualPositions.length,
+        currentTotal: currentPositions,
+        availableBotSlots: availableSlots,
+        botLimitReached: availableSlots === 0
     };
 }
 
@@ -450,10 +459,11 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
     }
 }
 
-// 🎯 NOUVELLE FONCTION: Forcer le relancement de l'analyse si des positions sont disponibles
+// 🔧 FONCTION CORRIGÉE: Forcer le relancement si le bot a des slots disponibles
 function forceAnalysisIfAvailable() {
-    const MAX_SIMULTANEOUS_POSITIONS = 2; // Nouvelle stratégie: 2 positions maximum
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    const MAX_BOT_POSITIONS = 2; // Limite pour le bot seulement
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    const availableSlots = MAX_BOT_POSITIONS - botPositions.length;
     
     if (!botRunning) {
         console.log('❌ Le bot n\'est pas en cours d\'exécution');
@@ -461,11 +471,13 @@ function forceAnalysisIfAvailable() {
     }
     
     if (availableSlots <= 0) {
-        console.log('⚠️ Aucun slot disponible - Limite de positions atteinte');
+        console.log(`⚠️ Aucun slot bot disponible - Bot à sa limite (${botPositions.length}/${MAX_BOT_POSITIONS})`);
+        console.log(`📊 Positions totales: ${openPositions.length} (dont ${openPositions.length - botPositions.length} manuelles)`);
         return false;
     }
     
-    console.log(`🚀 Forçage de l'analyse - ${availableSlots} slots disponibles`);
+    console.log(`🚀 Forçage de l'analyse - ${availableSlots} slots bot disponibles`);
+    console.log(`📊 État: ${botPositions.length}/${MAX_BOT_POSITIONS} bot, ${openPositions.length} total`);
     
     // Relancer l'analyse
     setTimeout(() => {

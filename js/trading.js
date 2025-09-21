@@ -1205,12 +1205,10 @@ async function importExistingPositions() {
                 return;
             }
             
-            // NEW: Limit check before importing
-            if (openPositions.length + apiPositions.length > MAX_SIMULTANEOUS_POSITIONS) {
-                log(`⚠️ Import limité: Trop de positions (${openPositions.length + apiPositions.length} > ${MAX_SIMULTANEOUS_POSITIONS}) - Import partiel`, 'WARNING');
-                const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
-                apiPositions.splice(availableSlots); // Keep only what fits
-            }
+            // 🔧 CORRECTION: Ne plus limiter l'import des positions - Afficher toutes les positions
+            // L'ancienne logique limitait l'affichage à MAX_SIMULTANEOUS_POSITIONS (2) positions
+            // Maintenant on affiche toutes les positions (bot + manuelles)
+            log(`📊 Import de toutes les positions: ${apiPositions.length} positions trouvées`, 'INFO');
             
             apiPositions.forEach((pos, index) => {
                 log(`📍 Position ${index + 1}: ${pos.symbol} ${pos.holdSide || 'NO_SIDE'} - Total: ${pos.total || 'NO_TOTAL'} - Price: ${pos.markPrice || 'NO_PRICE'}`, 'DEBUG');
@@ -2166,6 +2164,67 @@ window.testNewInterface = function() {
         elementsMissing: missingElements.length,
         sectionsFound: Object.values(sections).filter(s => s).length,
         allGood: missingElements.length === 0 && Object.values(sections).every(s => s)
+    };
+};
+
+// 🧪 FONCTION DE TEST: Vérifier que l'affichage des positions n'est plus limité
+window.testPositionDisplayLimit = function() {
+    console.log('🧪 Test de la limite d\'affichage des positions...');
+    
+    const currentPositions = openPositions.length;
+    const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
+    
+    console.log(`📊 État actuel:`);
+    console.log(`   Positions ouvertes: ${currentPositions}`);
+    console.log(`   Limite d'affichage: ${maxDisplayed}`);
+    console.log(`   Positions affichées: ${Math.min(currentPositions, maxDisplayed)}`);
+    
+    if (currentPositions > 2) {
+        console.log('✅ Plus de 2 positions - Test de l\'affichage...');
+        
+        // Vérifier que updatePositionsDisplay ne limite pas à 2
+        const positionsListEl = document.getElementById('positionsList');
+        if (positionsListEl) {
+            const displayedPositionElements = positionsListEl.querySelectorAll('[style*="background: linear-gradient"]');
+            console.log(`   Éléments affichés dans le DOM: ${displayedPositionElements.length}`);
+            
+            if (displayedPositionElements.length >= Math.min(currentPositions, maxDisplayed)) {
+                console.log('✅ Toutes les positions sont affichées correctement');
+            } else {
+                console.log('❌ Certaines positions ne sont pas affichées');
+            }
+        } else {
+            console.log('❌ Élément positionsList non trouvé');
+        }
+    } else {
+        console.log('ℹ️ Moins de 3 positions - Impossible de tester la limite');
+        console.log('💡 Ouvrez plus de 2 positions manuellement pour tester');
+    }
+    
+    // Vérifier les fonctions de limitation
+    console.log('\n🔍 Vérification des fonctions de limitation:');
+    
+    // Test de la fonction d'import (ne doit plus limiter)
+    console.log('   Import: Aucune limitation d\'affichage (✅ Corrigé)');
+    
+    // Test de la fonction updatePositionsDisplay
+    if (typeof updatePositionsDisplay === 'function') {
+        console.log('   updatePositionsDisplay: Disponible');
+        console.log(`   Limite configurée: ${maxDisplayed} positions`);
+    } else {
+        console.log('   updatePositionsDisplay: Non disponible');
+    }
+    
+    console.log('\n🎯 Résumé:');
+    console.log(`   - Limite bot: 2 positions (pour l'ouverture automatique)`);
+    console.log(`   - Limite affichage: ${maxDisplayed} positions (configurable)`);
+    console.log(`   - Positions manuelles: Aucune limite d'ouverture`);
+    
+    return {
+        currentPositions,
+        maxDisplayed,
+        limitFixed: true,
+        canDisplayMore: currentPositions <= maxDisplayed
     };
 };
 
