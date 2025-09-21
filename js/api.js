@@ -155,7 +155,8 @@ async function refreshBalance() {
         const usedCapitalEl = document.getElementById('usedCapital');
         const availableCapitalEl = document.getElementById('availableCapital');
         
-        if (usdtBalanceEl) usdtBalanceEl.textContent = balance.USDT.toFixed(2);
+        // 🔧 CORRECTION: Afficher le total des actifs au lieu du USDT disponible
+        if (usdtBalanceEl) usdtBalanceEl.textContent = balance.totalEquity.toFixed(2);
         if (totalEquityEl) totalEquityEl.textContent = balance.totalEquity.toFixed(2);
         
         const usedCapital = openPositions.reduce((sum, pos) => sum + pos.size, 0);

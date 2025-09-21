@@ -555,7 +555,8 @@ async function openPosition(symbol, selectedPair) {
             highestPrice: currentPrice,
             reason: `Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`,
             change24h: selectedPair.change24h,
-            targetPnL: config.targetPnL // 🆕 Objectif configurable
+            targetPnL: config.targetPnL, // 🆕 Objectif configurable
+            isBotManaged: true // 🔧 NOUVEAU: Marquer comme position gérée par le bot
         };
         
         openPositions.push(position);
@@ -631,12 +632,15 @@ async function createEmergencyStopLoss(position, stopPrice) {
     }
 }
 
-// 🎯 NOUVELLE FONCTION: Surveillance PnL et fermeture automatique à +2%
+// 🎯 FONCTION MODIFIÉE: Surveillance PnL et fermeture automatique UNIQUEMENT pour les positions du bot
 async function monitorPnLAndClose() {
     if (!botRunning || openPositions.length === 0) return;
     
     try {
-        for (const position of openPositions) {
+        // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
+        const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
+        
+        for (const position of botManagedPositions) {
             const currentPrice = await getCurrentPrice(position.symbol);
             if (!currentPrice) {
                 log(`⚠️ ${position.symbol}: Impossible de récupérer le prix`, 'WARNING');
@@ -1003,6 +1007,14 @@ function updatePositionsDisplay() {
             const pnlSign = isPositive ? '+' : '';
             const pnlIcon = isPositive ? '📈' : '📊';
             
+            // 🔧 NOUVEAU: Différenciation Bot vs Manuel
+            const isBotManaged = position.isBotManaged === true;
+            const managementIcon = isBotManaged ? '🤖' : '👤';
+            const managementText = isBotManaged ? 'Bot' : 'Manuel';
+            const managementColor = isBotManaged ? '#3b82f6' : '#f59e0b';
+            const managementBg = isBotManaged ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+            const autoCloseText = isBotManaged ? `Auto-close +${position.targetPnL || 2}%` : 'Gestion manuelle';
+            
             // Animation de pulsation pour les gains
             const pulseAnimation = isPositive && pnlPercent > 1 ? 'animation: pulse 2s infinite;' : '';
             
@@ -1025,9 +1037,12 @@ function updatePositionsDisplay() {
                     " onmouseover="this.style.transform='scale(1.01)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.2)'">
                         
                         <!-- Info compacte -->
-                        <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="color: #ffffff; font-weight: bold; font-size: 14px;">
                                 ${pnlIcon} ${position.symbol.replace('USDT', '')}
+                            </span>
+                            <span style="color: ${managementColor}; font-size: 10px; background: ${managementBg}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                                ${managementIcon} ${managementText}
                             </span>
                             <span style="color: #d1d5db; font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">
                                 ${timeDisplay}
@@ -1095,9 +1110,12 @@ function updatePositionsDisplay() {
                             <span style="display: inline-block; background: rgba(0,0,0,0.3); color: #ffffff; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
                                 ⏱️ ${timeDisplay}
                 </span>
+                            <span style="display: inline-block; background: ${managementBg}; color: ${managementColor}; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
+                                ${managementIcon} ${managementText}
+                            </span>
                             <span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
-                                🎯 +${position.targetPnL || 2}%
-                </span>
+                                🎯 ${autoCloseText}
+                            </span>
             </div>
                         
                         <!-- Indicateur de progression -->
@@ -1224,7 +1242,8 @@ async function importExistingPositions() {
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: config.targetPnL || 2.0, // 🔧 AJOUT: Target PnL pour la nouvelle stratégie
                         reason: '📥 Position importée depuis Bitget',
-                        lastPnLLog: 0 // 🔧 AJOUT: Pour éviter le spam de logs PnL
+                        lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
+                        isBotManaged: false // 🔧 NOUVEAU: Position manuelle, pas gérée par le bot
                     };
                     
                     if (position.symbol && position.size > 0 && position.entryPrice > 0) {
@@ -1316,6 +1335,7 @@ window.syncAndCheckPositions = syncAndCheckPositions;
 window.updatePositionsPnL = updatePositionsPnL;
 window.fetchActivePositionsFromAPI = fetchActivePositionsFromAPI;
 window.makeRequestWithRetry = makeRequestWithRetry;
+window.syncNewManualPositions = syncNewManualPositions; // 🆕 NOUVEAU: Sync automatique
 
 // 🧪 FONCTION DE TEST: Tester les nouveaux paramètres MACD par timeframe
 async function testMACDParameters(symbol = 'BTCUSDT') {
@@ -1804,6 +1824,106 @@ window.forceAllUpdates = async function() {
         console.error('❌ Erreur lors des mises à jour forcées:', error);
     }
 };
+
+// 🆕 NOUVELLE FONCTION: Synchroniser les nouvelles positions manuelles automatiquement
+async function syncNewManualPositions() {
+    try {
+        // Récupérer les positions actuelles depuis l'API
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        
+        if (!result || result.code !== '00000' || !result.data) {
+            return; // Échec silencieux pour éviter le spam
+        }
+        
+        const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+        const currentSymbols = openPositions.map(pos => pos.symbol);
+        
+        // Trouver les nouvelles positions (présentes dans l'API mais pas localement)
+        const newPositions = apiPositions.filter(apiPos => 
+            !currentSymbols.includes(apiPos.symbol)
+        );
+        
+        if (newPositions.length > 0) {
+            log(`🔍 ${newPositions.length} nouvelle(s) position(s) manuelle(s) détectée(s)`, 'INFO');
+            
+            for (const apiPos of newPositions) {
+                const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
+                const total = parseFloat(apiPos.total || 0);
+                const markPrice = parseFloat(apiPos.markPrice || 0);
+                const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
+                const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                
+                const position = {
+                    id: Date.now() + Math.random(),
+                    symbol: apiPos.symbol,
+                    side: side,
+                    size: total,
+                    quantity: parseFloat(apiPos.size || total / markPrice),
+                    entryPrice: averageOpenPrice,
+                    status: 'OPEN',
+                    timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),
+                    orderId: `manual_${Date.now()}`,
+                    stopLossId: null,
+                    currentStopPrice: null,
+                    highestPrice: markPrice,
+                    currentPrice: markPrice,
+                    unrealizedPnL: unrealizedPL,
+                    pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                    targetPnL: config.targetPnL || 2.0,
+                    reason: '👤 Position manuelle détectée automatiquement',
+                    lastPnLLog: 0,
+                    isBotManaged: false // Position manuelle
+                };
+                
+                if (position.symbol && position.size > 0 && position.entryPrice > 0) {
+                    openPositions.push(position);
+                    log(`👤 Nouvelle position manuelle ajoutée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)}`, 'SUCCESS');
+                }
+            }
+            
+            // Mettre à jour l'affichage
+            updatePositionsDisplay();
+            updateStats();
+            
+            log(`✅ Synchronisation automatique terminée: ${newPositions.length} position(s) ajoutée(s)`, 'SUCCESS');
+        }
+        
+        // Vérifier aussi les positions fermées (comme dans syncAndCheckPositions)
+        const currentApiSymbols = apiPositions.map(pos => pos.symbol);
+        const closedPositions = openPositions.filter(localPos => 
+            !currentApiSymbols.includes(localPos.symbol)
+        );
+        
+        if (closedPositions.length > 0) {
+            log(`🔚 ${closedPositions.length} position(s) fermée(s) détectée(s) automatiquement`, 'INFO');
+            
+            for (const closedPos of closedPositions) {
+                botStats.totalClosedPositions++;
+                const pnl = closedPos.unrealizedPnL || 0;
+                
+                if (pnl > 0) {
+                    botStats.winningPositions++;
+                    botStats.totalWinAmount += pnl;
+                } else if (pnl < 0) {
+                    botStats.losingPositions++;
+                    botStats.totalLossAmount += pnl;
+                }
+            }
+            
+            // Supprimer les positions fermées
+            openPositions = openPositions.filter(localPos => 
+                currentApiSymbols.includes(localPos.symbol)
+            );
+            
+            updatePositionsDisplay();
+            updateStats();
+        }
+        
+    } catch (error) {
+        // Échec silencieux pour éviter le spam dans les logs
+        console.error('Erreur sync positions manuelles:', error.message);
+    }
+}
 
 // 🧪 FONCTION DE TEST: Créer plusieurs positions de test pour tester l'affichage
 window.createTestPositions = function(count = 15) {
