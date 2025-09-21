@@ -944,3 +944,305 @@ body.dark-mode {
         font-size: 12px !important;
     }
 } 
+
+/* 🎯 NOUVEAUX STYLES: Interface améliorée pour les paramètres et statistiques */
+
+/* Section Headers */
+.section-header {
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Configuration Section */
+.config-section {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.config-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.config-label {
+    font-size: 12px;
+    color: #bfdbfe;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.config-value {
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.pnl-config {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.pnl-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.pnl-slider {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.pnl-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #10b981;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.pnl-display {
+    background: #10b981;
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 60px;
+    text-align: center;
+}
+
+/* Status Section */
+.status-section {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.status-main {
+    margin-bottom: 16px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    animation: pulse-status 2s infinite;
+}
+
+.status-dot.active {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+@keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.status-text {
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.positions-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+}
+
+.position-type {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.position-icon {
+    font-size: 20px;
+}
+
+.position-info {
+    flex: 1;
+}
+
+.position-label {
+    font-size: 11px;
+    color: #d1fae5;
+    margin-bottom: 2px;
+}
+
+.position-count {
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Performance Section */
+.stats-section {
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.performance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.perf-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.perf-item.success {
+    border-left: 4px solid #10b981;
+}
+
+.perf-item.danger {
+    border-left: 4px solid #ef4444;
+}
+
+.perf-icon {
+    font-size: 20px;
+}
+
+.perf-info {
+    flex: 1;
+}
+
+.perf-label {
+    font-size: 12px;
+    color: #e9d5ff;
+    margin-bottom: 4px;
+}
+
+.perf-value {
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Capital Section */
+.capital-section {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.capital-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.capital-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.capital-item.primary {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.capital-label {
+    font-size: 13px;
+    color: #fecaca;
+    font-weight: 500;
+}
+
+.capital-value {
+    font-size: 16px;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .positions-summary {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .performance-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .config-section, .status-section, .stats-section, .capital-section {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .pnl-slider-container {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .pnl-display {
+        align-self: center;
+    }
+}
