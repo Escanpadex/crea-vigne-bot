@@ -869,6 +869,59 @@ body.dark-mode {
     color: #e0e0e0 !important; /* High contrast */
 }
 
+/* 🎯 NOUVEAUX STYLES: Optimisation pour l'affichage de nombreuses positions */
+.panel-inner {
+    max-height: 600px; /* Hauteur maximale pour éviter un affichage trop long */
+    overflow-y: auto; /* Scroll si nécessaire */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #6b7280 #374151; /* Firefox */
+}
+
+/* Webkit scrollbar styling */
+.panel-inner::-webkit-scrollbar {
+    width: 6px;
+}
+
+.panel-inner::-webkit-scrollbar-track {
+    background: #374151;
+    border-radius: 3px;
+}
+
+.panel-inner::-webkit-scrollbar-thumb {
+    background: #6b7280;
+    border-radius: 3px;
+}
+
+.panel-inner::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Styles pour l'affichage compact des positions */
+.position-compact {
+    transition: all 0.2s ease;
+}
+
+.position-compact:hover {
+    transform: scale(1.01);
+    z-index: 10;
+}
+
+/* Animation pour les nouvelles positions */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.position-new {
+    animation: slideIn 0.3s ease-out;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .card {
@@ -877,5 +930,17 @@ body.dark-mode {
     .grid {
         grid-template-columns: 1fr;
         gap: 10px;
+    }
+    
+    /* 🎯 Mobile: Réduire encore plus l'affichage */
+    .panel-inner {
+        max-height: 400px;
+    }
+    
+    /* Forcer l'affichage compact sur mobile */
+    .position-mobile-compact {
+        padding: 6px 10px !important;
+        margin-bottom: 4px !important;
+        font-size: 12px !important;
     }
 } 
