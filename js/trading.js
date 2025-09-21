@@ -1430,9 +1430,31 @@ async function syncAndCheckPositions() {
                     }
                 }
                 
-                openPositions = openPositions.filter(localPos => 
-                    currentSymbols.includes(localPos.symbol)
-                );
+                // 🔧 SÉCURITÉ: Ne supprimer les positions locales que si on est sûr qu'elles sont fermées
+                // Éviter de supprimer des positions si l'API retourne moins de données que prévu
+                const localSymbols = openPositions.map(pos => pos.symbol);
+                const apiReturnedCount = apiPositions.length;
+                const localCount = openPositions.length;
+                
+                if (apiReturnedCount < localCount && closedPositions.length < localCount) {
+                    log(`⚠️ SÉCURITÉ: L'API retourne ${apiReturnedCount} positions mais nous en avons ${localCount} localement`, 'WARNING');
+                    log(`🛡️ Conservation des positions locales pour éviter une perte de données`, 'INFO');
+                    
+                    // Ne supprimer que les positions explicitement fermées (avec confirmation)
+                    openPositions = openPositions.filter(localPos => {
+                        const isConfirmedClosed = closedPositions.some(closed => closed.symbol === localPos.symbol);
+                        if (isConfirmedClosed) {
+                            log(`🗑️ Suppression confirmée: ${localPos.symbol}`, 'INFO');
+                            return false;
+                        }
+                        return true;
+                    });
+                } else {
+                    // Filtrage normal si les données semblent cohérentes
+                    openPositions = openPositions.filter(localPos => 
+                        currentSymbols.includes(localPos.symbol)
+                    );
+                }
                 
                 updatePositionsDisplay();
                 updateStats();
@@ -2226,6 +2248,164 @@ window.testPositionDisplayLimit = function() {
         limitFixed: true,
         canDisplayMore: currentPositions <= maxDisplayed
     };
+};
+
+// 🔧 FONCTION DE DIAGNOSTIC: Vérifier pourquoi seulement 2 positions sont affichées
+window.debugPositionDisplay = function() {
+    console.log('🔍 DIAGNOSTIC: Pourquoi seulement 2 positions affichées ?');
+    console.log('=====================================');
+    
+    // 1. Vérifier le contenu de openPositions
+    console.log(`📊 openPositions.length: ${openPositions.length}`);
+    console.log(`📋 Contenu de openPositions:`, openPositions);
+    
+    if (openPositions.length > 0) {
+        openPositions.forEach((pos, index) => {
+            console.log(`   ${index + 1}. ${pos.symbol} - ${pos.isBotManaged ? '🤖 Bot' : '👤 Manuel'} - Status: ${pos.status}`);
+        });
+    }
+    
+    // 2. Vérifier les paramètres d'affichage
+    const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
+    const compactThreshold = config.displaySettings?.compactDisplayThreshold || 10;
+    
+    console.log(`\n⚙️ Paramètres d'affichage:`);
+    console.log(`   maxDisplayed: ${maxDisplayed}`);
+    console.log(`   compactThreshold: ${compactThreshold}`);
+    console.log(`   config.displaySettings:`, config.displaySettings);
+    
+    // 3. Tester la fonction updatePositionsDisplay
+    console.log(`\n🔄 Test de updatePositionsDisplay()...`);
+    if (typeof updatePositionsDisplay === 'function') {
+        try {
+            updatePositionsDisplay();
+            console.log('✅ updatePositionsDisplay() exécuté sans erreur');
+        } catch (error) {
+            console.error('❌ Erreur dans updatePositionsDisplay():', error);
+        }
+    } else {
+        console.log('❌ updatePositionsDisplay() non disponible');
+    }
+    
+    // 4. Vérifier le DOM
+    const positionsListEl = document.getElementById('positionsList');
+    if (positionsListEl) {
+        const positionElements = positionsListEl.children;
+        console.log(`\n🌐 Éléments dans le DOM:`);
+        console.log(`   positionsList.children.length: ${positionElements.length}`);
+        
+        for (let i = 0; i < positionElements.length; i++) {
+            const element = positionElements[i];
+            const symbolMatch = element.innerHTML.match(/([A-Z]+)USDT/);
+            const symbol = symbolMatch ? symbolMatch[0] : 'INCONNU';
+            console.log(`   ${i + 1}. ${symbol} (HTML présent)`);
+        }
+    } else {
+        console.log('❌ Élément positionsList non trouvé');
+    }
+    
+    // 5. Forcer un refresh
+    console.log(`\n🔄 Forçage d'un refresh complet...`);
+    if (typeof importExistingPositions === 'function') {
+        console.log('🔄 Lancement importExistingPositions()...');
+        importExistingPositions().then(() => {
+            console.log('✅ Import terminé, nouvelles données:');
+            console.log(`   Positions après import: ${openPositions.length}`);
+            
+            // Re-test de l'affichage
+            if (typeof updatePositionsDisplay === 'function') {
+                updatePositionsDisplay();
+                console.log('✅ Affichage mis à jour');
+            }
+        }).catch(error => {
+            console.error('❌ Erreur import:', error);
+        });
+    } else {
+        console.log('❌ importExistingPositions() non disponible');
+    }
+    
+    return {
+        openPositionsCount: openPositions.length,
+        maxDisplayed,
+        domElementsCount: positionsListEl ? positionsListEl.children.length : 0,
+        diagnosis: openPositions.length <= 2 ? 'PROBLEME_DATA' : 'PROBLEME_AFFICHAGE'
+    };
+};
+
+// 🔧 FONCTION DE RÉPARATION: Forcer un refresh complet des positions
+window.forceFullPositionRefresh = async function() {
+    console.log('🔄 RÉPARATION: Refresh complet forcé des positions...');
+    
+    try {
+        // 1. Sauvegarder les positions actuelles
+        const backupPositions = [...openPositions];
+        console.log(`💾 Sauvegarde: ${backupPositions.length} positions`);
+        
+        // 2. Appeler directement l'API sans filtrage
+        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+        
+        if (!result || result.code !== '00000' || !result.data) {
+            console.error('❌ Erreur API:', result);
+            return false;
+        }
+        
+        const allApiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+        console.log(`📊 API retourne: ${allApiPositions.length} positions actives`);
+        
+        // 3. Lister toutes les positions trouvées
+        allApiPositions.forEach((pos, index) => {
+            console.log(`   ${index + 1}. ${pos.symbol} - ${pos.holdSide} - Total: ${pos.total} - PnL: ${pos.unrealizedPL}`);
+        });
+        
+        // 4. Vider et reimporter toutes les positions
+        openPositions.length = 0;
+        console.log('🗑️ Positions locales vidées');
+        
+        // 5. Importer toutes les positions de l'API
+        for (const apiPos of allApiPositions) {
+            const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
+            const total = parseFloat(apiPos.total || 0);
+            const markPrice = parseFloat(apiPos.markPrice || 0);
+            const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
+            const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+            
+            const position = {
+                id: Date.now() + Math.random(),
+                symbol: apiPos.symbol,
+                side: side,
+                size: total,
+                quantity: parseFloat(apiPos.size || total / markPrice),
+                entryPrice: averageOpenPrice,
+                status: 'OPEN',
+                timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),
+                orderId: `refresh_${Date.now()}`,
+                stopLossId: null,
+                currentStopPrice: null,
+                highestPrice: markPrice,
+                currentPrice: markPrice,
+                unrealizedPnL: unrealizedPL,
+                pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                reason: 'Position importée (refresh complet)',
+                isBotManaged: false // Marquer comme manuel par défaut
+            };
+            
+            openPositions.push(position);
+            console.log(`✅ Importé: ${position.symbol} (${position.side})`);
+        }
+        
+        console.log(`✅ Import terminé: ${openPositions.length} positions au total`);
+        
+        // 6. Mettre à jour l'affichage
+        updatePositionsDisplay();
+        updateStats();
+        
+        console.log('🎯 Refresh complet terminé avec succès!');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du refresh complet:', error);
+        return false;
+    }
 };
 
 // 🧪 FONCTION DE TEST: Vérifier la séparation bot/manuel dans les limites
