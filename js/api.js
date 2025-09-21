@@ -29,17 +29,17 @@ async function makeRequest(endpoint, options = {}) {
     }
 }
 
-async function testConnection() {
+async function testConnection(isAutoRefresh = false) {
     config.apiKey = document.getElementById('apiKey').value;
     config.secretKey = document.getElementById('secretKey').value;
     config.passphrase = document.getElementById('passphrase').value;
     
     if (!config.apiKey || !config.secretKey || !config.passphrase) {
-        alert('Veuillez remplir tous les champs API');
+        if (!isAutoRefresh) alert('Veuillez remplir tous les champs API');
         return;
     }
     
-    log('🔄 Test de connexion à Bitget Futures...');
+    if (!isAutoRefresh) log('🔄 Test de connexion à Bitget Futures...');
     
     const result = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
     
@@ -48,27 +48,29 @@ async function testConnection() {
         // 🛡️ SÉCURITÉ: Vérifier que l'élément existe
         const connectionTextEl = document.getElementById('connectionText');
         if (connectionTextEl) connectionTextEl.textContent = 'Connecté (Futures)';
-        log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
+        if (!isAutoRefresh) log('✅ Connexion réussie à Bitget Futures!', 'SUCCESS');
         await refreshBalance();
         
-        // 🚀 AUTOMATISATION pour la nouvelle stratégie MACD multi-timeframes
-        log('🤖 Préparation de la stratégie MACD multi-timeframes...', 'SUCCESS');
-        
-        // 1. Test de récupération des paires disponibles
-        log('🔄 Test de récupération des paires disponibles...', 'INFO');
-        const testPairs = await getAllAvailablePairs();
-        if (testPairs.length > 0) {
-            log(`✅ ${testPairs.length} paires disponibles - Stratégie MACD prête`, 'SUCCESS');
-        } else {
-            log('⚠️ Aucune paire disponible trouvée', 'WARNING');
+        // 🚀 AUTOMATISATION pour la nouvelle stratégie MACD multi-timeframes (silencieux en auto-refresh)
+        if (!isAutoRefresh) {
+            log('🤖 Préparation de la stratégie MACD multi-timeframes...', 'SUCCESS');
+            
+            // 1. Test de récupération des paires disponibles
+            log('🔄 Test de récupération des paires disponibles...', 'INFO');
+            const testPairs = await getAllAvailablePairs();
+            if (testPairs.length > 0) {
+                log(`✅ ${testPairs.length} paires disponibles - Stratégie MACD prête`, 'SUCCESS');
+            } else {
+                log('⚠️ Aucune paire disponible trouvée', 'WARNING');
+            }
         }
         
         // 4. 🔧 NOUVEAU: Importer les positions existantes dès la connexion
-        log('📥 Importation des positions existantes...', 'INFO');
+        if (!isAutoRefresh) log('📥 Importation des positions existantes...', 'INFO');
         try {
             if (typeof window.importExistingPositions === 'function') {
                 await window.importExistingPositions();
-                log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
+                if (!isAutoRefresh) log(`✅ Import terminé: ${openPositions ? openPositions.length : 0} position(s) détectée(s)`, 'SUCCESS');
                 
                 // Forcer la mise à jour des données temps réel après import
                 if (typeof window.updatePositionsPnL === 'function') {

@@ -147,12 +147,18 @@ async function getPositivePairs() {
     }
 }
 
+// 🔧 NOUVELLE FONCTION UTILITAIRE: Compter seulement les positions gérées par le bot
+function getBotManagedPositionsCount() {
+    return openPositions.filter(pos => pos.isBotManaged === true).length;
+}
+
 // 🆕 NOUVELLE FONCTION: Sélectionner une paire aléatoire parmi les positives
 function selectRandomPositivePair(excludeSymbols = []) {
-    // 🎯 AMÉLIORATION: Vérifier d'abord si on a des emplacements disponibles
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+    // 🔧 CORRECTION: Vérifier seulement les positions du bot, pas les manuelles
+    const botPositionsCount = getBotManagedPositionsCount();
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsCount;
     if (availableSlots <= 0) {
-        log(`⚠️ Aucun emplacement disponible (${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}) - Pas de sélection`, 'INFO');
+        log(`⚠️ Limite bot atteinte: ${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} positions bot (${openPositions.length} total dont manuelles) - Pas de sélection`, 'INFO');
         return null;
     }
     
@@ -454,9 +460,10 @@ function canOpenNewPosition(symbol) {
         return { canOpen: false, reason: 'Position déjà ouverte sur ce symbole' };
     }
     
-    // Vérifier la limite de positions simultanées
-    if (openPositions.length >= MAX_SIMULTANEOUS_POSITIONS) {
-        return { canOpen: false, reason: `Limite de ${MAX_SIMULTANEOUS_POSITIONS} positions simultanées atteinte` };
+    // 🔧 CORRECTION: Vérifier seulement la limite des positions du bot
+    const botPositionsCount = getBotManagedPositionsCount();
+    if (botPositionsCount >= MAX_SIMULTANEOUS_POSITIONS) {
+        return { canOpen: false, reason: `Limite bot atteinte: ${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} positions automatiques (${openPositions.length} total)` };
     }
     
     // Vérifier le cooldown (1 minute après fermeture)
@@ -489,9 +496,10 @@ async function openPosition(symbol, selectedPair) {
         return false;
     }
     
-    // Log informatif sur le nombre de positions disponibles
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
-    log(`📊 Ouverture position ${symbol} - ${availableSlots} slots disponibles sur ${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
+    // 🔧 CORRECTION: Log informatif sur les positions du bot uniquement
+    const botPositionsCount = getBotManagedPositionsCount();
+    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsCount;
+    log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} bot, ${openPositions.length} total)`, 'INFO');
     
     const positionValue = calculatePositionSize();
     
@@ -681,10 +689,11 @@ async function monitorPnLAndClose() {
                         openPositions.splice(index, 1);
                     }
                     
-                    // 🆕 AMÉLIORATION: Déclencher immédiatement une nouvelle sélection si un emplacement est libre
-                    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - openPositions.length;
+                    // 🔧 CORRECTION: Déclencher seulement si le bot a des slots libres
+                    const botPositionsAfterClose = getBotManagedPositionsCount();
+                    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsAfterClose;
                     if (availableSlots > 0) {
-                        log(`🔄 Position fermée - Déclenchement immédiat d'une nouvelle sélection (${availableSlots} emplacements libres)`, 'INFO');
+                        log(`🔄 Position bot fermée - Déclenchement immédiat d'une nouvelle sélection (${availableSlots} slots bot libres)`, 'INFO');
                         setTimeout(() => {
                             if (typeof tradingLoop === 'function') {
                                 tradingLoop();
@@ -2037,4 +2046,108 @@ window.testDisplayModes = function() {
             }, 3000);
         }, 3000);
     }, 3000);
+};
+
+// 🧪 FONCTION DE TEST: Vérifier l'auto-refresh de connexion
+window.testAutoRefresh = function() {
+    console.log('🧪 Test du système d\'auto-refresh...');
+    
+    if (window.autoConnectInterval) {
+        console.log('✅ Auto-refresh ACTIF - Intervalle toutes les 10 secondes');
+        console.log('📊 Prochaine vérification dans 10 secondes maximum');
+        
+        // Compter les connexions automatiques
+        let autoRefreshCount = 0;
+        const originalTestConnection = window.testConnection;
+        
+        window.testConnection = async function(isAutoRefresh = false) {
+            if (isAutoRefresh) {
+                autoRefreshCount++;
+                console.log(`🔄 Auto-refresh #${autoRefreshCount} - ${new Date().toLocaleTimeString()}`);
+            }
+            return await originalTestConnection(isAutoRefresh);
+        };
+        
+        // Restaurer après 60 secondes
+        setTimeout(() => {
+            window.testConnection = originalTestConnection;
+            console.log(`✅ Test terminé - ${autoRefreshCount} auto-refresh détectés en 60 secondes`);
+        }, 60000);
+        
+        console.log('⏳ Test en cours pendant 60 secondes...');
+        
+    } else {
+        console.log('❌ Auto-refresh INACTIF');
+        console.log('💡 Démarrez le bot pour activer l\'auto-refresh');
+    }
+};
+
+// 🧪 FONCTION DE TEST: Forcer un auto-refresh immédiat
+window.forceAutoRefresh = async function() {
+    console.log('🔄 Force auto-refresh immédiat...');
+    
+    if (typeof testConnection === 'function') {
+        try {
+            await testConnection(true);
+            console.log('✅ Auto-refresh forcé terminé');
+        } catch (error) {
+            console.error('❌ Erreur auto-refresh:', error);
+        }
+    } else {
+        console.log('❌ Fonction testConnection non disponible');
+    }
+};
+
+// 🧪 FONCTION DE TEST: Vérifier la séparation bot/manuel dans les limites
+window.testBotPositionLimits = function() {
+    console.log('🧪 Test des limites de positions bot vs manuelles...');
+    
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
+    
+    console.log(`📊 État actuel:`);
+    console.log(`   🤖 Positions bot: ${botPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`);
+    console.log(`   👤 Positions manuelles: ${manualPositions.length}`);
+    console.log(`   📈 Total: ${openPositions.length}`);
+    
+    // Tester la fonction de comptage
+    const countFromFunction = getBotManagedPositionsCount();
+    console.log(`✅ Fonction getBotManagedPositionsCount(): ${countFromFunction}`);
+    
+    // Tester si le bot peut ouvrir une nouvelle position
+    if (typeof canOpenNewPosition === 'function') {
+        const testSymbol = 'TESTUSDT';
+        const canOpen = canOpenNewPosition(testSymbol);
+        console.log(`🔍 Test canOpenNewPosition('${testSymbol}'):`);
+        console.log(`   Résultat: ${canOpen.canOpen ? 'AUTORISÉ' : 'BLOQUÉ'}`);
+        console.log(`   Raison: ${canOpen.reason}`);
+    }
+    
+    // Afficher les détails de chaque position
+    if (openPositions.length > 0) {
+        console.log(`\n📋 Détail des positions:`);
+        openPositions.forEach((pos, idx) => {
+            const type = pos.isBotManaged ? '🤖 Bot' : '👤 Manuel';
+            console.log(`   ${idx + 1}. ${pos.symbol}: ${type} - ${pos.reason}`);
+        });
+    }
+    
+    // Recommandations
+    console.log(`\n💡 État:`);
+    if (botPositions.length < MAX_SIMULTANEOUS_POSITIONS) {
+        console.log(`✅ Le bot peut ouvrir ${MAX_SIMULTANEOUS_POSITIONS - botPositions.length} position(s) supplémentaire(s)`);
+    } else {
+        console.log(`⚠️ Le bot a atteint sa limite (${MAX_SIMULTANEOUS_POSITIONS} positions)`);
+    }
+    
+    if (manualPositions.length > 0) {
+        console.log(`✅ ${manualPositions.length} position(s) manuelle(s) n'affectent pas la limite du bot`);
+    }
+    
+    return {
+        botPositions: botPositions.length,
+        manualPositions: manualPositions.length,
+        total: openPositions.length,
+        botCanOpen: botPositions.length < MAX_SIMULTANEOUS_POSITIONS
+    };
 };
