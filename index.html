@@ -84,38 +84,136 @@
                                 <select id="leverage"><option value="2" selected>2x</option></select>
                             </div>
                             
-                            <!-- Paramètres de la nouvelle stratégie -->
-                            <div class="panel panel-warning">
-                                <h5 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text);">⚡ Configuration Stratégie</h5>
-                                <div style="font-size: 12px; color: var(--muted); line-height: 1.5;">
-                                    <div><strong>💰 Capital par trade:</strong> 50% du solde</div>
-                                    <div><strong>📈 Levier:</strong> x2 fixe</div>
-                                    <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0;">
-                                        <strong>🎯 Objectif PnL:</strong>
+                            <!-- Configuration Stratégie - Design amélioré -->
+                            <div class="config-section">
+                                <div class="section-header">
+                                    <h4>⚙️ Configuration de Trading</h4>
+                                </div>
+                                
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <div class="config-label">💰 Capital par trade</div>
+                                        <div class="config-value">50% du solde</div>
+                                    </div>
+                                    
+                                    <div class="config-item">
+                                        <div class="config-label">📈 Levier</div>
+                                        <div class="config-value">x2 fixe</div>
+                                    </div>
+                                    
+                                    <div class="config-item">
+                                        <div class="config-label">⏰ Cooldown</div>
+                                        <div class="config-value">1 min après fermeture</div>
+                                    </div>
+                                    
+                                    <div class="config-item">
+                                        <div class="config-label">🔄 Limite bot</div>
+                                        <div class="config-value">2 positions max</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="pnl-config">
+                                    <div class="config-label">🎯 Objectif PnL</div>
+                                    <div class="pnl-slider-container">
                                         <input type="range" 
                                                id="targetPnLRange" 
                                                min="0.3" 
                                                max="5.0" 
                                                step="0.1" 
                                                value="2.0" 
-                                               class="range-compact"
+                                               class="pnl-slider"
                                                onchange="updateTargetPnL(this.value)">
-                                        <span id="targetPnLDisplay" class="stat-strong">+2.0%</span>
+                                        <span id="targetPnLDisplay" class="pnl-display">+2.0%</span>
                                     </div>
-                                    <div><strong>⏰ Cooldown:</strong> 1 minute après fermeture</div>
-                                    <div><strong>🔄 Limite bot:</strong> 2 positions automatiques max (+ positions manuelles)</div>
                                 </div>
                             </div>
                             
-                            <!-- Section Statut et Statistiques -->
-                            <div class="panel panel-info">
-                                <h5 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text);">📊 Statut & Statistiques</h5>
-                                <div style="font-size: 12px; color: var(--muted); line-height: 1.5;">
-                                    <div><strong>🔍 Statut:</strong> <span id="currentScanPair">En attente de démarrage...</span></div>
-                                    <div><strong>📈 Positions:</strong> <span id="totalOpenPositions">0</span> | <strong>Fermées:</strong> <span id="totalClosedPositions">0</span></div>
-                                    <div><strong>✅ Gagnantes:</strong> <span id="winningPositions">0 (+0$)</span> | <strong>❌ Perdantes:</strong> <span id="losingPositions">0 (-0$)</span></div>
-                                    <div><strong>🎯 Signaux:</strong> <span id="totalSignals">0</span> | <strong>💰 Capital libre:</strong> <span id="availableCapital">--</span>$ | <strong>📊 Utilisé:</strong> <span id="usedCapital">--</span>$</div>
-                                    <div><strong>💼 Total équité:</strong> <span id="totalEquity">--</span>$</div>
+                            <!-- Statut Bot - Design amélioré -->
+                            <div class="status-section">
+                                <div class="section-header">
+                                    <h4>📊 État du Bot</h4>
+                                </div>
+                                
+                                <div class="status-main">
+                                    <div class="status-indicator">
+                                        <div class="status-dot" id="botStatusDot"></div>
+                                        <span id="currentScanPair" class="status-text">En attente de démarrage...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="positions-summary">
+                                    <div class="position-type">
+                                        <div class="position-icon">🤖</div>
+                                        <div class="position-info">
+                                            <div class="position-label">Bot</div>
+                                            <div class="position-count" id="botPositionsCount">0/2</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="position-type">
+                                        <div class="position-icon">👤</div>
+                                        <div class="position-info">
+                                            <div class="position-label">Manuel</div>
+                                            <div class="position-count" id="manualPositionsCount">0</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="position-type">
+                                        <div class="position-icon">🏁</div>
+                                        <div class="position-info">
+                                            <div class="position-label">Fermées</div>
+                                            <div class="position-count" id="totalClosedPositions">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Statistiques Performance - Design amélioré -->
+                            <div class="stats-section">
+                                <div class="section-header">
+                                    <h4>📈 Performance</h4>
+                                </div>
+                                
+                                <div class="performance-grid">
+                                    <div class="perf-item success">
+                                        <div class="perf-icon">✅</div>
+                                        <div class="perf-info">
+                                            <div class="perf-label">Gagnantes</div>
+                                            <div class="perf-value" id="winningPositions">0 (+0$)</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="perf-item danger">
+                                        <div class="perf-icon">❌</div>
+                                        <div class="perf-info">
+                                            <div class="perf-label">Perdantes</div>
+                                            <div class="perf-value" id="losingPositions">0 (-0$)</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Capital & Équité - Design amélioré -->
+                            <div class="capital-section">
+                                <div class="section-header">
+                                    <h4>💼 Capital</h4>
+                                </div>
+                                
+                                <div class="capital-grid">
+                                    <div class="capital-item primary">
+                                        <div class="capital-label">Total équité</div>
+                                        <div class="capital-value" id="totalEquity">--$</div>
+                                    </div>
+                                    
+                                    <div class="capital-item">
+                                        <div class="capital-label">Capital utilisé</div>
+                                        <div class="capital-value" id="usedCapital">--$</div>
+                                    </div>
+                                    
+                                    <div class="capital-item">
+                                        <div class="capital-label">Capital libre</div>
+                                        <div class="capital-value" id="availableCapital">--$</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
