@@ -588,4 +588,5 @@ async function testSpecificPairMacd(symbol) {
 
 // Rendre les fonctions accessibles globalement
 window.testMacd4hAPI = testMacd4hAPI;
-window.testSpecificPairMacd = testSpecificPairMacd; 
+window.testSpecificPairMacd = testSpecificPairMacd;
+window.getCurrentPrice = getCurrentPrice; // 🔧 AJOUT: Export pour la surveillance PnL 
