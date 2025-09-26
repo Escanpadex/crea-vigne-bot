@@ -44,9 +44,9 @@ async function makeRequest(endpoint, options = {}) {
 }
 
 async function testConnection(isAutoRefresh = false) {
-    config.apiKey = document.getElementById('apiKey').value;
-    config.secretKey = document.getElementById('secretKey').value;
-    config.passphrase = document.getElementById('passphrase').value;
+    config.apiKey = document.getElementById('apiKey').value.trim();
+    config.secretKey = document.getElementById('secretKey').value.trim();
+    config.passphrase = document.getElementById('passphrase').value.trim();
     
     if (!config.apiKey || !config.secretKey || !config.passphrase) {
         if (!isAutoRefresh) alert('Veuillez remplir tous les champs API');
