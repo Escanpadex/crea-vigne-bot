@@ -649,7 +649,7 @@ async function createEmergencyStopLoss(position, stopPrice) {
             tradeSide: "close",
             orderType: "market",
             clientOid: `emergency_stop_${Date.now()}_${position.symbol}`,
-            reduceOnly: "YES"
+            reduceOnly: "yes"
         };
         
         const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-plan-order', {
@@ -796,7 +796,7 @@ async function closePositionAtMarket(position) {
             tradeSide: "close",
             orderType: "market",
             clientOid: `tp_${Date.now()}_${position.symbol}`, // 🔧 Préfixe TP
-            reduceOnly: "YES" // 🔧 AJOUT: Force reduce only pour fermeture
+            reduceOnly: "yes" // 🔧 AJOUT: Force reduce only pour fermeture
         };
         
         // 🔧 DIAGNOSTIC COMPLET: Log des données de fermeture
@@ -3093,7 +3093,7 @@ window.debug400CloseError = async function() {
                 tradeSide: "close",
                 orderType: "market",
                 clientOid: `debug_${Date.now()}_${position.symbol}`,
-                reduceOnly: "YES"
+                reduceOnly: "yes"
             };
             
             console.log('\n📋 Ordre qui serait envoyé:');
@@ -3193,7 +3193,7 @@ window.testTPClosure = async function() {
                     tradeSide: "close",
                     orderType: "market",
                     clientOid: `test_tp_${Date.now()}_${position.symbol}`,
-                    reduceOnly: "YES"
+                    reduceOnly: "yes"
                 };
                 
                 console.log('   📋 Données fermeture simulées:');
