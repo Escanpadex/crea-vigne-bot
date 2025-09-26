@@ -969,41 +969,48 @@ function updatePositionsDisplay() {
             let pnlPercent = 0;
             let pnlDollar = 0;
 
-            // 🔧 CORRECTION: Logique de calcul PnL améliorée
+            // 🔧 CORRECTION MAJEURE: Logique de calcul PnL corrigée
             let dataSource = 'UNKNOWN';
 
             // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
                 dataSource = 'API_UNREALIZED_PNL';
-                // Calculer le pourcentage depuis le PnL dollar si possible
-                if (position.size && position.size > 0) {
+                
+                // 🔧 CORRECTION: Calculer le pourcentage basé sur la valeur initiale de la position
+                // La valeur initiale = quantity * entryPrice (plus précis que position.size qui peut être la valeur actuelle)
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlPercent = (pnlDollar / initialValue) * 100;
+                } else if (position.size && position.size > 0) {
+                    // Fallback si quantity n'est pas disponible
                     pnlPercent = (pnlDollar / position.size) * 100;
-                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    // Estimation basée sur la quantité et le prix d'entrée
-                    const positionValue = position.quantity * position.entryPrice;
-                    pnlPercent = positionValue > 0 ? (pnlDollar / positionValue) * 100 : 0;
                 }
             }
-            // 2. Sinon utiliser pnlPercentage depuis l'API
+            // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
             else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
                 pnlPercent = position.pnlPercentage;
                 dataSource = 'API_PERCENTAGE';
-                // Calculer le PnL en dollars
-                if (position.size && position.size > 0) {
+                
+                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlDollar = (initialValue * pnlPercent) / 100;
+                } else if (position.size && position.size > 0) {
                     pnlDollar = (position.size * pnlPercent) / 100;
-                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    pnlDollar = (position.quantity * position.entryPrice * pnlPercent) / 100;
                 }
             }
             // 3. Calcul de secours basé sur les prix actuels
             else {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
                 dataSource = 'CALCULATED';
-                if (position.size && position.size > 0) {
+                
+                // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlDollar = (initialValue * pnlPercent) / 100;
+                } else if (position.size && position.size > 0) {
                     pnlDollar = (position.size * pnlPercent) / 100;
-                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    pnlDollar = (position.quantity * position.entryPrice * pnlPercent) / 100;
                 }
             }
 
@@ -2506,4 +2513,245 @@ window.testMultiplePositionOpening = function() {
         maxAttemptsPerCycle: Math.min(availableSlots, 3),
         cooldownsActive: typeof pairCooldown !== 'undefined' ? pairCooldown.size : 0
     };
+};
+
+// 🔧 FONCTION DE DIAGNOSTIC: Vérifier pourquoi les TP ne sont pas pris
+window.debugTakeProfit = async function() {
+    console.log('🔍 DIAGNOSTIC: Pourquoi les TP ne sont pas pris ?');
+    console.log('===============================================');
+    
+    // 1. Vérifier la configuration
+    console.log(`⚙️ Configuration:`);
+    console.log(`   config.targetPnL: ${config.targetPnL}%`);
+    console.log(`   botRunning: ${typeof botRunning !== 'undefined' ? botRunning : 'UNDEFINED'}`);
+    
+    // 2. Vérifier les positions du bot
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    console.log(`\n🤖 Positions du bot: ${botPositions.length}`);
+    
+    if (botPositions.length === 0) {
+        console.log('❌ Aucune position gérée par le bot trouvée !');
+        console.log('💡 Vérifiez que les positions ont isBotManaged: true');
+        return;
+    }
+    
+    // 3. Analyser chaque position bot
+    for (const position of botPositions) {
+        console.log(`\n📊 Analyse ${position.symbol}:`);
+        console.log(`   Prix d'entrée: ${position.entryPrice}`);
+        console.log(`   Objectif TP: ${position.targetPnL || 'UNDEFINED'}%`);
+        console.log(`   isBotManaged: ${position.isBotManaged}`);
+        
+        // Test de récupération du prix actuel
+        try {
+            const currentPrice = await getCurrentPrice(position.symbol);
+            if (currentPrice) {
+                const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                console.log(`   Prix actuel: ${currentPrice}`);
+                console.log(`   PnL calculé: ${pnlPercent.toFixed(3)}%`);
+                console.log(`   TP atteint: ${pnlPercent >= (position.targetPnL || config.targetPnL) ? '✅ OUI' : '❌ NON'}`);
+                
+                if (pnlPercent >= (position.targetPnL || config.targetPnL)) {
+                    console.log(`🚨 ALERTE: Cette position devrait être fermée !`);
+                    console.log(`   PnL: ${pnlPercent.toFixed(3)}% >= Objectif: ${position.targetPnL || config.targetPnL}%`);
+                }
+            } else {
+                console.log(`❌ Impossible de récupérer le prix actuel pour ${position.symbol}`);
+            }
+        } catch (error) {
+            console.error(`❌ Erreur récupération prix ${position.symbol}:`, error);
+        }
+    }
+    
+    // 4. Vérifier que monitorPnLAndClose est appelé
+    console.log(`\n🔄 Vérification de la surveillance:`);
+    console.log(`   Fonction monitorPnLAndClose: ${typeof monitorPnLAndClose === 'function' ? 'OK' : 'MANQUANTE'}`);
+    
+    // 5. Test manuel de la fonction
+    console.log(`\n🧪 Test manuel de monitorPnLAndClose...`);
+    try {
+        await monitorPnLAndClose();
+        console.log('✅ monitorPnLAndClose() exécuté sans erreur');
+    } catch (error) {
+        console.error('❌ Erreur dans monitorPnLAndClose():', error);
+    }
+    
+    return {
+        botPositions: botPositions.length,
+        targetPnL: config.targetPnL,
+        botRunning: typeof botRunning !== 'undefined' ? botRunning : false,
+        monitorFunctionExists: typeof monitorPnLAndClose === 'function'
+    };
+};
+
+// 🔧 FONCTION DE FORÇAGE: Forcer la prise de profit sur les positions éligibles
+window.forceTakeProfit = async function() {
+    console.log('🎯 FORÇAGE: Prise de profit sur positions éligibles...');
+    
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    if (botPositions.length === 0) {
+        console.log('❌ Aucune position bot trouvée');
+        return false;
+    }
+    
+    let forcedClosed = 0;
+    
+    for (const position of botPositions) {
+        try {
+            const currentPrice = await getCurrentPrice(position.symbol);
+            if (!currentPrice) {
+                console.log(`❌ ${position.symbol}: Prix indisponible`);
+                continue;
+            }
+            
+            const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            const targetPnL = position.targetPnL || config.targetPnL || 0.3;
+            
+            console.log(`📊 ${position.symbol}: PnL ${pnlPercent.toFixed(3)}% (Objectif: ${targetPnL}%)`);
+            
+            if (pnlPercent >= targetPnL) {
+                console.log(`🎯 ${position.symbol}: FORÇAGE de la fermeture (${pnlPercent.toFixed(3)}% >= ${targetPnL}%)`);
+                
+                const closed = await closePositionAtMarket(position);
+                if (closed) {
+                    forcedClosed++;
+                    console.log(`✅ ${position.symbol}: Position fermée avec succès (+${pnlPercent.toFixed(3)}%)`);
+                    
+                    // Supprimer de la liste
+                    const index = openPositions.findIndex(p => p.id === position.id);
+                    if (index !== -1) {
+                        openPositions.splice(index, 1);
+                    }
+                } else {
+                    console.log(`❌ ${position.symbol}: Échec de fermeture`);
+                }
+            } else {
+                console.log(`⏳ ${position.symbol}: Objectif non atteint (${pnlPercent.toFixed(3)}% < ${targetPnL}%)`);
+            }
+        } catch (error) {
+            console.error(`❌ Erreur ${position.symbol}:`, error);
+        }
+    }
+    
+    if (forcedClosed > 0) {
+        console.log(`🎯 FORÇAGE TERMINÉ: ${forcedClosed} position(s) fermée(s)`);
+        updatePositionsDisplay();
+        updateStats();
+    } else {
+        console.log('ℹ️ Aucune position éligible pour fermeture forcée');
+    }
+    
+    return forcedClosed > 0;
+};
+
+// 🔧 FONCTION DE DIAGNOSTIC: Analyser les calculs PnL incohérents
+window.debugPnLCalculation = function() {
+    console.log('🔍 DIAGNOSTIC: Analyse des calculs PnL...');
+    console.log('=========================================');
+    
+    if (openPositions.length === 0) {
+        console.log('❌ Aucune position à analyser');
+        return;
+    }
+    
+    openPositions.forEach((position, index) => {
+        console.log(`\n📊 Position ${index + 1}: ${position.symbol}`);
+        console.log(`   Type: ${position.isBotManaged ? '🤖 Bot' : '👤 Manuel'}`);
+        
+        // Données de base
+        console.log(`   Prix d'entrée: ${position.entryPrice}`);
+        console.log(`   Prix actuel: ${position.currentPrice || 'N/A'}`);
+        console.log(`   Taille position: ${position.size || 'N/A'}`);
+        console.log(`   Quantité: ${position.quantity || 'N/A'}`);
+        
+        // Données PnL de l'API
+        console.log(`   unrealizedPnL (API): ${position.unrealizedPnL || 'N/A'}`);
+        console.log(`   pnlPercentage (API): ${position.pnlPercentage || 'N/A'}%`);
+        
+        // Calculs manuels pour vérification
+        const currentPrice = position.currentPrice || position.entryPrice;
+        const calculatedPnLPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+        
+        console.log(`\n🧮 Calculs de vérification:`);
+        console.log(`   PnL% calculé: ${calculatedPnLPercent.toFixed(3)}%`);
+        
+        if (position.size && position.size > 0) {
+            const calculatedPnLDollar = (position.size * calculatedPnLPercent) / 100;
+            console.log(`   PnL$ calculé (via size): ${calculatedPnLDollar.toFixed(2)}$`);
+        }
+        
+        if (position.quantity && position.entryPrice) {
+            const positionValue = position.quantity * position.entryPrice;
+            const calculatedPnLDollar2 = (positionValue * calculatedPnLPercent) / 100;
+            console.log(`   PnL$ calculé (via quantity): ${calculatedPnLDollar2.toFixed(2)}$`);
+            console.log(`   Valeur position: ${positionValue.toFixed(2)}$`);
+        }
+        
+        // Déterminer quelle source est utilisée dans l'affichage
+        let displaySource = 'UNKNOWN';
+        let displayPnLDollar = 0;
+        let displayPnLPercent = 0;
+        
+        if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
+            displayPnLDollar = position.unrealizedPnL;
+            displaySource = 'API_UNREALIZED_PNL';
+            if (position.size && position.size > 0) {
+                displayPnLPercent = (displayPnLDollar / position.size) * 100;
+            }
+        } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+            displayPnLPercent = position.pnlPercentage;
+            displaySource = 'API_PERCENTAGE';
+            if (position.size && position.size > 0) {
+                displayPnLDollar = (position.size * displayPnLPercent) / 100;
+            }
+        } else {
+            displayPnLPercent = calculatedPnLPercent;
+            displaySource = 'CALCULATED';
+            if (position.size && position.size > 0) {
+                displayPnLDollar = (position.size * displayPnLPercent) / 100;
+            }
+        }
+        
+        console.log(`\n📺 Affichage actuel (source: ${displaySource}):`);
+        console.log(`   PnL affiché: ${displayPnLDollar.toFixed(2)}$ (${displayPnLPercent.toFixed(2)}%)`);
+        
+        // Vérifier la cohérence
+        if (Math.abs(displayPnLPercent - calculatedPnLPercent) > 0.1) {
+            console.log(`🚨 INCOHÉRENCE DÉTECTÉE:`);
+            console.log(`   Écart PnL%: ${Math.abs(displayPnLPercent - calculatedPnLPercent).toFixed(3)}%`);
+        }
+        
+        // Recommandations
+        if (position.size && position.size < 10) {
+            console.log(`⚠️ ATTENTION: Taille position très faible (${position.size}$) - Possibles erreurs de calcul`);
+        }
+    });
+    
+    console.log('\n💡 RECOMMANDATIONS:');
+    console.log('   - Vérifiez que position.size correspond à la valeur réelle de la position');
+    console.log('   - Comparez avec l\'interface Bitget pour validation');
+    console.log('   - Les positions manuelles utilisent les données API qui peuvent être différées');
+};
+
+// 🔧 FONCTION DE CORRECTION: Forcer la mise à jour des PnL avec la logique corrigée
+window.fixPnLDisplay = function() {
+    console.log('🔧 CORRECTION: Mise à jour forcée des calculs PnL...');
+    
+    if (openPositions.length === 0) {
+        console.log('❌ Aucune position à corriger');
+        return;
+    }
+    
+    console.log(`📊 Correction de ${openPositions.length} position(s)...`);
+    
+    // Forcer la mise à jour de l'affichage avec la nouvelle logique
+    updatePositionsDisplay();
+    
+    console.log('✅ Affichage des PnL mis à jour avec la logique corrigée');
+    console.log('💡 Les calculs utilisent maintenant:');
+    console.log('   1. unrealizedPnL de l\'API (priorité absolue)');
+    console.log('   2. Calcul basé sur quantity * entryPrice (valeur initiale)');
+    console.log('   3. Fallback sur position.size si nécessaire');
+    
+    return true;
 };
