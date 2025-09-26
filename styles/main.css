@@ -1041,6 +1041,44 @@ body.dark-mode {
     text-align: center;
 }
 
+/* Bot Limit Slider */
+.bot-limit-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.bot-limit-slider {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.bot-limit-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.bot-limit-display {
+    background: #3b82f6;
+    color: #ffffff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+    min-width: 80px;
+    text-align: center;
+}
+
 /* Status Section */
 .status-section {
     background: linear-gradient(135deg, #059669 0%, #10b981 100%);
