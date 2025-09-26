@@ -842,38 +842,27 @@ async function closePositionAtMarket(position) {
             log(`⚠️ Aucun position à fermer pour ${position.symbol} (code 22002) - Suppression locale`, 'WARNING');
             return true; // rien à fermer côté Bitget, mais on poursuit la gestion locale
         } else {
-            log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || result?.code || 'Erreur inconnue'}`, 'ERROR');
+            // 🚨 SOLUTION DIRECTE: Afficher l'erreur dans la console ET les logs
+            const errorMsg = `❌ FERMETURE ÉCHOUÉE ${position.symbol}`;
+            const bitgetCode = result?.code || 'NO_CODE';
+            const bitgetMsg = result?.msg || 'NO_MESSAGE';
             
-            // 🔧 DIAGNOSTIC COMPLET: Log de l'erreur API
-            log(`🚨 ERREUR API FERMETURE - Analyse détaillée:`, 'ERROR');
-            log(`=`.repeat(60), 'ERROR');
+            console.error(errorMsg);
+            console.error(`🔴 BITGET ERROR: ${bitgetCode} - ${bitgetMsg}`);
+            console.error(`📋 ORDER SENT:`, orderData);
+            console.error(`📡 FULL RESPONSE:`, result);
             
-            if (result) {
-                log(`📡 RÉPONSE API:`, 'ERROR');
-                log(`   Code: ${result.code} (${typeof result.code})`, 'ERROR');
-                log(`   Message: ${result.msg}`, 'ERROR');
-                log(`   RequestTime: ${result.requestTime}`, 'ERROR');
-                
-                if (result.data) {
-                    log(`   Data: ${JSON.stringify(result.data, null, 2)}`, 'ERROR');
-                } else {
-                    log(`   Data: NULL/UNDEFINED`, 'ERROR');
-                }
-                
-                // Réponse complète
-                log(`📄 RÉPONSE COMPLÈTE:`, 'ERROR');
-                log(JSON.stringify(result, null, 2), 'ERROR');
-            } else {
-                log(`❌ AUCUNE RÉPONSE API (result = ${result})`, 'ERROR');
+            log(errorMsg, 'ERROR');
+            log(`🔴 Code Bitget: ${bitgetCode}`, 'ERROR');
+            log(`🔴 Message Bitget: ${bitgetMsg}`, 'ERROR');
+            
+            // 🎯 ACTIONS CORRECTIVES AUTOMATIQUES
+            if (bitgetCode === '22002') {
+                // Position n'existe plus côté API - la supprimer localement
+                console.log(`🧹 AUTO-FIX: Position ${position.symbol} supprimée côté API, nettoyage local...`);
+                log(`🧹 AUTO-FIX: Suppression locale position inexistante ${position.symbol}`, 'WARNING');
+                return true; // Traiter comme succès pour permettre la suppression locale
             }
-            
-            // Suggestions de correction
-            log(`💡 SUGGESTIONS DE CORRECTION:`, 'ERROR');
-            log(`   1. Vérifier que le symbol existe: ${orderData.symbol}`, 'ERROR');
-            log(`   2. Vérifier la quantité: ${orderData.size}`, 'ERROR');
-            log(`   3. Vérifier si position existe côté API`, 'ERROR');
-            log(`   4. Vérifier les permissions API`, 'ERROR');
-            log(`=`.repeat(60), 'ERROR');
             
             return false;
         }
@@ -1469,6 +1458,67 @@ window.openPosition = openPosition;
 window.monitorPnLAndClose = monitorPnLAndClose;
 window.closePositionAtMarket = closePositionAtMarket;
 window.diagnosePosState = diagnosePosState;
+
+// 🚀 SOLUTION IMMÉDIATE: Nettoyer et synchroniser les positions
+window.fixPositions = async function() {
+    console.log('🔧 RÉPARATION POSITIONS - Démarrage...');
+    console.log('='.repeat(50));
+    
+    try {
+        const beforeLocal = openPositions.length;
+        console.log(`📊 Positions locales avant: ${beforeLocal}`);
+        
+        // 1. Récupérer les positions réelles depuis l'API
+        console.log('📡 Récupération positions API...');
+        const apiPositions = await fetchActivePositionsFromAPI();
+        console.log(`📡 Positions API actives: ${apiPositions.length}`);
+        
+        // 2. Supprimer les positions locales qui n'existent plus côté API
+        const toRemove = [];
+        openPositions.forEach((localPos, index) => {
+            const existsInAPI = apiPositions.some(apiPos => 
+                apiPos.symbol === localPos.symbol && Math.abs(parseFloat(apiPos.total)) > 0
+            );
+            
+            if (!existsInAPI) {
+                toRemove.push({index, position: localPos});
+                console.log(`❌ À supprimer: ${localPos.symbol} (n'existe plus côté API)`);
+            }
+        });
+        
+        // 3. Supprimer en ordre inverse pour ne pas décaler les indices
+        toRemove.reverse().forEach(item => {
+            openPositions.splice(item.index, 1);
+            console.log(`🗑️ Supprimé: ${item.position.symbol}`);
+        });
+        
+        const afterLocal = openPositions.length;
+        console.log(`\n✅ NETTOYAGE TERMINÉ:`);
+        console.log(`   Avant: ${beforeLocal} positions`);
+        console.log(`   Après: ${afterLocal} positions`);
+        console.log(`   Supprimées: ${toRemove.length} positions`);
+        
+        // 4. Mettre à jour l'affichage
+        updatePositionsDisplay();
+        
+        // 5. Diagnostic final
+        const botCount = getBotManagedPositionsCount();
+        const maxBot = getMaxBotPositions();
+        console.log(`\n🤖 Positions bot: ${botCount}/${maxBot}`);
+        console.log(`🎯 Slots disponibles: ${maxBot - botCount}`);
+        
+        return {
+            removed: toRemove.length,
+            remaining: afterLocal,
+            botPositions: botCount,
+            availableSlots: maxBot - botCount
+        };
+        
+    } catch (error) {
+        console.error('❌ Erreur réparation positions:', error);
+        return null;
+    }
+};
 
 // 🔧 FONCTIONS DE DIAGNOSTIC EXPORTÉES
 
