@@ -3053,6 +3053,33 @@ window.fixTPConfig = function() {
     return true;
 };
 
+// 🔍 FONCTION DE DIAGNOSTIC: État actuel des positions
+window.diagnosePosState = function() {
+    console.log('🔍 DIAGNOSTIC: État des positions');
+    console.log('='.repeat(50));
+    
+    console.log(`📊 Positions locales: ${openPositions.length}`);
+    console.log(`🤖 Positions bot: ${getBotManagedPositionsCount()}`);
+    console.log(`🎯 Limite bot: ${getMaxBotPositions()}`);
+    console.log(`🏃 Bot actif: ${botRunning ? '✅' : '❌'}`);
+    
+    if (openPositions.length > 0) {
+        console.log('\n📋 DÉTAIL POSITIONS:');
+        openPositions.forEach((pos, i) => {
+            const botFlag = pos.isBotManaged ? '🤖' : '👤';
+            const pnl = pos.pnlPercent ? `(${pos.pnlPercent.toFixed(2)}%)` : '(PnL?)';
+            console.log(`  ${i+1}. ${botFlag} ${pos.symbol} ${pos.side} ${pnl}`);
+        });
+    }
+    
+    return {
+        total: openPositions.length,
+        bot: getBotManagedPositionsCount(),
+        limit: getMaxBotPositions(),
+        running: botRunning
+    };
+};
+
 // 🔧 FONCTION DE DIAGNOSTIC: Analyser l'erreur 400 de fermeture
 window.debug400CloseError = async function() {
     console.log('🔍 DIAGNOSTIC: Erreur 400 fermeture de position...');
