@@ -2603,6 +2603,20 @@ window.debugTakeProfit = async function() {
     console.log(`   config.targetPnL: ${config.targetPnL}%`);
     console.log(`   botRunning: ${typeof botRunning !== 'undefined' ? botRunning : 'UNDEFINED'}`);
     
+    // 🔧 DEBUG: Vérifier la configuration complète
+    console.log('\n🔧 Configuration détaillée:');
+    console.log(`   config object:`, config);
+    console.log(`   config.targetPnL (raw): ${config.targetPnL} (${typeof config.targetPnL})`);
+    
+    // 🔧 Vérifier l'élément HTML du slider
+    const slider = document.getElementById('targetPnLRange');
+    if (slider) {
+        console.log(`   Slider HTML value: ${slider.value} (${typeof slider.value})`);
+        console.log(`   Slider min: ${slider.min}, max: ${slider.max}, step: ${slider.step}`);
+    } else {
+        console.log(`   ⚠️ Slider targetPnLRange introuvable`);
+    }
+    
     // 2. Vérifier les positions du bot
     const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
     console.log(`\n🤖 Positions du bot: ${botPositions.length}`);
@@ -2888,6 +2902,52 @@ window.checkTPMonitoring = function() {
         botPositions: botPositions.length,
         targetPnL: config.targetPnL
     };
+};
+
+// 🔧 FONCTION DE CORRECTION: Synchroniser la configuration TP
+window.fixTPConfig = function() {
+    console.log('🔧 CORRECTION: Synchronisation configuration TP...');
+    console.log('='.repeat(50));
+    
+    // 1. Lire la valeur du slider
+    const slider = document.getElementById('targetPnLRange');
+    if (!slider) {
+        console.log('❌ Slider targetPnLRange introuvable');
+        return false;
+    }
+    
+    const sliderValue = parseFloat(slider.value);
+    console.log(`📊 Valeur slider: ${sliderValue}%`);
+    
+    // 2. Mettre à jour la configuration
+    const oldValue = config.targetPnL;
+    config.targetPnL = sliderValue;
+    
+    console.log(`🔄 Configuration mise à jour:`);
+    console.log(`   Ancien: ${oldValue}%`);
+    console.log(`   Nouveau: ${config.targetPnL}%`);
+    
+    // 3. Mettre à jour les positions existantes
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    console.log(`\n🤖 Mise à jour ${botPositions.length} positions bot...`);
+    
+    botPositions.forEach((pos, index) => {
+        const oldTarget = pos.targetPnL;
+        pos.targetPnL = config.targetPnL;
+        console.log(`   ${index + 1}. ${pos.symbol}: ${oldTarget}% → ${pos.targetPnL}%`);
+    });
+    
+    // 4. Mettre à jour l'affichage
+    const display = document.getElementById('targetPnLDisplay');
+    if (display) {
+        display.textContent = `+${config.targetPnL}%`;
+        console.log(`✅ Affichage mis à jour: +${config.targetPnL}%`);
+    }
+    
+    console.log('\n✅ Configuration TP synchronisée !');
+    console.log(`🎯 Nouvel objectif: ${config.targetPnL}% pour toutes les positions bot`);
+    
+    return true;
 };
 
 // 🔧 FONCTION DE TEST: Tester la fermeture TP avec diagnostic complet

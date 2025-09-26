@@ -481,11 +481,30 @@ async function getCurrentPrice(symbol) {
         }
         
         if (data.code === '00000' && data.data) {
-            const price = parseFloat(data.data.lastPr);
+            // 🔧 DEBUG: Afficher la structure complète des données
+            console.log(`🔍 Structure données ${symbol}:`, data.data);
+            
+            // Tenter plusieurs champs possibles pour le prix
+            let price = null;
+            if (data.data.lastPr) {
+                price = parseFloat(data.data.lastPr);
+            } else if (data.data.last) {
+                price = parseFloat(data.data.last);
+            } else if (data.data.close) {
+                price = parseFloat(data.data.close);
+            } else if (data.data.price) {
+                price = parseFloat(data.data.price);
+            }
+            
             if (price && price > 0) {
+                console.log(`✅ Prix ${symbol} trouvé: ${price}`);
                 return price;
             } else {
-                console.log(`⚠️ Prix ${symbol} invalide: ${data.data.lastPr}`);
+                console.log(`⚠️ Prix ${symbol} invalide dans:`, data.data);
+                console.log(`   lastPr: ${data.data.lastPr}`);
+                console.log(`   last: ${data.data.last}`);
+                console.log(`   close: ${data.data.close}`);
+                console.log(`   price: ${data.data.price}`);
             }
         }
         return null;
