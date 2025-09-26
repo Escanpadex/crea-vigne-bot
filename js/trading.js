@@ -786,13 +786,15 @@ async function closePositionAtMarket(position) {
             return false;
         }
         
+        const isShortPosition = (position.side || '').toString().toUpperCase() === 'SHORT';
+        const closeSide = isShortPosition ? "buy" : "sell";
         const orderData = {
             symbol: position.symbol,
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
             size: String(closeQuantity), // 🔧 CORRECTION: String + quantité absolue
-            side: "sell",
+            side: closeSide,
             tradeSide: "close",
             orderType: "market",
             clientOid: `tp_${Date.now()}_${position.symbol}`, // 🔧 Préfixe TP

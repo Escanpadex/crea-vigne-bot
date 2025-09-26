@@ -22,13 +22,14 @@ async function makeRequest(endpoint, options = {}) {
             headers
         });
         
+        const responseClone = response.clone();
         let data = null;
         try {
-            data = await response.json();
+            data = await responseClone.json();
         } catch (parseError) {
             log(`Erreur API: Réponse non JSON (${parseError.message})`, 'ERROR');
         }
-        
+
         if (!response.ok) {
             const statusInfo = `${response.status} ${response.statusText}`;
             const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
