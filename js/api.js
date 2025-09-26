@@ -481,30 +481,41 @@ async function getCurrentPrice(symbol) {
         }
         
         if (data.code === '00000' && data.data) {
-            // 🔧 DEBUG: Afficher la structure complète des données
-            console.log(`🔍 Structure données ${symbol}:`, data.data);
+            // 🔧 CORRECTION: L'API retourne un Array, pas un objet
+            let tickerData = data.data;
+            
+            // Si c'est un array, prendre le premier élément
+            if (Array.isArray(tickerData) && tickerData.length > 0) {
+                tickerData = tickerData[0];
+                console.log(`🔍 Données ticker ${symbol}:`, tickerData);
+            } else if (!Array.isArray(tickerData)) {
+                console.log(`🔍 Données ticker ${symbol} (objet direct):`, tickerData);
+            } else {
+                console.log(`❌ Array vide pour ${symbol}:`, data.data);
+                return null;
+            }
             
             // Tenter plusieurs champs possibles pour le prix
             let price = null;
-            if (data.data.lastPr) {
-                price = parseFloat(data.data.lastPr);
-            } else if (data.data.last) {
-                price = parseFloat(data.data.last);
-            } else if (data.data.close) {
-                price = parseFloat(data.data.close);
-            } else if (data.data.price) {
-                price = parseFloat(data.data.price);
+            if (tickerData.lastPr) {
+                price = parseFloat(tickerData.lastPr);
+            } else if (tickerData.last) {
+                price = parseFloat(tickerData.last);
+            } else if (tickerData.close) {
+                price = parseFloat(tickerData.close);
+            } else if (tickerData.price) {
+                price = parseFloat(tickerData.price);
             }
             
             if (price && price > 0) {
                 console.log(`✅ Prix ${symbol} trouvé: ${price}`);
                 return price;
             } else {
-                console.log(`⚠️ Prix ${symbol} invalide dans:`, data.data);
-                console.log(`   lastPr: ${data.data.lastPr}`);
-                console.log(`   last: ${data.data.last}`);
-                console.log(`   close: ${data.data.close}`);
-                console.log(`   price: ${data.data.price}`);
+                console.log(`⚠️ Prix ${symbol} invalide dans:`, tickerData);
+                console.log(`   lastPr: ${tickerData.lastPr}`);
+                console.log(`   last: ${tickerData.last}`);
+                console.log(`   close: ${tickerData.close}`);
+                console.log(`   price: ${tickerData.price}`);
             }
         }
         return null;
@@ -695,18 +706,23 @@ window.testGetCurrentPrice = async function(symbol = 'BTCUSDT') {
         const price = await getCurrentPrice(symbol);
         if (price) {
             console.log(`✅ Prix récupéré: ${symbol} = ${price}`);
+            console.log(`🎯 getCurrentPrice() fonctionne maintenant !`);
             return price;
         } else {
             console.log(`❌ Échec récupération prix ${symbol}`);
             
-            // Test manuel de l'URL
+            // Test manuel de l'URL pour debug
             console.log('🔍 Test manuel de l\'URL...');
             const testUrl = `${API_BASE}/bitget/api/v2/mix/market/ticker?symbol=${symbol}&productType=USDT-FUTURES`;
             console.log(`URL: ${testUrl}`);
             
             const response = await fetch(testUrl);
             const data = await response.json();
-            console.log('Réponse API:', data);
+            console.log('Réponse API complète:', data);
+            
+            if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+                console.log('Premier élément du tableau:', data.data[0]);
+            }
             
             return null;
         }
