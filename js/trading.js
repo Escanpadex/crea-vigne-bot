@@ -802,9 +802,9 @@ async function closePositionAtMarket(position) {
         };
         
         // 🔧 DIAGNOSTIC COMPLET: Log des données de fermeture
-        log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
-        log(`🔍 DIAGNOSTIC FERMETURE - Données complètes:`, 'ERROR');
-        log(`=`.repeat(60), 'ERROR');
+            log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
+            log(`🔍 DIAGNOSTIC FERMETURE - Données complètes:`, 'ERROR');
+            log(`_${Date.now()}_${Math.random().toString(16).slice(2)} DEBUG_CLOSE_START`, 'ERROR');
         
         // Position complète
         log(`📊 POSITION ORIGINALE:`, 'ERROR');
@@ -832,6 +832,9 @@ async function closePositionAtMarket(position) {
         
         const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
+            headers: {
+                'X-Debug-Close': `symbol:${orderData.symbol};side:${orderData.side};size:${orderData.size}`
+            },
             body: JSON.stringify(orderData)
         });
         
@@ -1470,7 +1473,6 @@ window.monitorPnLAndClose = monitorPnLAndClose;
 window.closePositionAtMarket = closePositionAtMarket;
 
 // 🔧 FONCTIONS DE DIAGNOSTIC EXPORTÉES
-window.debug400CloseError = debug400CloseError;
 
 // 🔧 FONCTION DE NETTOYAGE RAPIDE: Supprimer positions fermées côté API
 window.cleanClosedPositions = async function() {
