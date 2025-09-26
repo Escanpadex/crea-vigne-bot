@@ -14,13 +14,13 @@ function formatNumber(num) {
 }
 
 function updateStats() {
-    // 🔧 FONCTION AMÉLIORÉE: Mise à jour des statistiques avec nouvelle interface
-    const MAX_SIMULTANEOUS_POSITIONS = 2;
+    // 🔧 FONCTION AMÉLIORÉE: Mise à jour des statistiques avec limite configurable
+    const MAX_BOT_POSITIONS = config.maxBotPositions || 2;
     
     // Calculer les positions par type
     const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
     const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositions.length;
+    const availableSlots = MAX_BOT_POSITIONS - botPositions.length;
     
     // 🛡️ SÉCURITÉ: Vérifier que les éléments existent avant de les modifier
     const elements = {
@@ -45,7 +45,7 @@ function updateStats() {
     if (elements.losingPositions) elements.losingPositions.textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
     
     // Mise à jour nouveaux éléments
-    if (elements.botPositionsCount) elements.botPositionsCount.textContent = `${botPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`;
+    if (elements.botPositionsCount) elements.botPositionsCount.textContent = `${botPositions.length}/${MAX_BOT_POSITIONS}`;
     if (elements.manualPositionsCount) elements.manualPositionsCount.textContent = manualPositions.length.toString();
     
     // Mise à jour du statut dot
@@ -61,10 +61,31 @@ function updateStats() {
     if (typeof botRunning !== 'undefined' && botRunning && availableSlots > 0) {
         // Log seulement toutes les 5 minutes pour éviter le spam
         if (!window.lastPositionInfoLog || Date.now() - window.lastPositionInfoLog > 300000) {
-            log(`📊 Slots bot disponibles: ${availableSlots}/${MAX_SIMULTANEOUS_POSITIONS} (+ ${manualPositions.length} manuelles)`, 'INFO');
+            log(`📊 Slots bot disponibles: ${availableSlots}/${MAX_BOT_POSITIONS} (+ ${manualPositions.length} manuelles)`, 'INFO');
             window.lastPositionInfoLog = Date.now();
         }
     }
+}
+
+// 🆕 FONCTION D'INITIALISATION: Initialiser les curseurs de configuration
+function initializeConfigSliders() {
+    // Initialiser le curseur PnL
+    const pnlSlider = document.getElementById('targetPnLRange');
+    const pnlDisplay = document.getElementById('targetPnLDisplay');
+    if (pnlSlider && pnlDisplay) {
+        pnlSlider.value = config.targetPnL || 2.0;
+        pnlDisplay.textContent = `+${config.targetPnL || 2.0}%`;
+    }
+    
+    // Initialiser le curseur limite bot
+    const botLimitSlider = document.getElementById('botLimitRange');
+    const botLimitDisplay = document.getElementById('botLimitDisplay');
+    if (botLimitSlider && botLimitDisplay) {
+        botLimitSlider.value = config.maxBotPositions || 2;
+        botLimitDisplay.textContent = `${config.maxBotPositions || 2} positions max`;
+    }
+    
+    log('⚙️ Curseurs de configuration initialisés', 'INFO');
 }
 
 // NEW: Update version timestamp
@@ -109,7 +130,7 @@ function saveKeys() {
 
 // 🔧 FONCTION CORRIGÉE: Afficher un résumé des positions (sans limite d'affichage)
 function showPositionSummary() {
-    const MAX_BOT_POSITIONS = 2; // Limite pour le bot seulement
+    const MAX_BOT_POSITIONS = config.maxBotPositions || 2; // Limite configurable pour le bot
     const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
     const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
     const currentPositions = openPositions.length;
@@ -461,7 +482,7 @@ async function analyzePairMACD(symbol, timeframe = '15m') {
 
 // 🔧 FONCTION CORRIGÉE: Forcer le relancement si le bot a des slots disponibles
 function forceAnalysisIfAvailable() {
-    const MAX_BOT_POSITIONS = 2; // Limite pour le bot seulement
+    const MAX_BOT_POSITIONS = config.maxBotPositions || 2; // Limite configurable pour le bot
     const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
     const availableSlots = MAX_BOT_POSITIONS - botPositions.length;
     
@@ -542,9 +563,30 @@ async function getKlineDataWithAggregation(symbol, limit, timeframe) {
     }
 }
 
+// 🆕 NOUVELLE FONCTION: Mettre à jour l'objectif PnL
+function updateTargetPnL(value) {
+    config.targetPnL = parseFloat(value);
+    document.getElementById('targetPnLDisplay').textContent = `+${value}%`;
+    log(`🎯 Objectif PnL mis à jour: ${value}%`, 'INFO');
+}
+
+// 🆕 NOUVELLE FONCTION: Mettre à jour la limite de positions du bot
+function updateBotLimit(value) {
+    const newLimit = parseInt(value);
+    config.maxBotPositions = newLimit;
+    document.getElementById('botLimitDisplay').textContent = `${newLimit} positions max`;
+    log(`🔄 Limite bot mise à jour: ${newLimit} positions maximum`, 'INFO');
+    
+    // Mettre à jour l'affichage des statistiques
+    updateStats();
+}
+
 // Exported for use in backtesting and main
 window.analyzePairMACD = analyzePairMACD;
 window.calculateMACD = calculateMACD;
 window.getMACDParameters = getMACDParameters;
 window.showPositionSummary = showPositionSummary;
-window.forceAnalysisIfAvailable = forceAnalysisIfAvailable; 
+window.forceAnalysisIfAvailable = forceAnalysisIfAvailable;
+window.updateTargetPnL = updateTargetPnL;
+window.updateBotLimit = updateBotLimit;
+window.initializeConfigSliders = initializeConfigSliders; 

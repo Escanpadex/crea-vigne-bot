@@ -2,8 +2,10 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
-// 🎯 NOUVELLE STRATÉGIE: Limite de positions simultanées (2 trades maximum)
-const MAX_SIMULTANEOUS_POSITIONS = 2;
+// 🎯 STRATÉGIE CONFIGURABLE: Limite de positions simultanées (2-5 trades configurables)
+function getMaxBotPositions() {
+    return config.maxBotPositions || 2;
+}
 
 // 🆕 NOUVELLE FONCTION: Wrapper de retry pour les appels API
 async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
@@ -156,9 +158,9 @@ function getBotManagedPositionsCount() {
 function selectRandomPositivePair(excludeSymbols = []) {
     // 🔧 CORRECTION: Vérifier seulement les positions du bot, pas les manuelles
     const botPositionsCount = getBotManagedPositionsCount();
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsCount;
+    const availableSlots = getMaxBotPositions() - botPositionsCount;
     if (availableSlots <= 0) {
-        log(`⚠️ Limite bot atteinte: ${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} positions bot (${openPositions.length} total dont manuelles) - Pas de sélection`, 'INFO');
+        log(`⚠️ Limite bot atteinte: ${botPositionsCount}/${getMaxBotPositions()} positions bot (${openPositions.length} total dont manuelles) - Pas de sélection`, 'INFO');
         return null;
     }
     
@@ -462,8 +464,8 @@ function canOpenNewPosition(symbol) {
     
     // 🔧 CORRECTION: Vérifier seulement la limite des positions du bot
     const botPositionsCount = getBotManagedPositionsCount();
-    if (botPositionsCount >= MAX_SIMULTANEOUS_POSITIONS) {
-        return { canOpen: false, reason: `Limite bot atteinte: ${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} positions automatiques (${openPositions.length} total)` };
+    if (botPositionsCount >= getMaxBotPositions()) {
+        return { canOpen: false, reason: `Limite bot atteinte: ${botPositionsCount}/${getMaxBotPositions()} positions automatiques (${openPositions.length} total)` };
     }
     
     // Vérifier le cooldown (1 minute après fermeture)
@@ -498,8 +500,8 @@ async function openPosition(symbol, selectedPair) {
     
     // 🔧 CORRECTION: Log informatif sur les positions du bot uniquement
     const botPositionsCount = getBotManagedPositionsCount();
-    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsCount;
-    log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${MAX_SIMULTANEOUS_POSITIONS} bot, ${openPositions.length} total)`, 'INFO');
+    const availableSlots = getMaxBotPositions() - botPositionsCount;
+    log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${getMaxBotPositions()} bot, ${openPositions.length} total)`, 'INFO');
     
     const positionValue = calculatePositionSize();
     
@@ -538,7 +540,7 @@ async function openPosition(symbol, selectedPair) {
         }
         
         log(`✅ Position ouverte: ${symbol} - Ordre ID: ${orderResult.data.orderId}`, 'SUCCESS');
-        log(`📊 Positions ouvertes: ${openPositions.length + 1}/${MAX_SIMULTANEOUS_POSITIONS}`, 'INFO');
+        log(`📊 Positions ouvertes: ${openPositions.length + 1}/${getMaxBotPositions()}`, 'INFO');
         
         // 🆕 AMÉLIORATION: Ajouter cooldown 12h pour cette paire (empêcher re-trade immédiat)
         addTradedPairCooldown(symbol);
@@ -691,7 +693,7 @@ async function monitorPnLAndClose() {
                     
                     // 🔧 CORRECTION: Déclencher seulement si le bot a des slots libres
                     const botPositionsAfterClose = getBotManagedPositionsCount();
-                    const availableSlots = MAX_SIMULTANEOUS_POSITIONS - botPositionsAfterClose;
+                    const availableSlots = getMaxBotPositions() - botPositionsAfterClose;
                     if (availableSlots > 0) {
                         log(`🔄 Position bot fermée - Déclenchement immédiat d'une nouvelle sélection (${availableSlots} slots bot libres)`, 'INFO');
                         setTimeout(() => {
@@ -1206,7 +1208,7 @@ async function importExistingPositions() {
             }
             
             // 🔧 CORRECTION: Ne plus limiter l'import des positions - Afficher toutes les positions
-            // L'ancienne logique limitait l'affichage à MAX_SIMULTANEOUS_POSITIONS (2) positions
+            // L'ancienne logique limitait l'affichage à getMaxBotPositions() (2) positions
             // Maintenant on affiche toutes les positions (bot + manuelles)
             log(`📊 Import de toutes les positions: ${apiPositions.length} positions trouvées`, 'INFO');
             
@@ -1266,7 +1268,7 @@ async function importExistingPositions() {
             
             if (imported > 0) {
                 log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
-                log(`📊 État final après import: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS} positions actives`, 'INFO');
+                log(`📊 État final après import: ${openPositions.length}/${getMaxBotPositions()} positions actives`, 'INFO');
                 
                 // Log détaillé des positions importées
                 openPositions.forEach((pos, idx) => {
@@ -1312,7 +1314,7 @@ async function importExistingPositions() {
                 
             } else {
                 log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
-                log(`📊 État: ${openPositions.length}/${MAX_SIMULTANEOUS_POSITIONS} positions actives`, 'INFO');
+                log(`📊 État: ${openPositions.length}/${getMaxBotPositions()} positions actives`, 'INFO');
                 
                 // Même si aucune position n'est importée, s'assurer que l'affichage est correct
                 if (openPositions.length > 0) {
@@ -2416,7 +2418,7 @@ window.testBotPositionLimits = function() {
     const manualPositions = openPositions.filter(pos => pos.isBotManaged !== true);
     
     console.log(`📊 État actuel:`);
-    console.log(`   🤖 Positions bot: ${botPositions.length}/${MAX_SIMULTANEOUS_POSITIONS}`);
+    console.log(`   🤖 Positions bot: ${botPositions.length}/${getMaxBotPositions()}`);
     console.log(`   👤 Positions manuelles: ${manualPositions.length}`);
     console.log(`   📈 Total: ${openPositions.length}`);
     
@@ -2444,10 +2446,10 @@ window.testBotPositionLimits = function() {
     
     // Recommandations
     console.log(`\n💡 État:`);
-    if (botPositions.length < MAX_SIMULTANEOUS_POSITIONS) {
-        console.log(`✅ Le bot peut ouvrir ${MAX_SIMULTANEOUS_POSITIONS - botPositions.length} position(s) supplémentaire(s)`);
+    if (botPositions.length < getMaxBotPositions()) {
+        console.log(`✅ Le bot peut ouvrir ${getMaxBotPositions() - botPositions.length} position(s) supplémentaire(s)`);
     } else {
-        console.log(`⚠️ Le bot a atteint sa limite (${MAX_SIMULTANEOUS_POSITIONS} positions)`);
+        console.log(`⚠️ Le bot a atteint sa limite (${getMaxBotPositions()} positions)`);
     }
     
     if (manualPositions.length > 0) {
@@ -2458,6 +2460,6 @@ window.testBotPositionLimits = function() {
         botPositions: botPositions.length,
         manualPositions: manualPositions.length,
         total: openPositions.length,
-        botCanOpen: botPositions.length < MAX_SIMULTANEOUS_POSITIONS
+        botCanOpen: botPositions.length < getMaxBotPositions()
     };
 };

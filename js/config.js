@@ -38,6 +38,7 @@ let config = {
     trailingStop: 1.0,
     cooldownMinutes: 30,
     targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
+    maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
         maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)
