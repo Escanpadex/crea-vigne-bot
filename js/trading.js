@@ -832,9 +832,6 @@ async function closePositionAtMarket(position) {
         
         const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
-            headers: {
-                'X-Debug-Close': `symbol:${orderData.symbol};side:${orderData.side};size:${orderData.size}`
-            },
             body: JSON.stringify(orderData)
         });
         
