@@ -442,13 +442,13 @@ async function aggregateDataFromLowerTimeframe(symbol, lowerTimeframe, targetTim
 }
 
 function calculatePositionSize() {
-    // 🎯 NOUVELLE STRATÉGIE: 50% du solde avec levier x2
-    const availableBalance = balance.totalEquity || balance.available || 1000; // Fallback si balance pas disponible
-    const positionValue = availableBalance * 0.5; // 50% du solde
-    
-    log(`💰 Calcul position: Solde disponible ${availableBalance.toFixed(2)}$ → Position ${positionValue.toFixed(2)}$ (50% + levier x2)`, 'INFO');
-    
-    return Math.max(positionValue, 10); // Minimum 10$
+    const availableBalance = balance.totalEquity || balance.available || 1000;
+    const percent = config.capitalPercent || 10;
+    const positionValue = availableBalance * (percent / 100);
+
+    log(`💰 Calcul position: ${availableBalance.toFixed(2)}$ × ${percent}% = ${positionValue.toFixed(2)}$`, 'INFO');
+
+    return Math.max(positionValue, 10);
 }
 
 function hasOpenPosition(symbol) {
