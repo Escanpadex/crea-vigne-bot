@@ -796,7 +796,7 @@ async function closePositionAtMarket(position) {
             tradeSide: "close",
             orderType: "market",
             clientOid: `tp_${Date.now()}_${position.symbol}`, // 🔧 Préfixe TP
-            reduceOnly: "yes" // 🔧 AJOUT: Force reduce only pour fermeture
+            reduceOnly: "YES" // 🔧 AJOUT: Force reduce only pour fermeture
         };
         
         // 🔧 DIAGNOSTIC COMPLET: Log des données de fermeture
@@ -3093,7 +3093,7 @@ window.debug400CloseError = async function() {
                 tradeSide: "close",
                 orderType: "market",
                 clientOid: `debug_${Date.now()}_${position.symbol}`,
-                reduceOnly: "yes"
+                reduceOnly: "YES"
             };
             
             console.log('\n📋 Ordre qui serait envoyé:');
@@ -3193,7 +3193,7 @@ window.testTPClosure = async function() {
                     tradeSide: "close",
                     orderType: "market",
                     clientOid: `test_tp_${Date.now()}_${position.symbol}`,
-                    reduceOnly: "yes"
+                    reduceOnly: "YES"
                 };
                 
                 console.log('   📋 Données fermeture simulées:');

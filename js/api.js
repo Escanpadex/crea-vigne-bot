@@ -22,7 +22,20 @@ async function makeRequest(endpoint, options = {}) {
             headers
         });
         
-        return await response.json();
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            log(`Erreur API: Réponse non JSON (${parseError.message})`, 'ERROR');
+        }
+        
+        if (!response.ok) {
+            const statusInfo = `${response.status} ${response.statusText}`;
+            const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
+            log(`Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
+        }
+
+        return data;
     } catch (error) {
         log(`Erreur API: ${error.message}`, 'ERROR');
         return null;
