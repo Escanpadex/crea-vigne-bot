@@ -838,6 +838,9 @@ async function closePositionAtMarket(position) {
         if (result && result.code === '00000') {
             log(`✅ Ordre de fermeture placé: ${position.symbol} - ID: ${result.data.orderId}`, 'SUCCESS');
             return true;
+        } else if (result && result.code === '22002') {
+            log(`⚠️ Aucun position à fermer pour ${position.symbol} (code 22002) - Suppression locale`, 'WARNING');
+            return true; // rien à fermer côté Bitget, mais on poursuit la gestion locale
         } else {
             log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || result?.code || 'Erreur inconnue'}`, 'ERROR');
             
