@@ -1464,6 +1464,63 @@ window.openPosition = openPosition;
 window.monitorPnLAndClose = monitorPnLAndClose;
 window.closePositionAtMarket = closePositionAtMarket;
 
+// 🔧 FONCTIONS DE DIAGNOSTIC EXPORTÉES
+window.debug400CloseError = debug400CloseError;
+
+// 🔧 FONCTION DE NETTOYAGE RAPIDE: Supprimer positions fermées côté API
+window.cleanClosedPositions = async function() {
+    console.log('🧹 NETTOYAGE: Suppression positions fermées côté API...');
+    console.log('='.repeat(50));
+    
+    try {
+        const beforeCount = openPositions.length;
+        console.log(`📊 Positions locales avant: ${beforeCount}`);
+        
+        // Récupérer positions actives côté API
+        const apiPositions = await fetchActivePositionsFromAPI();
+        console.log(`📡 Positions API actives: ${apiPositions.length}`);
+        
+        // Identifier positions locales qui n'existent plus côté API
+        const toRemove = [];
+        
+        openPositions.forEach((localPos, index) => {
+            const existsInAPI = apiPositions.some(apiPos => 
+                apiPos.symbol === localPos.symbol && 
+                Math.abs(parseFloat(apiPos.size)) > 0
+            );
+            
+            if (!existsInAPI) {
+                toRemove.push({index, position: localPos});
+                console.log(`❌ À supprimer: ${localPos.symbol} (n'existe plus côté API)`);
+            } else {
+                console.log(`✅ Conservé: ${localPos.symbol} (existe côté API)`);
+            }
+        });
+        
+        // Supprimer les positions fermées
+        toRemove.reverse().forEach(item => {
+            openPositions.splice(item.index, 1);
+            console.log(`🗑️ Supprimé: ${item.position.symbol}`);
+        });
+        
+        const afterCount = openPositions.length;
+        console.log(`\n📊 Résultat:`);
+        console.log(`   Avant: ${beforeCount} positions`);
+        console.log(`   Après: ${afterCount} positions`);
+        console.log(`   Supprimées: ${toRemove.length} positions`);
+        
+        if (toRemove.length > 0) {
+            console.log('✅ Positions fermées nettoyées - Erreurs 400 devraient disparaître');
+            updatePositionsDisplay();
+        } else {
+            console.log('ℹ️ Aucun nettoyage nécessaire');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur nettoyage:', error);
+    }
+};
+
 // 🔧 FONCTIONS UTILITAIRES EXPORTÉES
 window.importExistingPositions = importExistingPositions;
 window.canOpenNewPosition = canOpenNewPosition;
