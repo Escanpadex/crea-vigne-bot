@@ -2247,7 +2247,7 @@ window.testPositionDisplayLimit = function() {
     }
     
     console.log('\n🎯 Résumé:');
-    console.log(`   - Limite bot: 2 positions (pour l'ouverture automatique)`);
+    console.log(`   - Limite bot: ${config.maxBotPositions || 2} positions (pour l'ouverture automatique)`);
     console.log(`   - Limite affichage: ${maxDisplayed} positions (configurable)`);
     console.log(`   - Positions manuelles: Aucune limite d'ouverture`);
     
@@ -2754,4 +2754,60 @@ window.fixPnLDisplay = function() {
     console.log('   3. Fallback sur position.size si nécessaire');
     
     return true;
+};
+
+// 🔧 FONCTION DE DIAGNOSTIC: Vérifier l'état de la surveillance TP
+window.checkTPMonitoring = function() {
+    console.log('🔍 DIAGNOSTIC: État de la surveillance Take Profit...');
+    console.log('================================================');
+    
+    // 1. Vérifier si le bot tourne
+    console.log(`🤖 Bot status: ${typeof botRunning !== 'undefined' && botRunning ? '✅ ACTIF' : '❌ ARRÊTÉ'}`);
+    
+    // 2. Vérifier l'intervalle de surveillance
+    console.log(`⏱️ Surveillance PnL: ${typeof pnlMonitoringInterval !== 'undefined' && pnlMonitoringInterval ? '✅ ACTIVE (1s)' : '❌ INACTIVE'}`);
+    
+    // 3. Vérifier les positions bot
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    console.log(`🤖 Positions bot surveillées: ${botPositions.length}`);
+    
+    if (botPositions.length === 0) {
+        console.log('⚠️ Aucune position bot à surveiller');
+        return;
+    }
+    
+    // 4. Tester la fonction de surveillance
+    console.log('\n🧪 Test de la fonction monitorPnLAndClose...');
+    if (typeof monitorPnLAndClose === 'function') {
+        console.log('✅ Fonction monitorPnLAndClose disponible');
+        
+        // Test d'exécution
+        monitorPnLAndClose().then(() => {
+            console.log('✅ Test d\'exécution réussi');
+        }).catch(error => {
+            console.error('❌ Erreur lors du test:', error);
+        });
+    } else {
+        console.log('❌ Fonction monitorPnLAndClose MANQUANTE');
+    }
+    
+    // 5. Vérifier les objectifs TP des positions
+    console.log('\n🎯 Objectifs TP des positions bot:');
+    botPositions.forEach((pos, index) => {
+        const targetPnL = pos.targetPnL || config.targetPnL || 'UNDEFINED';
+        console.log(`   ${index + 1}. ${pos.symbol}: Objectif ${targetPnL}%`);
+    });
+    
+    console.log('\n💡 FONCTIONNEMENT DU SYSTÈME TP:');
+    console.log('   1. Surveillance automatique toutes les 1 seconde');
+    console.log('   2. Calcul PnL en temps réel via getCurrentPrice()');
+    console.log('   3. Si PnL >= Objectif → Ordre MARKET automatique');
+    console.log('   4. Pas d\'ordres préplacés (système réactif)');
+    
+    return {
+        botRunning: typeof botRunning !== 'undefined' && botRunning,
+        monitoringActive: typeof pnlMonitoringInterval !== 'undefined' && pnlMonitoringInterval,
+        botPositions: botPositions.length,
+        targetPnL: config.targetPnL
+    };
 };
