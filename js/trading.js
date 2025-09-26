@@ -2463,3 +2463,47 @@ window.testBotPositionLimits = function() {
         botCanOpen: botPositions.length < getMaxBotPositions()
     };
 };
+
+// 🧪 FONCTION DE TEST: Vérifier la logique d'ouverture multiple de positions
+window.testMultiplePositionOpening = function() {
+    console.log('🧪 Test de la logique d\'ouverture multiple de positions...');
+    
+    const maxBotPositions = getMaxBotPositions();
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    const availableSlots = maxBotPositions - botPositions.length;
+    
+    console.log(`📊 Configuration actuelle:`);
+    console.log(`   Limite bot: ${maxBotPositions} positions`);
+    console.log(`   Positions bot actuelles: ${botPositions.length}`);
+    console.log(`   Slots disponibles: ${availableSlots}`);
+    console.log(`   Tentatives par cycle: ${Math.min(availableSlots, 3)}`);
+    
+    if (availableSlots > 0) {
+        console.log(`✅ Le bot devrait ouvrir ${Math.min(availableSlots, 3)} position(s) au prochain cycle`);
+        console.log(`💡 Si le bot n'ouvre qu'une position, vérifiez:`);
+        console.log(`   - Cooldowns des paires (pairCooldown)`);
+        console.log(`   - Disponibilité des paires positives`);
+        console.log(`   - Erreurs API lors de l'ouverture`);
+        
+        // Vérifier les cooldowns actifs
+        if (typeof pairCooldown !== 'undefined' && pairCooldown.size > 0) {
+            console.log(`⏰ Cooldowns actifs: ${pairCooldown.size} paires en cooldown`);
+            for (const [symbol, endTime] of pairCooldown.entries()) {
+                const remaining = Math.max(0, endTime - Date.now());
+                if (remaining > 0) {
+                    console.log(`   - ${symbol}: ${Math.round(remaining / 60000)} min restantes`);
+                }
+            }
+        }
+    } else {
+        console.log('ℹ️ Aucun slot disponible - Le bot est à sa limite');
+    }
+    
+    return {
+        maxBotPositions,
+        currentBotPositions: botPositions.length,
+        availableSlots,
+        maxAttemptsPerCycle: Math.min(availableSlots, 3),
+        cooldownsActive: typeof pairCooldown !== 'undefined' ? pairCooldown.size : 0
+    };
+};
