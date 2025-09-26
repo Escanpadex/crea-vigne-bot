@@ -771,19 +771,41 @@ async function monitorPnLAndClose() {
 // 🆕 NOUVELLE FONCTION: Fermer une position au marché
 async function closePositionAtMarket(position) {
     try {
+        // 🔧 CORRECTION: Validation des paramètres de fermeture
+        if (!position || !position.symbol || !position.quantity) {
+            log(`❌ Paramètres position invalides pour fermeture`, 'ERROR');
+            log(`   Position: ${JSON.stringify(position)}`, 'ERROR');
+            return false;
+        }
+        
+        // 🔧 CORRECTION: Utiliser la quantité absolue (sans signe négatif)
+        const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
+        
+        if (!closeQuantity || parseFloat(closeQuantity) <= 0) {
+            log(`❌ Quantité invalide pour fermeture: ${position.quantity} → ${closeQuantity}`, 'ERROR');
+            return false;
+        }
+        
         const orderData = {
             symbol: position.symbol,
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
-            size: position.quantity.toString(),
+            size: String(closeQuantity), // 🔧 CORRECTION: String + quantité absolue
             side: "sell",
             tradeSide: "close",
             orderType: "market",
-            clientOid: `close_${Date.now()}_${position.symbol}`
+            clientOid: `tp_${Date.now()}_${position.symbol}`, // 🔧 Préfixe TP
+            reduceOnly: "YES" // 🔧 AJOUT: Force reduce only pour fermeture
         };
         
+        // 🔧 DIAGNOSTIC: Log des données de fermeture
         log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
+        log(`🔍 Données fermeture:`, 'DEBUG');
+        log(`   Symbol: ${orderData.symbol}`, 'DEBUG');
+        log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
+        log(`   Quantité originale: ${position.quantity}`, 'DEBUG');
+        log(`   Quantité calculée: ${closeQuantity}`, 'DEBUG');
         
         const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -794,7 +816,18 @@ async function closePositionAtMarket(position) {
             log(`✅ Ordre de fermeture placé: ${position.symbol} - ID: ${result.data.orderId}`, 'SUCCESS');
             return true;
         } else {
-            log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || 'Erreur inconnue'}`, 'ERROR');
+            log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || result?.code || 'Erreur inconnue'}`, 'ERROR');
+            
+            // 🔧 DIAGNOSTIC: Log de l'erreur complète
+            if (result) {
+                log(`🔍 Réponse API fermeture:`, 'ERROR');
+                log(`   Code: ${result.code}`, 'ERROR');
+                log(`   Message: ${result.msg}`, 'ERROR');
+                if (result.data) {
+                    log(`   Data: ${JSON.stringify(result.data)}`, 'ERROR');
+                }
+            }
+            
             return false;
         }
         
@@ -2855,6 +2888,90 @@ window.checkTPMonitoring = function() {
         botPositions: botPositions.length,
         targetPnL: config.targetPnL
     };
+};
+
+// 🔧 FONCTION DE TEST: Tester la fermeture TP avec diagnostic complet
+window.testTPClosure = async function() {
+    console.log('🔍 TEST: Fermeture Take Profit avec diagnostic...');
+    console.log('='.repeat(60));
+    
+    try {
+        // 1. Vérifier les positions bot éligibles au TP
+        console.log('1️⃣ Positions bot éligibles au TP...');
+        
+        const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+        console.log(`   🤖 Positions bot: ${botPositions.length}`);
+        
+        if (botPositions.length === 0) {
+            console.log('❌ Aucune position bot à tester');
+            return;
+        }
+        
+        // 2. Analyser chaque position
+        console.log('\n2️⃣ Analyse des positions...');
+        
+        for (const position of botPositions) {
+            console.log(`\n📊 ${position.symbol}:`);
+            console.log(`   Prix d'entrée: ${position.entryPrice}`);
+            console.log(`   Quantité: ${position.quantity} (${typeof position.quantity})`);
+            console.log(`   Objectif TP: ${position.targetPnL || config.targetPnL}%`);
+            
+            // Calculer le PnL actuel
+            let currentPnL = 0;
+            if (position.unrealizedPnL && position.quantity && position.entryPrice) {
+                const initialValue = position.quantity * position.entryPrice;
+                currentPnL = (position.unrealizedPnL / initialValue) * 100;
+                console.log(`   PnL actuel: ${currentPnL.toFixed(3)}% (${position.unrealizedPnL.toFixed(2)}$)`);
+            } else {
+                console.log(`   ⚠️ PnL non calculable - données manquantes`);
+                console.log(`     unrealizedPnL: ${position.unrealizedPnL}`);
+                console.log(`     quantity: ${position.quantity}`);
+                console.log(`     entryPrice: ${position.entryPrice}`);
+            }
+            
+            // Vérifier si éligible TP
+            const targetPnL = position.targetPnL || config.targetPnL || 2;
+            const isEligible = currentPnL >= targetPnL;
+            console.log(`   ${isEligible ? '🎯 ÉLIGIBLE TP' : '⏳ Pas encore éligible'}`);
+            
+            // 3. Test de fermeture (SIMULATION)
+            if (isEligible) {
+                console.log(`\n3️⃣ Test fermeture ${position.symbol} (SIMULATION)...`);
+                
+                // Préparer les données de fermeture
+                const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
+                
+                const orderData = {
+                    symbol: position.symbol,
+                    productType: "USDT-FUTURES",
+                    marginMode: "isolated",
+                    marginCoin: "USDT",
+                    size: String(closeQuantity),
+                    side: "sell",
+                    tradeSide: "close",
+                    orderType: "market",
+                    clientOid: `test_tp_${Date.now()}_${position.symbol}`,
+                    reduceOnly: "YES"
+                };
+                
+                console.log('   📋 Données fermeture simulées:');
+                console.log('   ', JSON.stringify(orderData, null, 4));
+                
+                console.log('   ⚠️ SIMULATION - Aucun ordre réel placé');
+                // Pour tester réellement, décommentez :
+                // const result = await closePositionAtMarket(position);
+                // console.log(`   Résultat: ${result ? '✅ Succès' : '❌ Échec'}`);
+            }
+        }
+        
+        console.log('\n✅ Test TP terminé');
+        console.log('\n💡 Pour tester la fermeture réelle:');
+        console.log('   1. Décommentez la ligne closePositionAtMarket() dans testTPClosure()');
+        console.log('   2. Ou utilisez forceTakeProfit() pour forcer les fermetures');
+        
+    } catch (error) {
+        console.error('❌ Erreur test TP:', error);
+    }
 };
 
 // 🔧 FONCTION DE DIAGNOSTIC: Tester l'ouverture d'une position avec debug complet
