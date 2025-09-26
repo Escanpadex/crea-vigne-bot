@@ -2811,3 +2811,54 @@ window.checkTPMonitoring = function() {
         targetPnL: config.targetPnL
     };
 };
+
+// 🔍 FONCTION DE SUIVI: Surveiller l'ouverture des positions en temps réel
+window.watchPositionOpening = function() {
+    console.log('👀 SURVEILLANCE: Ouverture de positions en cours...');
+    
+    const initialBotPositions = openPositions.filter(pos => pos.isBotManaged === true).length;
+    const maxBotPositions = config.maxBotPositions || 2;
+    const availableSlots = maxBotPositions - initialBotPositions;
+    
+    console.log(`📊 État initial: ${initialBotPositions}/${maxBotPositions} positions bot`);
+    console.log(`🎯 Objectif: Ouvrir ${availableSlots} position(s) supplémentaire(s)`);
+    console.log('⏱️ Surveillance active... (Ctrl+C pour arrêter)');
+    
+    let checkCount = 0;
+    const maxChecks = 120; // 2 minutes max
+    
+    const watchInterval = setInterval(() => {
+        checkCount++;
+        const currentBotPositions = openPositions.filter(pos => pos.isBotManaged === true).length;
+        const newPositions = currentBotPositions - initialBotPositions;
+        
+        console.log(`⏱️ ${checkCount}s: ${currentBotPositions}/${maxBotPositions} positions bot (+${newPositions} nouvelles)`);
+        
+        // Arrêter si objectif atteint ou timeout
+        if (currentBotPositions >= maxBotPositions || checkCount >= maxChecks) {
+            clearInterval(watchInterval);
+            
+            if (currentBotPositions >= maxBotPositions) {
+                console.log(`✅ OBJECTIF ATTEINT: ${currentBotPositions}/${maxBotPositions} positions bot ouvertes !`);
+            } else {
+                console.log(`⏰ TIMEOUT: ${currentBotPositions}/${maxBotPositions} positions après 2 minutes`);
+                console.log('💡 Utilisez debugTakeProfit() pour analyser les problèmes');
+            }
+            
+            // Vérifier le TP sur les nouvelles positions
+            if (newPositions > 0) {
+                console.log('\n🎯 Vérification du système Take Profit...');
+                setTimeout(() => checkTPMonitoring(), 2000);
+            }
+        }
+    }, 1000); // Vérifier toutes les secondes
+    
+    // Sauvegarder l'intervalle pour pouvoir l'arrêter
+    window.positionWatchInterval = watchInterval;
+    
+    return {
+        initialPositions: initialBotPositions,
+        targetPositions: maxBotPositions,
+        watchingFor: availableSlots
+    };
+};
