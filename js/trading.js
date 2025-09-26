@@ -1468,6 +1468,7 @@ window.selectRandomPositivePair = selectRandomPositivePair;
 window.openPosition = openPosition;
 window.monitorPnLAndClose = monitorPnLAndClose;
 window.closePositionAtMarket = closePositionAtMarket;
+window.diagnosePosState = diagnosePosState;
 
 // 🔧 FONCTIONS DE DIAGNOSTIC EXPORTÉES
 
