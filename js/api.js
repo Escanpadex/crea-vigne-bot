@@ -471,15 +471,26 @@ async function fetchActivePositionsFromAPI() {
 
 async function getCurrentPrice(symbol) {
     try {
-        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?symbol=${symbol}&productType=usdt-futures`);
+        // 🔧 CORRECTION: Utiliser la même URL que pour les autres appels API
+        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/ticker?symbol=${symbol}&productType=USDT-FUTURES`);
         const data = await response.json();
         
+        // 🔧 DEBUG: Log pour diagnostiquer les problèmes
+        if (data.code !== '00000') {
+            console.log(`⚠️ Prix ${symbol} - Code erreur: ${data.code}, Message: ${data.msg}`);
+        }
+        
         if (data.code === '00000' && data.data) {
-            return parseFloat(data.data.lastPr);
+            const price = parseFloat(data.data.lastPr);
+            if (price && price > 0) {
+                return price;
+            } else {
+                console.log(`⚠️ Prix ${symbol} invalide: ${data.data.lastPr}`);
+            }
         }
         return null;
     } catch (error) {
-        console.error(`Erreur prix ${symbol}:`, error);
+        console.error(`❌ Erreur prix ${symbol}:`, error);
         return null;
     }
 }
@@ -585,6 +596,35 @@ async function testSpecificPairMacd(symbol) {
     console.log('\n' + '=' .repeat(60));
     console.log('✅ Diagnostic terminé');
 }
+
+// 🔧 FONCTION DE TEST: Tester getCurrentPrice avec diagnostic
+window.testGetCurrentPrice = async function(symbol = 'BTCUSDT') {
+    console.log(`🧪 Test de getCurrentPrice pour ${symbol}...`);
+    
+    try {
+        const price = await getCurrentPrice(symbol);
+        if (price) {
+            console.log(`✅ Prix récupéré: ${symbol} = ${price}`);
+            return price;
+        } else {
+            console.log(`❌ Échec récupération prix ${symbol}`);
+            
+            // Test manuel de l'URL
+            console.log('🔍 Test manuel de l\'URL...');
+            const testUrl = `${API_BASE}/bitget/api/v2/mix/market/ticker?symbol=${symbol}&productType=USDT-FUTURES`;
+            console.log(`URL: ${testUrl}`);
+            
+            const response = await fetch(testUrl);
+            const data = await response.json();
+            console.log('Réponse API:', data);
+            
+            return null;
+        }
+    } catch (error) {
+        console.error('❌ Erreur test getCurrentPrice:', error);
+        return null;
+    }
+};
 
 // Rendre les fonctions accessibles globalement
 window.testMacd4hAPI = testMacd4hAPI;

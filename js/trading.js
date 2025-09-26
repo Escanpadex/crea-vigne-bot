@@ -651,20 +651,35 @@ async function monitorPnLAndClose() {
         const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
         
         for (const position of botManagedPositions) {
-            const currentPrice = await getCurrentPrice(position.symbol);
-            if (!currentPrice) {
-                log(`⚠️ ${position.symbol}: Impossible de récupérer le prix`, 'WARNING');
-                continue;
+            let pnlPercent = 0;
+            let dataSource = 'UNKNOWN';
+            
+            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
+                // Calculer le pourcentage depuis unrealizedPnL (plus fiable)
+                const initialValue = position.quantity * position.entryPrice;
+                pnlPercent = (position.unrealizedPnL / initialValue) * 100;
+                dataSource = 'API_UNREALIZED_PNL';
+                log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+            } else {
+                // Fallback: essayer getCurrentPrice
+                const currentPrice = await getCurrentPrice(position.symbol);
+                if (!currentPrice) {
+                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL`, 'WARNING');
+                    continue;
+                }
+                
+                // Calculer le PnL en pourcentage
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                position.currentPrice = currentPrice;
+                dataSource = 'CALCULATED';
             }
             
-            // Calculer le PnL en pourcentage
-            const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-            position.currentPrice = currentPrice;
             position.pnlPercent = pnlPercent;
             
-            // Mettre à jour le prix le plus haut
-            if (currentPrice > position.highestPrice) {
-                position.highestPrice = currentPrice;
+            // Mettre à jour le prix le plus haut (seulement si on a un prix actuel)
+            if (dataSource === 'CALCULATED' && position.currentPrice > position.highestPrice) {
+                position.highestPrice = position.currentPrice;
             }
             
             // 🎯 FERMETURE AUTOMATIQUE À +2%
