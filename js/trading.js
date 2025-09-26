@@ -799,13 +799,34 @@ async function closePositionAtMarket(position) {
             reduceOnly: "YES" // 🔧 AJOUT: Force reduce only pour fermeture
         };
         
-        // 🔧 DIAGNOSTIC: Log des données de fermeture
+        // 🔧 DIAGNOSTIC COMPLET: Log des données de fermeture
         log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
-        log(`🔍 Données fermeture:`, 'DEBUG');
-        log(`   Symbol: ${orderData.symbol}`, 'DEBUG');
-        log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
-        log(`   Quantité originale: ${position.quantity}`, 'DEBUG');
-        log(`   Quantité calculée: ${closeQuantity}`, 'DEBUG');
+        log(`🔍 DIAGNOSTIC FERMETURE - Données complètes:`, 'ERROR');
+        log(`=`.repeat(60), 'ERROR');
+        
+        // Position complète
+        log(`📊 POSITION ORIGINALE:`, 'ERROR');
+        log(`   Symbol: ${position.symbol}`, 'ERROR');
+        log(`   Quantity: ${position.quantity} (${typeof position.quantity})`, 'ERROR');
+        log(`   Size: ${position.size} (${typeof position.size})`, 'ERROR');
+        log(`   Side: ${position.side}`, 'ERROR');
+        log(`   EntryPrice: ${position.entryPrice}`, 'ERROR');
+        log(`   ID: ${position.id}`, 'ERROR');
+        log(`   isBotManaged: ${position.isBotManaged}`, 'ERROR');
+        
+        // Calculs
+        log(`🧮 CALCULS:`, 'ERROR');
+        log(`   closeQuantity: ${closeQuantity} (${typeof closeQuantity})`, 'ERROR');
+        log(`   Math.abs(position.quantity): ${Math.abs(parseFloat(position.quantity))}`, 'ERROR');
+        log(`   parseFloat(position.quantity): ${parseFloat(position.quantity)}`, 'ERROR');
+        
+        // Ordre final
+        log(`📋 ORDRE DE FERMETURE:`, 'ERROR');
+        Object.keys(orderData).forEach(key => {
+            log(`   ${key}: ${orderData[key]} (${typeof orderData[key]})`, 'ERROR');
+        });
+        
+        log(`=`.repeat(60), 'ERROR');
         
         const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -818,15 +839,36 @@ async function closePositionAtMarket(position) {
         } else {
             log(`❌ Erreur fermeture position ${position.symbol}: ${result?.msg || result?.code || 'Erreur inconnue'}`, 'ERROR');
             
-            // 🔧 DIAGNOSTIC: Log de l'erreur complète
+            // 🔧 DIAGNOSTIC COMPLET: Log de l'erreur API
+            log(`🚨 ERREUR API FERMETURE - Analyse détaillée:`, 'ERROR');
+            log(`=`.repeat(60), 'ERROR');
+            
             if (result) {
-                log(`🔍 Réponse API fermeture:`, 'ERROR');
-                log(`   Code: ${result.code}`, 'ERROR');
+                log(`📡 RÉPONSE API:`, 'ERROR');
+                log(`   Code: ${result.code} (${typeof result.code})`, 'ERROR');
                 log(`   Message: ${result.msg}`, 'ERROR');
+                log(`   RequestTime: ${result.requestTime}`, 'ERROR');
+                
                 if (result.data) {
-                    log(`   Data: ${JSON.stringify(result.data)}`, 'ERROR');
+                    log(`   Data: ${JSON.stringify(result.data, null, 2)}`, 'ERROR');
+                } else {
+                    log(`   Data: NULL/UNDEFINED`, 'ERROR');
                 }
+                
+                // Réponse complète
+                log(`📄 RÉPONSE COMPLÈTE:`, 'ERROR');
+                log(JSON.stringify(result, null, 2), 'ERROR');
+            } else {
+                log(`❌ AUCUNE RÉPONSE API (result = ${result})`, 'ERROR');
             }
+            
+            // Suggestions de correction
+            log(`💡 SUGGESTIONS DE CORRECTION:`, 'ERROR');
+            log(`   1. Vérifier que le symbol existe: ${orderData.symbol}`, 'ERROR');
+            log(`   2. Vérifier la quantité: ${orderData.size}`, 'ERROR');
+            log(`   3. Vérifier si position existe côté API`, 'ERROR');
+            log(`   4. Vérifier les permissions API`, 'ERROR');
+            log(`=`.repeat(60), 'ERROR');
             
             return false;
         }
@@ -2948,6 +2990,89 @@ window.fixTPConfig = function() {
     console.log(`🎯 Nouvel objectif: ${config.targetPnL}% pour toutes les positions bot`);
     
     return true;
+};
+
+// 🔧 FONCTION DE DIAGNOSTIC: Analyser l'erreur 400 de fermeture
+window.debug400CloseError = async function() {
+    console.log('🔍 DIAGNOSTIC: Erreur 400 fermeture de position...');
+    console.log('='.repeat(60));
+    
+    try {
+        // 1. Lister les positions bot
+        const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+        console.log(`🤖 Positions bot disponibles: ${botPositions.length}`);
+        
+        if (botPositions.length === 0) {
+            console.log('❌ Aucune position bot à analyser');
+            return;
+        }
+        
+        // 2. Analyser chaque position
+        for (let i = 0; i < botPositions.length; i++) {
+            const position = botPositions[i];
+            console.log(`\n📊 ANALYSE POSITION ${i + 1}: ${position.symbol}`);
+            console.log('─'.repeat(40));
+            
+            // Structure de la position
+            console.log('🔍 Structure position:');
+            Object.keys(position).forEach(key => {
+                console.log(`   ${key}: ${position[key]} (${typeof position[key]})`);
+            });
+            
+            // Test de préparation des données de fermeture
+            console.log('\n🧮 Test préparation ordre fermeture:');
+            
+            const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
+            console.log(`   Quantité calculée: ${closeQuantity}`);
+            console.log(`   Quantité valide: ${!isNaN(parseFloat(closeQuantity)) && parseFloat(closeQuantity) > 0}`);
+            
+            const orderData = {
+                symbol: position.symbol,
+                productType: "USDT-FUTURES",
+                marginMode: "isolated",
+                marginCoin: "USDT",
+                size: String(closeQuantity),
+                side: "sell",
+                tradeSide: "close",
+                orderType: "market",
+                clientOid: `debug_${Date.now()}_${position.symbol}`,
+                reduceOnly: "YES"
+            };
+            
+            console.log('\n📋 Ordre qui serait envoyé:');
+            console.log(JSON.stringify(orderData, null, 2));
+            
+            // 3. Vérifier si la position existe côté API
+            console.log('\n🔍 Vérification position côté API...');
+            try {
+                const apiPositions = await fetchActivePositionsFromAPI();
+                const apiPosition = apiPositions.find(p => p.symbol === position.symbol);
+                
+                if (apiPosition) {
+                    console.log('✅ Position trouvée côté API:');
+                    console.log(`   Symbol: ${apiPosition.symbol}`);
+                    console.log(`   Size: ${apiPosition.size}`);
+                    console.log(`   Side: ${apiPosition.side}`);
+                    console.log(`   Available: ${apiPosition.available}`);
+                } else {
+                    console.log('❌ Position INTROUVABLE côté API !');
+                    console.log('   → Cela peut expliquer l\'erreur 400');
+                }
+            } catch (error) {
+                console.log(`❌ Erreur vérification API: ${error.message}`);
+            }
+        }
+        
+        // 4. Recommandations
+        console.log('\n💡 RECOMMANDATIONS:');
+        console.log('   1. Si position introuvable côté API → Nettoyer positions locales');
+        console.log('   2. Si quantité incorrecte → Vérifier calcul closeQuantity');
+        console.log('   3. Si symbol incorrect → Vérifier format symbole');
+        console.log('   4. Tester avec syncAndCheckPositions() pour nettoyer');
+        
+    } catch (error) {
+        console.error('❌ Erreur diagnostic 400:', error);
+    }
 };
 
 // 🔧 FONCTION DE TEST: Tester la fermeture TP avec diagnostic complet
