@@ -597,6 +597,77 @@ async function testSpecificPairMacd(symbol) {
     console.log('✅ Diagnostic terminé');
 }
 
+// 🔧 FONCTION DE TEST: Vérifier les paramètres d'ordre et API
+window.testOrderParameters = async function() {
+    console.log('🔍 DIAGNOSTIC: Vérification paramètres d\'ordre...');
+    console.log('='.repeat(50));
+    
+    try {
+        // 1. Vérifier la connexion API
+        console.log('1️⃣ Test connexion API...');
+        const accountTest = await makeRequest('/bitget/api/v2/mix/account/accounts?productType=USDT-FUTURES');
+        
+        if (accountTest && accountTest.code === '00000') {
+            console.log('✅ API connectée');
+            console.log(`   Balance: ${accountTest.data?.[0]?.available || 'N/A'} USDT`);
+        } else {
+            console.log('❌ Problème connexion API');
+            console.log('   Code:', accountTest?.code);
+            console.log('   Message:', accountTest?.msg);
+            return;
+        }
+        
+        // 2. Tester les symboles disponibles
+        console.log('\n2️⃣ Test symboles disponibles...');
+        const symbolsTest = await makeRequest('/bitget/api/v2/mix/market/contracts?productType=USDT-FUTURES');
+        
+        if (symbolsTest && symbolsTest.code === '00000') {
+            const totalSymbols = symbolsTest.data?.length || 0;
+            console.log(`✅ ${totalSymbols} symboles disponibles`);
+            
+            // Vérifier quelques symboles populaires
+            const testSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+            testSymbols.forEach(symbol => {
+                const found = symbolsTest.data?.find(s => s.symbol === symbol);
+                console.log(`   ${symbol}: ${found ? '✅' : '❌'}`);
+            });
+        } else {
+            console.log('❌ Impossible de récupérer les symboles');
+        }
+        
+        // 3. Tester la structure d'un ordre type
+        console.log('\n3️⃣ Structure ordre recommandée...');
+        
+        const sampleOrder = {
+            symbol: 'BTCUSDT',
+            productType: 'USDT-FUTURES',
+            marginMode: 'isolated',
+            marginCoin: 'USDT',
+            size: '0.001000',  // String avec 6 décimales
+            side: 'buy',
+            tradeSide: 'open',
+            orderType: 'market',
+            clientOid: `test_${Date.now()}`
+        };
+        
+        console.log('📋 Exemple ordre valide:');
+        console.log(JSON.stringify(sampleOrder, null, 2));
+        
+        // 4. Points de vérification critiques
+        console.log('\n4️⃣ Points critiques à vérifier:');
+        console.log('   • size: Doit être string avec format décimal');
+        console.log('   • symbol: Doit exister sur Bitget');
+        console.log('   • marginMode: isolated ou cross');
+        console.log('   • productType: USDT-FUTURES (majuscules)');
+        console.log('   • clientOid: Unique pour chaque ordre');
+        
+        console.log('\n✅ Diagnostic terminé');
+        
+    } catch (error) {
+        console.error('❌ Erreur diagnostic:', error);
+    }
+};
+
 // 🔧 FONCTION DE TEST: Tester getCurrentPrice avec diagnostic
 window.testGetCurrentPrice = async function(symbol = 'BTCUSDT') {
     console.log(`🧪 Test de getCurrentPrice pour ${symbol}...`);

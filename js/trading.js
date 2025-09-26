@@ -517,17 +517,35 @@ async function openPosition(symbol, selectedPair) {
         log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x2)`, 'INFO');
         log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
+        // 🔧 CORRECTION: Validation des paramètres d'ordre
+        if (!symbol || typeof symbol !== 'string') {
+            log(`❌ Symbole invalide: ${symbol}`, 'ERROR');
+            return false;
+        }
+        
+        if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
+            log(`❌ Quantité invalide: ${quantity}`, 'ERROR');
+            return false;
+        }
+        
         const orderData = {
             symbol: symbol,
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
-            size: quantity,
+            size: String(quantity), // 🔧 CORRECTION: Forcer en string
             side: "buy",
             tradeSide: "open",
             orderType: "market",
-            clientOid: `${Date.now()}_${symbol}`
+            clientOid: `bot_${Date.now()}_${symbol}` // 🔧 Préfixe bot pour différencier
         };
+        
+        // 🔧 DIAGNOSTIC: Log des données d'ordre pour debug
+        log(`🔍 Données ordre ${symbol}:`, 'DEBUG');
+        log(`   Symbol: ${orderData.symbol}`, 'DEBUG');
+        log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
+        log(`   Prix: ${currentPrice} (${typeof currentPrice})`, 'DEBUG');
+        log(`   Valeur position: ${positionValue}$`, 'DEBUG');
         
         const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -535,7 +553,18 @@ async function openPosition(symbol, selectedPair) {
         });
         
         if (!orderResult || orderResult.code !== '00000') {
-            log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || 'Erreur inconnue'}`, 'ERROR');
+            log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || orderResult?.code || 'Erreur inconnue'}`, 'ERROR');
+            
+            // 🔧 DIAGNOSTIC: Log de l'erreur complète
+            if (orderResult) {
+                log(`🔍 Réponse API complète:`, 'ERROR');
+                log(`   Code: ${orderResult.code}`, 'ERROR');
+                log(`   Message: ${orderResult.msg}`, 'ERROR');
+                if (orderResult.data) {
+                    log(`   Data: ${JSON.stringify(orderResult.data)}`, 'ERROR');
+                }
+            }
+            
             return false;
         }
         
@@ -706,14 +735,15 @@ async function monitorPnLAndClose() {
                         openPositions.splice(index, 1);
                     }
                     
-                    // 🔧 CORRECTION: Déclencher seulement si le bot a des slots libres
+                    // 🚀 NOUVEAU: Redémarrer l'ouverture séquentielle après fermeture
                     const botPositionsAfterClose = getBotManagedPositionsCount();
                     const availableSlots = getMaxBotPositions() - botPositionsAfterClose;
                     if (availableSlots > 0) {
-                        log(`🔄 Position bot fermée - Déclenchement immédiat d'une nouvelle sélection (${availableSlots} slots bot libres)`, 'INFO');
+                        log(`🔄 Position bot fermée - Redémarrage ouverture séquentielle (${availableSlots} slots libres)`, 'INFO');
                         setTimeout(() => {
-                            if (typeof tradingLoop === 'function') {
-                                tradingLoop();
+                            if (typeof startSequentialPositionOpening === 'function') {
+                                log('🚀 Ouverture séquentielle relancée après fermeture automatique', 'SUCCESS');
+                                startSequentialPositionOpening();
                             }
                         }, 2000); // Attendre 2 secondes pour que le cooldown soit actif
                     }
@@ -2827,7 +2857,137 @@ window.checkTPMonitoring = function() {
     };
 };
 
+// 🔧 FONCTION DE DIAGNOSTIC: Tester l'ouverture d'une position avec debug complet
+window.debugOrderPlacement = async function(testSymbol = 'BTCUSDT') {
+    console.log(`🔍 DIAGNOSTIC: Test d'ouverture de position ${testSymbol}...`);
+    console.log('='.repeat(60));
+    
+    try {
+        // 1. Vérifier les conditions préalables
+        console.log('1️⃣ Vérification des conditions...');
+        
+        const balance = await refreshBalance();
+        console.log(`   💰 Balance: ${balance ? 'OK' : 'ERREUR'}`);
+        
+        const botPositions = openPositions.filter(pos => pos.isBotManaged === true).length;
+        const maxPositions = config.maxBotPositions || 2;
+        console.log(`   📊 Positions: ${botPositions}/${maxPositions}`);
+        
+        if (botPositions >= maxPositions) {
+            console.log('❌ Limite de positions atteinte - Test impossible');
+            return;
+        }
+        
+        // 2. Calculer les paramètres d'ordre
+        console.log('\n2️⃣ Calcul des paramètres...');
+        
+        const positionValue = calculatePositionSize();
+        console.log(`   💰 Valeur position: ${positionValue}$`);
+        
+        // Simuler un prix (utiliser le prix actuel si possible)
+        let currentPrice = 50000; // Prix par défaut pour BTCUSDT
+        try {
+            const realPrice = await getCurrentPrice(testSymbol);
+            if (realPrice) {
+                currentPrice = realPrice;
+                console.log(`   📈 Prix actuel: ${currentPrice} (API)`);
+            } else {
+                console.log(`   📈 Prix simulé: ${currentPrice} (fallback)`);
+            }
+        } catch (error) {
+            console.log(`   📈 Prix simulé: ${currentPrice} (erreur API)`);
+        }
+        
+        const quantity = (positionValue / currentPrice).toFixed(6);
+        console.log(`   📊 Quantité: ${quantity}`);
+        
+        // 3. Préparer les données d'ordre
+        console.log('\n3️⃣ Données d\'ordre...');
+        
+        const orderData = {
+            symbol: testSymbol,
+            productType: "USDT-FUTURES",
+            marginMode: "isolated",
+            marginCoin: "USDT",
+            size: quantity,
+            side: "buy",
+            tradeSide: "open",
+            orderType: "market",
+            clientOid: `test_${Date.now()}_${testSymbol}`
+        };
+        
+        console.log('   📋 OrderData:', JSON.stringify(orderData, null, 2));
+        
+        // 4. Test de l'API (SANS PLACER L'ORDRE RÉELLEMENT)
+        console.log('\n4️⃣ Test API (simulation)...');
+        console.log('⚠️ SIMULATION SEULEMENT - Aucun ordre ne sera placé');
+        
+        // Vous pouvez décommenter la ligne suivante pour tester réellement
+        // const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
+        //     method: 'POST',
+        //     body: JSON.stringify(orderData)
+        // });
+        
+        console.log('✅ Diagnostic terminé');
+        console.log('\n💡 Pour tester réellement, décommentez la ligne dans debugOrderPlacement()');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors du diagnostic:', error);
+    }
+};
+
 // 🔍 FONCTION DE SUIVI: Surveiller l'ouverture des positions en temps réel
+// 🚀 FONCTION DE TEST: Surveiller l'ouverture séquentielle en temps réel
+window.watchSequentialOpening = function() {
+    console.log('🔍 SURVEILLANCE: Ouverture séquentielle en temps réel...');
+    console.log('=====================================================');
+    
+    let watchCount = 0;
+    const maxWatch = 120; // 2 minutes de surveillance
+    
+    const watchInterval = setInterval(() => {
+        watchCount++;
+        
+        const currentBotPositions = openPositions.filter(pos => pos.isBotManaged === true).length;
+        const targetPositions = config.maxBotPositions || 2;
+        const progress = `${currentBotPositions}/${targetPositions}`;
+        
+        console.log(`⏱️ [${watchCount}s] Positions bot: ${progress} | Bot actif: ${botRunning ? '✅' : '❌'}`);
+        
+        // Afficher les positions bot actuelles
+        const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+        if (botPositions.length > 0) {
+            console.log(`🤖 Positions bot actives:`);
+            botPositions.forEach((pos, index) => {
+                const pnl = pos.pnlPercent ? `(${pos.pnlPercent.toFixed(2)}%)` : '';
+                console.log(`   ${index + 1}. ${pos.symbol} ${pnl}`);
+            });
+        }
+        
+        // Arrêter si objectif atteint ou bot arrêté
+        if (currentBotPositions >= targetPositions) {
+            console.log(`🎯 OBJECTIF ATTEINT: ${progress} positions bot ouvertes!`);
+            clearInterval(watchInterval);
+            return;
+        }
+        
+        if (!botRunning) {
+            console.log('🛑 Bot arrêté - Surveillance interrompue');
+            clearInterval(watchInterval);
+            return;
+        }
+        
+        if (watchCount >= maxWatch) {
+            console.log('⏰ Fin de surveillance (2 minutes)');
+            clearInterval(watchInterval);
+            return;
+        }
+    }, 1000);
+    
+    console.log('💡 Utilisez Ctrl+C dans la console pour arrêter la surveillance');
+    return watchInterval;
+};
+
 window.watchPositionOpening = function() {
     console.log('👀 SURVEILLANCE: Ouverture de positions en cours...');
     
