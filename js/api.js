@@ -497,14 +497,14 @@ async function getCurrentPrice(symbol) {
             
             // Tenter plusieurs champs possibles pour le prix
             let price = null;
-            if (tickerData.lastPr) {
-                price = parseFloat(tickerData.lastPr);
-            } else if (tickerData.last) {
-                price = parseFloat(tickerData.last);
-            } else if (tickerData.close) {
-                price = parseFloat(tickerData.close);
-            } else if (tickerData.price) {
-                price = parseFloat(tickerData.price);
+            const priceFields = ['lastPr', 'last', 'close', 'price', 'closePrice', 'lastPrice'];
+            
+            for (const field of priceFields) {
+                if (tickerData[field] && !isNaN(parseFloat(tickerData[field]))) {
+                    price = parseFloat(tickerData[field]);
+                    console.log(`✅ Prix trouvé dans le champ '${field}': ${price}`);
+                    break;
+                }
             }
             
             if (price && price > 0) {
@@ -722,6 +722,19 @@ window.testGetCurrentPrice = async function(symbol = 'BTCUSDT') {
             
             if (data.data && Array.isArray(data.data) && data.data.length > 0) {
                 console.log('Premier élément du tableau:', data.data[0]);
+                console.log('Clés disponibles:', Object.keys(data.data[0]));
+                
+                // Tester tous les champs possibles
+                const ticker = data.data[0];
+                console.log('Tests de champs prix:');
+                console.log(`  lastPr: ${ticker.lastPr} (${typeof ticker.lastPr})`);
+                console.log(`  last: ${ticker.last} (${typeof ticker.last})`);
+                console.log(`  close: ${ticker.close} (${typeof ticker.close})`);
+                console.log(`  price: ${ticker.price} (${typeof ticker.price})`);
+                console.log(`  closePrice: ${ticker.closePrice} (${typeof ticker.closePrice})`);
+                console.log(`  lastPrice: ${ticker.lastPrice} (${typeof ticker.lastPrice})`);
+            } else {
+                console.log('Structure data inattendue:', data.data);
             }
             
             return null;
