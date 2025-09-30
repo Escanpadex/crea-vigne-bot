@@ -715,7 +715,7 @@ async function monitorPnLAndClose() {
             if (pnlPercent >= position.targetPnL) {
                 log(`🎯 ${position.symbol}: Objectif atteint +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
                 
-                const closed = await closePositionAtMarket(position);
+                const closed = await closePositionFlash(position);
                 if (closed) {
                     log(`✅ Position fermée avec succès: ${position.symbol} (+${pnlPercent.toFixed(2)}%)`, 'SUCCESS');
                     
@@ -768,100 +768,68 @@ async function monitorPnLAndClose() {
     }
 }
 
-// 🆕 NOUVELLE FONCTION: Fermer une position au marché
-async function closePositionAtMarket(position) {
+// 🆕 NOUVELLE FONCTION: Fermer une position avec Flash Close Position (API v2)
+async function closePositionFlash(position) {
     try {
-        // 🔧 CORRECTION: Validation des paramètres de fermeture
-        if (!position || !position.symbol || !position.quantity) {
+        // Validation des paramètres
+        if (!position || !position.symbol) {
             log(`❌ Paramètres position invalides pour fermeture`, 'ERROR');
-            log(`   Position: ${JSON.stringify(position)}`, 'ERROR');
             return false;
         }
         
-        // 🔧 CORRECTION: Utiliser la quantité absolue (sans signe négatif)
-        const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
+        log(`🔄 Fermeture position ${position.symbol} avec Flash Close...`, 'INFO');
         
-        if (!closeQuantity || parseFloat(closeQuantity) <= 0) {
-            log(`❌ Quantité invalide pour fermeture: ${position.quantity} → ${closeQuantity}`, 'ERROR');
-            return false;
-        }
-        
+        // Déterminer le holdSide selon le type de position
+        // En mode one-way, on ne spécifie pas le holdSide
+        // En mode hedge, on spécifie "long" ou "short"
         const isShortPosition = (position.side || '').toString().toUpperCase() === 'SHORT';
-        const closeSide = isShortPosition ? "buy" : "sell";
-        const orderData = {
+        const holdSide = isShortPosition ? 'short' : 'long';
+        
+        const closeData = {
             symbol: position.symbol,
             productType: "USDT-FUTURES",
-            marginMode: "isolated",
-            marginCoin: "USDT",
-            size: String(closeQuantity), // 🔧 CORRECTION: String + quantité absolue
-            side: closeSide,
-            tradeSide: "close",
-            orderType: "market",
-            clientOid: `tp_${Date.now()}_${position.symbol}`, // 🔧 Préfixe TP
-            reduceOnly: "YES" // 🔧 AJOUT: Force reduce only pour fermeture
+            holdSide: holdSide
         };
         
-        // 🔧 DIAGNOSTIC COMPLET: Log des données de fermeture
-            log(`🔄 Fermeture position ${position.symbol} au marché...`, 'INFO');
-            log(`🔍 DIAGNOSTIC FERMETURE - Données complètes:`, 'ERROR');
-            log(`_${Date.now()}_${Math.random().toString(16).slice(2)} DEBUG_CLOSE_START`, 'ERROR');
-        
-        // Position complète
-        log(`📊 POSITION ORIGINALE:`, 'ERROR');
-        log(`   Symbol: ${position.symbol}`, 'ERROR');
-        log(`   Quantity: ${position.quantity} (${typeof position.quantity})`, 'ERROR');
-        log(`   Size: ${position.size} (${typeof position.size})`, 'ERROR');
-        log(`   Side: ${position.side}`, 'ERROR');
-        log(`   EntryPrice: ${position.entryPrice}`, 'ERROR');
-        log(`   ID: ${position.id}`, 'ERROR');
-        log(`   isBotManaged: ${position.isBotManaged}`, 'ERROR');
-        
-        // Calculs
-        log(`🧮 CALCULS:`, 'ERROR');
-        log(`   closeQuantity: ${closeQuantity} (${typeof closeQuantity})`, 'ERROR');
-        log(`   Math.abs(position.quantity): ${Math.abs(parseFloat(position.quantity))}`, 'ERROR');
-        log(`   parseFloat(position.quantity): ${parseFloat(position.quantity)}`, 'ERROR');
-        
-        // Ordre final
-        log(`📋 ORDRE DE FERMETURE:`, 'ERROR');
-        Object.keys(orderData).forEach(key => {
-            log(`   ${key}: ${orderData[key]} (${typeof orderData[key]})`, 'ERROR');
-        });
-        
-        log(`=`.repeat(60), 'ERROR');
-        
-        const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/place-order', {
+        const result = await makeRequestWithRetry('/bitget/api/v2/mix/order/close-positions', {
             method: 'POST',
-            body: JSON.stringify(orderData)
+            body: JSON.stringify(closeData)
         });
         
         if (result && result.code === '00000') {
-            log(`✅ Ordre de fermeture placé: ${position.symbol} - ID: ${result.data.orderId}`, 'SUCCESS');
-            return true;
-        } else if (result && result.code === '22002') {
-            log(`⚠️ Aucun position à fermer pour ${position.symbol} (code 22002) - Suppression locale`, 'WARNING');
-            return true; // rien à fermer côté Bitget, mais on poursuit la gestion locale
+            // Vérifier les listes de succès et d'échec
+            const successList = result.data?.successList || [];
+            const failureList = result.data?.failureList || [];
+            
+            if (successList.length > 0) {
+                log(`✅ Position fermée avec succès: ${position.symbol}`, 'SUCCESS');
+                return true;
+            } else if (failureList.length > 0) {
+                const failure = failureList[0];
+                log(`❌ Échec fermeture ${position.symbol}: ${failure.errorMsg || 'Erreur inconnue'}`, 'ERROR');
+                
+                // Si la position n'existe plus, on considère comme succès pour nettoyer localement
+                if (failure.errorCode === '22002') {
+                    log(`⚠️ Position n'existe plus côté Bitget - Nettoyage local`, 'WARNING');
+                    return true;
+                }
+                return false;
+            } else {
+                log(`⚠️ Position déjà fermée: ${position.symbol}`, 'WARNING');
+                return true;
+            }
         } else {
-            // 🚨 SOLUTION DIRECTE: Afficher l'erreur dans la console ET les logs
-            const errorMsg = `❌ FERMETURE ÉCHOUÉE ${position.symbol}`;
+            const errorMsg = `❌ Échec fermeture ${position.symbol}`;
             const bitgetCode = result?.code || 'NO_CODE';
             const bitgetMsg = result?.msg || 'NO_MESSAGE';
             
-            console.error(errorMsg);
-            console.error(`🔴 BITGET ERROR: ${bitgetCode} - ${bitgetMsg}`);
-            console.error(`📋 ORDER SENT:`, orderData);
-            console.error(`📡 FULL RESPONSE:`, result);
-            
             log(errorMsg, 'ERROR');
-            log(`🔴 Code Bitget: ${bitgetCode}`, 'ERROR');
-            log(`🔴 Message Bitget: ${bitgetMsg}`, 'ERROR');
+            log(`🔴 Code: ${bitgetCode} - ${bitgetMsg}`, 'ERROR');
             
-            // 🎯 ACTIONS CORRECTIVES AUTOMATIQUES
+            // Position n'existe plus côté API
             if (bitgetCode === '22002') {
-                // Position n'existe plus côté API - la supprimer localement
-                console.log(`🧹 AUTO-FIX: Position ${position.symbol} supprimée côté API, nettoyage local...`);
-                log(`🧹 AUTO-FIX: Suppression locale position inexistante ${position.symbol}`, 'WARNING');
-                return true; // Traiter comme succès pour permettre la suppression locale
+                log(`⚠️ Position n'existe plus - Nettoyage local`, 'WARNING');
+                return true;
             }
             
             return false;
@@ -1456,8 +1424,7 @@ window.getPositivePairs = getPositivePairs;
 window.selectRandomPositivePair = selectRandomPositivePair;
 window.openPosition = openPosition;
 window.monitorPnLAndClose = monitorPnLAndClose;
-window.closePositionAtMarket = closePositionAtMarket;
-window.diagnosePosState = diagnosePosState;
+window.closePositionFlash = closePositionFlash;
 
 // 🚀 SOLUTION IMMÉDIATE: Nettoyer et synchroniser les positions
 window.fixPositions = async function() {
@@ -2858,7 +2825,7 @@ window.forceTakeProfit = async function() {
             if (pnlPercent >= targetPnL) {
                 console.log(`🎯 ${position.symbol}: FORÇAGE de la fermeture (${pnlPercent.toFixed(3)}% >= ${targetPnL}%)`);
                 
-                const closed = await closePositionAtMarket(position);
+                const closed = await closePositionFlash(position);
                 if (closed) {
                     forcedClosed++;
                     console.log(`✅ ${position.symbol}: Position fermée avec succès (+${pnlPercent.toFixed(3)}%)`);
@@ -3105,277 +3072,6 @@ window.fixTPConfig = function() {
 };
 
 // 🔍 FONCTION DE DIAGNOSTIC: État actuel des positions
-window.diagnosePosState = function() {
-    console.log('🔍 DIAGNOSTIC: État des positions');
-    console.log('='.repeat(50));
-    
-    console.log(`📊 Positions locales: ${openPositions.length}`);
-    console.log(`🤖 Positions bot: ${getBotManagedPositionsCount()}`);
-    console.log(`🎯 Limite bot: ${getMaxBotPositions()}`);
-    console.log(`🏃 Bot actif: ${botRunning ? '✅' : '❌'}`);
-    
-    if (openPositions.length > 0) {
-        console.log('\n📋 DÉTAIL POSITIONS:');
-        openPositions.forEach((pos, i) => {
-            const botFlag = pos.isBotManaged ? '🤖' : '👤';
-            const pnl = pos.pnlPercent ? `(${pos.pnlPercent.toFixed(2)}%)` : '(PnL?)';
-            console.log(`  ${i+1}. ${botFlag} ${pos.symbol} ${pos.side} ${pnl}`);
-        });
-    }
-    
-    return {
-        total: openPositions.length,
-        bot: getBotManagedPositionsCount(),
-        limit: getMaxBotPositions(),
-        running: botRunning
-    };
-};
-
-// 🔧 FONCTION DE DIAGNOSTIC: Analyser l'erreur 400 de fermeture
-window.debug400CloseError = async function() {
-    console.log('🔍 DIAGNOSTIC: Erreur 400 fermeture de position...');
-    console.log('='.repeat(60));
-    
-    try {
-        // 1. Lister les positions bot
-        const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
-        console.log(`🤖 Positions bot disponibles: ${botPositions.length}`);
-        
-        if (botPositions.length === 0) {
-            console.log('❌ Aucune position bot à analyser');
-            return;
-        }
-        
-        // 2. Analyser chaque position
-        for (let i = 0; i < botPositions.length; i++) {
-            const position = botPositions[i];
-            console.log(`\n📊 ANALYSE POSITION ${i + 1}: ${position.symbol}`);
-            console.log('─'.repeat(40));
-            
-            // Structure de la position
-            console.log('🔍 Structure position:');
-            Object.keys(position).forEach(key => {
-                console.log(`   ${key}: ${position[key]} (${typeof position[key]})`);
-            });
-            
-            // Test de préparation des données de fermeture
-            console.log('\n🧮 Test préparation ordre fermeture:');
-            
-            const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
-            console.log(`   Quantité calculée: ${closeQuantity}`);
-            console.log(`   Quantité valide: ${!isNaN(parseFloat(closeQuantity)) && parseFloat(closeQuantity) > 0}`);
-            
-            const orderData = {
-                symbol: position.symbol,
-                productType: "USDT-FUTURES",
-                marginMode: "isolated",
-                marginCoin: "USDT",
-                size: String(closeQuantity),
-                side: "sell",
-                tradeSide: "close",
-                orderType: "market",
-                clientOid: `debug_${Date.now()}_${position.symbol}`,
-                reduceOnly: "YES"
-            };
-            
-            console.log('\n📋 Ordre qui serait envoyé:');
-            console.log(JSON.stringify(orderData, null, 2));
-            
-            // 3. Vérifier si la position existe côté API
-            console.log('\n🔍 Vérification position côté API...');
-            try {
-                const apiPositions = await fetchActivePositionsFromAPI();
-                const apiPosition = apiPositions.find(p => p.symbol === position.symbol);
-                
-                if (apiPosition) {
-                    console.log('✅ Position trouvée côté API:');
-                    console.log(`   Symbol: ${apiPosition.symbol}`);
-                    console.log(`   Size: ${apiPosition.size}`);
-                    console.log(`   Side: ${apiPosition.side}`);
-                    console.log(`   Available: ${apiPosition.available}`);
-                } else {
-                    console.log('❌ Position INTROUVABLE côté API !');
-                    console.log('   → Cela peut expliquer l\'erreur 400');
-                }
-            } catch (error) {
-                console.log(`❌ Erreur vérification API: ${error.message}`);
-            }
-        }
-        
-        // 4. Recommandations
-        console.log('\n💡 RECOMMANDATIONS:');
-        console.log('   1. Si position introuvable côté API → Nettoyer positions locales');
-        console.log('   2. Si quantité incorrecte → Vérifier calcul closeQuantity');
-        console.log('   3. Si symbol incorrect → Vérifier format symbole');
-        console.log('   4. Tester avec syncAndCheckPositions() pour nettoyer');
-        
-    } catch (error) {
-        console.error('❌ Erreur diagnostic 400:', error);
-    }
-};
-
-// 🔧 FONCTION DE TEST: Tester la fermeture TP avec diagnostic complet
-window.testTPClosure = async function() {
-    console.log('🔍 TEST: Fermeture Take Profit avec diagnostic...');
-    console.log('='.repeat(60));
-    
-    try {
-        // 1. Vérifier les positions bot éligibles au TP
-        console.log('1️⃣ Positions bot éligibles au TP...');
-        
-        const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
-        console.log(`   🤖 Positions bot: ${botPositions.length}`);
-        
-        if (botPositions.length === 0) {
-            console.log('❌ Aucune position bot à tester');
-            return;
-        }
-        
-        // 2. Analyser chaque position
-        console.log('\n2️⃣ Analyse des positions...');
-        
-        for (const position of botPositions) {
-            console.log(`\n📊 ${position.symbol}:`);
-            console.log(`   Prix d'entrée: ${position.entryPrice}`);
-            console.log(`   Quantité: ${position.quantity} (${typeof position.quantity})`);
-            console.log(`   Objectif TP: ${position.targetPnL || config.targetPnL}%`);
-            
-            // Calculer le PnL actuel
-            let currentPnL = 0;
-            if (position.unrealizedPnL && position.quantity && position.entryPrice) {
-                const initialValue = position.quantity * position.entryPrice;
-                currentPnL = (position.unrealizedPnL / initialValue) * 100;
-                console.log(`   PnL actuel: ${currentPnL.toFixed(3)}% (${position.unrealizedPnL.toFixed(2)}$)`);
-            } else {
-                console.log(`   ⚠️ PnL non calculable - données manquantes`);
-                console.log(`     unrealizedPnL: ${position.unrealizedPnL}`);
-                console.log(`     quantity: ${position.quantity}`);
-                console.log(`     entryPrice: ${position.entryPrice}`);
-            }
-            
-            // Vérifier si éligible TP
-            const targetPnL = position.targetPnL || config.targetPnL || 2;
-            const isEligible = currentPnL >= targetPnL;
-            console.log(`   ${isEligible ? '🎯 ÉLIGIBLE TP' : '⏳ Pas encore éligible'}`);
-            
-            // 3. Test de fermeture (SIMULATION)
-            if (isEligible) {
-                console.log(`\n3️⃣ Test fermeture ${position.symbol} (SIMULATION)...`);
-                
-                // Préparer les données de fermeture
-                const closeQuantity = Math.abs(parseFloat(position.quantity)).toFixed(6);
-                
-                const orderData = {
-                    symbol: position.symbol,
-                    productType: "USDT-FUTURES",
-                    marginMode: "isolated",
-                    marginCoin: "USDT",
-                    size: String(closeQuantity),
-                    side: "sell",
-                    tradeSide: "close",
-                    orderType: "market",
-                    clientOid: `test_tp_${Date.now()}_${position.symbol}`,
-                    reduceOnly: "YES"
-                };
-                
-                console.log('   📋 Données fermeture simulées:');
-                console.log('   ', JSON.stringify(orderData, null, 4));
-                
-                console.log('   ⚠️ SIMULATION - Aucun ordre réel placé');
-                // Pour tester réellement, décommentez :
-                // const result = await closePositionAtMarket(position);
-                // console.log(`   Résultat: ${result ? '✅ Succès' : '❌ Échec'}`);
-            }
-        }
-        
-        console.log('\n✅ Test TP terminé');
-        console.log('\n💡 Pour tester la fermeture réelle:');
-        console.log('   1. Décommentez la ligne closePositionAtMarket() dans testTPClosure()');
-        console.log('   2. Ou utilisez forceTakeProfit() pour forcer les fermetures');
-        
-    } catch (error) {
-        console.error('❌ Erreur test TP:', error);
-    }
-};
-
-// 🔧 FONCTION DE DIAGNOSTIC: Tester l'ouverture d'une position avec debug complet
-window.debugOrderPlacement = async function(testSymbol = 'BTCUSDT') {
-    console.log(`🔍 DIAGNOSTIC: Test d'ouverture de position ${testSymbol}...`);
-    console.log('='.repeat(60));
-    
-    try {
-        // 1. Vérifier les conditions préalables
-        console.log('1️⃣ Vérification des conditions...');
-        
-        const balance = await refreshBalance();
-        console.log(`   💰 Balance: ${balance ? 'OK' : 'ERREUR'}`);
-        
-        const botPositions = openPositions.filter(pos => pos.isBotManaged === true).length;
-        const maxPositions = config.maxBotPositions || 2;
-        console.log(`   📊 Positions: ${botPositions}/${maxPositions}`);
-        
-        if (botPositions >= maxPositions) {
-            console.log('❌ Limite de positions atteinte - Test impossible');
-            return;
-        }
-        
-        // 2. Calculer les paramètres d'ordre
-        console.log('\n2️⃣ Calcul des paramètres...');
-        
-        const positionValue = calculatePositionSize();
-        console.log(`   💰 Valeur position: ${positionValue}$`);
-        
-        // Simuler un prix (utiliser le prix actuel si possible)
-        let currentPrice = 50000; // Prix par défaut pour BTCUSDT
-        try {
-            const realPrice = await getCurrentPrice(testSymbol);
-            if (realPrice) {
-                currentPrice = realPrice;
-                console.log(`   📈 Prix actuel: ${currentPrice} (API)`);
-            } else {
-                console.log(`   📈 Prix simulé: ${currentPrice} (fallback)`);
-            }
-        } catch (error) {
-            console.log(`   📈 Prix simulé: ${currentPrice} (erreur API)`);
-        }
-        
-        const quantity = (positionValue / currentPrice).toFixed(6);
-        console.log(`   📊 Quantité: ${quantity}`);
-        
-        // 3. Préparer les données d'ordre
-        console.log('\n3️⃣ Données d\'ordre...');
-        
-        const orderData = {
-            symbol: testSymbol,
-            productType: "USDT-FUTURES",
-            marginMode: "isolated",
-            marginCoin: "USDT",
-            size: quantity,
-            side: "buy",
-            tradeSide: "open",
-            orderType: "market",
-            clientOid: `test_${Date.now()}_${testSymbol}`
-        };
-        
-        console.log('   📋 OrderData:', JSON.stringify(orderData, null, 2));
-        
-        // 4. Test de l'API (SANS PLACER L'ORDRE RÉELLEMENT)
-        console.log('\n4️⃣ Test API (simulation)...');
-        console.log('⚠️ SIMULATION SEULEMENT - Aucun ordre ne sera placé');
-        
-        // Vous pouvez décommenter la ligne suivante pour tester réellement
-        // const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
-        //     method: 'POST',
-        //     body: JSON.stringify(orderData)
-        // });
-        
-        console.log('✅ Diagnostic terminé');
-        console.log('\n💡 Pour tester réellement, décommentez la ligne dans debugOrderPlacement()');
-        
-    } catch (error) {
-        console.error('❌ Erreur lors du diagnostic:', error);
-    }
-};
 
 // 🔍 FONCTION DE SUIVI: Surveiller l'ouverture des positions en temps réel
 // 🚀 FONCTION DE TEST: Surveiller l'ouverture séquentielle en temps réel
