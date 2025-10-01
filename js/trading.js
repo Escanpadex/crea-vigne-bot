@@ -679,6 +679,9 @@ async function monitorPnLAndClose() {
         // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
         const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
         
+        // 🎯 ÉTAPE 1: Identifier toutes les positions à fermer (sans attendre)
+        const positionsToClose = [];
+        
         for (const position of botManagedPositions) {
             let pnlPercent = 0;
             let dataSource = 'UNKNOWN';
@@ -711,45 +714,25 @@ async function monitorPnLAndClose() {
                 position.highestPrice = position.currentPrice;
             }
             
-            // 🎯 FERMETURE AUTOMATIQUE À +2%
+            // 🎯 DÉTECTION: Cette position doit-elle être fermée ?
             if (pnlPercent >= position.targetPnL) {
-                log(`🎯 ${position.symbol}: Objectif atteint +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
+                // 💰 Calculer les frais d'entrée (0.06% maker/taker fee sur Bitget)
+                const entryFee = position.size * 0.0006;
+                const exitFee = position.size * 0.0006;
+                const totalFees = entryFee + exitFee;
+                const grossPnL = position.size * (pnlPercent / 100);
+                const realizedPnL = grossPnL - totalFees;
                 
-                const closed = await closePositionFlash(position);
-                if (closed) {
-                    log(`✅ Position fermée avec succès: ${position.symbol} (+${pnlPercent.toFixed(2)}%)`, 'SUCCESS');
-                    
-                    // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
-                    addPositionCooldown(position.symbol);
-                    
-                    // Mettre à jour les stats
-                    botStats.totalClosedPositions++;
-                    if (pnlPercent > 0) {
-                        botStats.winningPositions++;
-                        botStats.totalWinAmount += (position.size * pnlPercent / 100);
-                    }
-                    
-                    // Supprimer de la liste des positions ouvertes
-                    const index = openPositions.findIndex(p => p.id === position.id);
-                    if (index !== -1) {
-                        openPositions.splice(index, 1);
-                    }
-                    
-                    // 🚀 NOUVEAU: Redémarrer l'ouverture séquentielle après fermeture
-                    const botPositionsAfterClose = getBotManagedPositionsCount();
-                    const availableSlots = getMaxBotPositions() - botPositionsAfterClose;
-                    if (availableSlots > 0) {
-                        log(`🔄 Position bot fermée - Redémarrage ouverture séquentielle (${availableSlots} slots libres)`, 'INFO');
-                        setTimeout(() => {
-                            if (typeof startSequentialPositionOpening === 'function') {
-                                log('🚀 Ouverture séquentielle relancée après fermeture automatique', 'SUCCESS');
-                                startSequentialPositionOpening();
-                            }
-                        }, 2000); // Attendre 2 secondes pour que le cooldown soit actif
-                    }
-                } else {
-                    log(`❌ Échec fermeture position ${position.symbol}`, 'ERROR');
-                }
+                positionsToClose.push({
+                    position,
+                    pnlPercent,
+                    grossPnL,
+                    totalFees,
+                    realizedPnL
+                });
+                
+                log(`🎯 ${position.symbol}: Objectif atteint +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
+                log(`💰 Position: $${position.size.toFixed(2)} | PnL brut: +$${grossPnL.toFixed(2)} | Frais: -$${totalFees.toFixed(2)} | PnL net: +$${realizedPnL.toFixed(2)}`, 'SUCCESS');
             } else {
                 // Log de suivi (moins fréquent pour éviter le spam avec surveillance 1s)
                 if (Date.now() - (position.lastPnLLog || 0) > 60000) { // Toutes les 60 secondes
@@ -759,6 +742,65 @@ async function monitorPnLAndClose() {
             }
             
             await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // 🎯 ÉTAPE 2: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai entre chaque)
+        if (positionsToClose.length > 0) {
+            log(`🚀 Fermeture de ${positionsToClose.length} position(s) en parallèle...`, 'INFO');
+            
+            // Lancer toutes les fermetures en parallèle avec un délai échelonné
+            const closePromises = positionsToClose.map((data, index) => {
+                return new Promise(async (resolve) => {
+                    // Délai échelonné: 0ms, 200ms, 400ms, 600ms, etc.
+                    await new Promise(r => setTimeout(r, index * 200));
+                    
+                    const closed = await closePositionFlash(data.position);
+                    if (closed) {
+                        log(`✅ Position fermée avec succès: ${data.position.symbol} | Taille: $${data.position.size.toFixed(2)} | PnL réalisé: +$${data.realizedPnL.toFixed(2)} (+${data.pnlPercent.toFixed(2)}%)`, 'SUCCESS');
+                        
+                        // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
+                        addPositionCooldown(data.position.symbol);
+                        
+                        // Mettre à jour les stats
+                        botStats.totalClosedPositions++;
+                        if (data.pnlPercent > 0) {
+                            botStats.winningPositions++;
+                            botStats.totalWinAmount += (data.position.size * data.pnlPercent / 100);
+                        }
+                        
+                        // Supprimer de la liste des positions ouvertes
+                        const index = openPositions.findIndex(p => p.id === data.position.id);
+                        if (index !== -1) {
+                            openPositions.splice(index, 1);
+                        }
+                    } else {
+                        log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
+                    }
+                    
+                    resolve(closed);
+                });
+            });
+            
+            // Attendre que toutes les fermetures soient terminées
+            const results = await Promise.all(closePromises);
+            const successCount = results.filter(r => r === true).length;
+            
+            if (successCount > 0) {
+                log(`✅ ${successCount}/${positionsToClose.length} position(s) fermée(s) avec succès`, 'SUCCESS');
+                
+                // 🚀 NOUVEAU: Redémarrer l'ouverture séquentielle après fermeture (1 minute de cooldown)
+                const botPositionsAfterClose = getBotManagedPositionsCount();
+                const availableSlots = getMaxBotPositions() - botPositionsAfterClose;
+                if (availableSlots > 0) {
+                    log(`🔄 ${successCount} position(s) fermée(s) - Nouvelle ouverture dans 1 minute (cooldown)`, 'INFO');
+                    setTimeout(() => {
+                        if (botRunning && typeof startSequentialPositionOpening === 'function') {
+                            log('🚀 Cooldown terminé - Ouverture séquentielle relancée', 'SUCCESS');
+                            startSequentialPositionOpening();
+                        }
+                    }, 60000); // 1 minute de cooldown
+                }
+            }
         }
         
         updatePositionsDisplay();
@@ -1098,7 +1140,7 @@ function updatePositionsDisplay() {
 
             // Log discret pour debug (toutes les 60 secondes par position)
             if (!position.lastPnlCalcLog || Date.now() - position.lastPnlCalcLog > 60000) {
-                console.log(`💰 ${position.symbol}: PnL calculé depuis ${dataSource} - $${pnlDollar?.toFixed(2)} (${pnlPercent?.toFixed(2)}%)`);
+                // Log supprimé pour éviter le spam - Seulement visible dans l'interface
                 position.lastPnlCalcLog = Date.now();
             }
             const isPositive = pnlPercent >= 0;
