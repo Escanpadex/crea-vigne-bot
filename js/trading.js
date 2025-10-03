@@ -2,6 +2,76 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
+// 🎯 FIX: Correction du double comptage des positions gagnantes/perdantes
+// 🔧 TRACKING: Set pour tracker les positions déjà comptées dans les stats
+let countedPositions = new Set(); // Stocke les IDs des positions déjà comptées
+
+// 🎯 FONCTION: Réinitialiser le tracking au démarrage du bot
+function resetStatsTracking() {
+    countedPositions.clear();
+    console.log('✅ Tracking des stats réinitialisé');
+}
+
+// 🎯 FONCTION: Vérifier si une position a déjà été comptée
+function isPositionCounted(positionId) {
+    return countedPositions.has(positionId);
+}
+
+// 🎯 FONCTION: Marquer une position comme comptée
+function markPositionAsCounted(positionId) {
+    countedPositions.add(positionId);
+    console.log(`📊 Position ${positionId} marquée comme comptée`);
+}
+
+// 🎯 FONCTION CENTRALISÉE: Compter une position fermée (évite les doublons)
+function countClosedPosition(position, pnl, source = 'unknown') {
+    // Créer un ID unique pour la position
+    const positionId = position.id || `${position.symbol}_${position.timestamp}`;
+    
+    // Vérifier si déjà comptée
+    if (isPositionCounted(positionId)) {
+        console.log(`⚠️ Position ${position.symbol} déjà comptée (source: ${source}) - Ignoré`);
+        return false;
+    }
+    
+    // Marquer comme comptée
+    markPositionAsCounted(positionId);
+    
+    // Compter la position
+    botStats.totalClosedPositions++;
+    
+    if (pnl > 0) {
+        botStats.winningPositions++;
+        botStats.totalWinAmount += Math.abs(pnl);
+        log(`🟢 Position gagnante comptée: ${position.symbol} +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes) [Source: ${source}]`, 'SUCCESS');
+    } else if (pnl < 0) {
+        botStats.losingPositions++;
+        botStats.totalLossAmount += pnl; // Déjà négatif
+        log(`🔴 Position perdante comptée: ${position.symbol} ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes) [Source: ${source}]`, 'WARNING');
+    } else {
+        log(`⚪ Position neutre comptée: ${position.symbol} ${pnl.toFixed(2)}$ [Source: ${source}]`, 'INFO');
+    }
+    
+    return true;
+}
+
+// 🎯 DIAGNOSTIC: Afficher les stats de tracking
+function showStatsTracking() {
+    console.log('📊 ========== DIAGNOSTIC STATS TRACKING ==========');
+    console.log(`Positions comptées: ${countedPositions.size}`);
+    console.log(`Positions gagnantes: ${botStats.winningPositions}`);
+    console.log(`Positions perdantes: ${botStats.losingPositions}`);
+    console.log(`Total fermées: ${botStats.totalClosedPositions}`);
+    console.log(`Somme check: ${botStats.winningPositions + botStats.losingPositions} (doit être ≤ ${botStats.totalClosedPositions})`);
+    
+    if (botStats.winningPositions + botStats.losingPositions > botStats.totalClosedPositions) {
+        console.log('🚨 ERREUR DÉTECTÉE: Surcomptage des positions!');
+    } else {
+        console.log('✅ Comptage cohérent');
+    }
+    console.log('='.repeat(50));
+}
+
 // 🎯 STRATÉGIE CONFIGURABLE: Limite de positions simultanées (2-5 trades configurables)
 function getMaxBotPositions() {
     return config.maxBotPositions || 2;
@@ -159,20 +229,36 @@ function selectRandomPositivePair(excludeSymbols = []) {
     // 🔧 CORRECTION: Vérifier seulement les positions du bot, pas les manuelles
     const botPositionsCount = getBotManagedPositionsCount();
     const availableSlots = getMaxBotPositions() - botPositionsCount;
+    
     if (availableSlots <= 0) {
-        log(`⚠️ Limite bot atteinte: ${botPositionsCount}/${getMaxBotPositions()} positions bot (${openPositions.length} total dont manuelles) - Pas de sélection`, 'INFO');
+        log(`⚠️ Limite bot atteinte: ${botPositionsCount}/${getMaxBotPositions()} positions bot - Pas de sélection`, 'INFO');
         return null;
     }
     
+    // 🔧 PROTECTION ANTI-DOUBLON: Récupérer toutes les paires déjà ouvertes
+    const openedSymbols = openPositions.map(pos => pos.symbol);
+    log(`🔍 Paires déjà ouvertes: ${openedSymbols.join(', ') || 'Aucune'}`, 'DEBUG');
+    
+    // Filtrer les paires disponibles en excluant celles déjà ouvertes
     const availablePairs = positivePairs.filter(pair => 
+        !openedSymbols.includes(pair.symbol) &&  // 🎯 NOUVEAU: Pas déjà ouverte
         !excludeSymbols.includes(pair.symbol) && 
-        !hasOpenPosition(pair.symbol) &&
         !isPairInCooldown(pair.symbol) &&
         !isTradedPairInCooldown(pair.symbol) // 🆕 Cooldown 12h pour paires déjà tradées
     );
     
     if (availablePairs.length === 0) {
-        log('⚠️ Aucune paire positive disponible pour trading (cooldowns actifs)', 'WARNING');
+        log('⚠️ Aucune paire positive disponible - Toutes les paires sont soit ouvertes, soit en cooldown', 'WARNING');
+        log(`📊 Paires positives totales: ${positivePairs.length}`, 'INFO');
+        log(`📊 Paires déjà ouvertes: ${openedSymbols.length}`, 'INFO');
+        log(`📊 Slots bot disponibles: ${availableSlots}/${getMaxBotPositions()}`, 'INFO');
+        
+        // 🎯 NOUVEAU: Si pas assez de paires, le bot attend
+        if (positivePairs.length < getMaxBotPositions()) {
+            log(`🔴 Pas assez de paires positives (${positivePairs.length}) pour ${getMaxBotPositions()} positions simultanées`, 'WARNING');
+            log('⏳ Le bot attend de nouvelles opportunités...', 'INFO');
+        }
+        
         return null;
     }
     
@@ -180,7 +266,8 @@ function selectRandomPositivePair(excludeSymbols = []) {
     const randomIndex = Math.floor(Math.random() * Math.min(availablePairs.length, 20)); // Top 20 pour plus de diversité
     const selectedPair = availablePairs[randomIndex];
     
-    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h) - ${availableSlots} emplacements disponibles`, 'SUCCESS');
+    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h)`, 'SUCCESS');
+    log(`📊 ${availablePairs.length} paires disponibles (${openedSymbols.length} déjà ouvertes)`, 'INFO');
     
     return selectedPair;
 }
@@ -761,12 +848,9 @@ async function monitorPnLAndClose() {
                         // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
                         addPositionCooldown(data.position.symbol);
                         
-                        // Mettre à jour les stats
-                        botStats.totalClosedPositions++;
-                        if (data.pnlPercent > 0) {
-                            botStats.winningPositions++;
-                            botStats.totalWinAmount += (data.position.size * data.pnlPercent / 100);
-                        }
+                        // 🎯 CORRECTION: Utiliser countClosedPosition pour éviter double comptage
+                        const pnl = (data.position.size * data.pnlPercent / 100);
+                        countClosedPosition(data.position, pnl, 'monitorPnLAndClose');
                         
                         // Supprimer de la liste des positions ouvertes
                         const index = openPositions.findIndex(p => p.id === data.position.id);
@@ -1659,18 +1743,9 @@ async function syncAndCheckPositions() {
                 for (const closedPos of closedPositions) {
                     log(`🔚 Position fermée détectée: ${closedPos.symbol} (Stop Loss déclenché ou fermeture manuelle)`, 'SUCCESS');
                     
-                    botStats.totalClosedPositions++;
+                    // 🎯 CORRECTION: Utiliser countClosedPosition pour éviter double comptage
                     const pnl = closedPos.unrealizedPnL || 0;
-                    
-                    if (pnl > 0) {
-                        botStats.winningPositions++;
-                        botStats.totalWinAmount += pnl;
-                        log(`🟢 Position gagnante: +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes)`, 'SUCCESS');
-                    } else if (pnl < 0) {
-                        botStats.losingPositions++;
-                        botStats.totalLossAmount += pnl;
-                        log(`🔴 Position perdante: ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes)`, 'WARNING');
-                    }
+                    countClosedPosition(closedPos, pnl, 'syncAndCheckPositions');
                     
                     // Cancel orphaned stop losses (from checkPositionsStatus)
                     if (closedPos.stopLossId) {
@@ -2191,16 +2266,9 @@ async function syncNewManualPositions() {
             log(`🔚 ${closedPositions.length} position(s) fermée(s) détectée(s) automatiquement`, 'INFO');
             
             for (const closedPos of closedPositions) {
-                botStats.totalClosedPositions++;
+                // 🎯 CORRECTION: Utiliser countClosedPosition pour éviter double comptage
                 const pnl = closedPos.unrealizedPnL || 0;
-                
-                if (pnl > 0) {
-                    botStats.winningPositions++;
-                    botStats.totalWinAmount += pnl;
-                } else if (pnl < 0) {
-                    botStats.losingPositions++;
-                    botStats.totalLossAmount += pnl;
-                }
+                countClosedPosition(closedPos, pnl, 'syncNewManualPositions');
             }
             
             // Supprimer les positions fermées
@@ -3230,3 +3298,12 @@ window.watchPositionOpening = function() {
         watchingFor: availableSlots
     };
 };
+
+// 🎯 EXPORTS: Rendre les fonctions de stats tracking accessibles globalement
+window.resetStatsTracking = resetStatsTracking;
+window.isPositionCounted = isPositionCounted;
+window.markPositionAsCounted = markPositionAsCounted;
+window.countClosedPosition = countClosedPosition;
+window.showStatsTracking = showStatsTracking;
+
+console.log('✅ trading.js chargé: Stats tracking anti-double-comptage activé');
