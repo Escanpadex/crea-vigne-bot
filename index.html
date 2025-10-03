@@ -98,7 +98,17 @@
                                     
                                     <div class="config-item">
                                         <div class="config-label">📈 Levier</div>
-                                        <div class="config-value">x2 fixe</div>
+                                        <div class="leverage-slider-container">
+                                            <input type="range" 
+                                                   id="leverageRange" 
+                                                   min="2" 
+                                                   max="5" 
+                                                   step="1" 
+                                                   value="2" 
+                                                   class="leverage-slider"
+                                                   oninput="updateLeverage(this.value)">
+                                            <span id="leverageDisplay" class="leverage-display">x2</span>
+                                        </div>
                                     </div>
                                     
                                     <div class="config-item">
@@ -108,32 +118,39 @@
                                     
                                     <div class="config-item">
                                         <div class="config-label">🔄 Limite bot</div>
-                                        <div class="bot-limit-container">
-                                            <input type="range" 
-                                                   id="botLimitRange" 
+                                        <div class="number-input-container">
+                                            <input type="number" 
+                                                   id="botLimitInput" 
                                                    min="2" 
-                                                   max="5" 
+                                                   max="15" 
                                                    step="1" 
                                                    value="2" 
-                                                   class="bot-limit-slider"
-                                                   onchange="updateBotLimit(this.value)">
-                                            <span id="botLimitDisplay" class="bot-limit-display">2 positions max</span>
+                                                   class="number-input"
+                                                   oninput="updateBotLimit(this.value)">
+                                            <div class="arrow-buttons">
+                                                <button class="arrow-btn" onclick="incrementBotLimit()">▲</button>
+                                                <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <div class="pnl-config">
                                     <div class="config-label">🎯 Objectif PnL</div>
-                                    <div class="pnl-slider-container">
-                                        <input type="range" 
-                                               id="targetPnLRange" 
-                                               min="0.1" 
-                                               max="5.0" 
-                                               step="0.1" 
+                                    <div class="number-input-container">
+                                        <input type="number" 
+                                               id="targetPnLInput" 
+                                               min="0.2" 
+                                               max="3.0" 
+                                               step="0.05" 
                                                value="2.0" 
-                                               class="pnl-slider"
-                                               onchange="updateTargetPnL(this.value)">
-                                        <span id="targetPnLDisplay" class="pnl-display">+2.0%</span>
+                                               class="number-input"
+                                               oninput="updateTargetPnL(this.value)">
+                                        <div class="arrow-buttons">
+                                            <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
+                                            <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
+                                        </div>
+                                        <span class="pnl-unit">%</span>
                                     </div>
                                 </div>
                             </div>
@@ -207,16 +224,7 @@
                     
                     <!-- Section Contrôles en bas -->
                     <div class="section-footer">
-                        <div class="topbar">
-                            <div style="font-size: 14px; color: var(--muted);">
-                                <strong>🎯 Stratégie: Paires Positives 24h (affichage toutes positions)</strong>
-                            </div>
-                            <div style="font-size: 12px; color: #9FB6C2;">
-                                Bot automatisé - Fermeture à +2%
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 15px; justify-content: center;">
+                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
                             <button class="btn btn-wide" onclick="startBot()" id="startBtn">▶️ Démarrer le Bot</button>
                             <button class="btn btn-danger btn-wide" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter le Bot</button>
                         </div>
@@ -234,43 +242,121 @@
     <script>
         // 🎯 NOUVELLE FONCTION: Mettre à jour l'objectif PnL
         function updateTargetPnL(value) {
-            const targetPnL = parseFloat(value);
+            let targetPnL = parseFloat(value);
+            
+            // Validation des limites
+            if (targetPnL < 0.2) targetPnL = 0.2;
+            if (targetPnL > 3.0) targetPnL = 3.0;
+            
+            // Arrondir à 0.05%
+            targetPnL = Math.round(targetPnL / 0.05) * 0.05;
             
             // Mettre à jour la configuration
             config.targetPnL = targetPnL;
             
-            // Mettre à jour l'affichage
-            document.getElementById('targetPnLDisplay').textContent = `+${targetPnL.toFixed(1)}%`;
+            // Mettre à jour l'input
+            document.getElementById('targetPnLInput').value = targetPnL.toFixed(2);
             
             // Log de confirmation
             if (typeof log === 'function') {
-                log(`🎯 Objectif PnL modifié: +${targetPnL.toFixed(1)}%`, 'SUCCESS');
+                log(`🎯 Objectif PnL modifié: +${targetPnL.toFixed(2)}%`, 'SUCCESS');
             }
             
             // Mettre à jour les positions existantes si le bot tourne
-            if (botRunning && openPositions && openPositions.length > 0) {
+            if (typeof botRunning !== 'undefined' && botRunning && typeof openPositions !== 'undefined' && openPositions && openPositions.length > 0) {
                 openPositions.forEach(position => {
                     position.targetPnL = targetPnL;
                 });
                 if (typeof log === 'function') {
-                    log(`📊 ${openPositions.length} position(s) existante(s) mise(s) à jour avec nouvel objectif +${targetPnL.toFixed(1)}%`, 'INFO');
+                    log(`📊 ${openPositions.length} position(s) existante(s) mise(s) à jour avec nouvel objectif +${targetPnL.toFixed(2)}%`, 'INFO');
                 }
+            }
+        }
+        
+        // 🎯 Incrémenter/Décrémenter le PnL
+        function incrementTargetPnL() {
+            const input = document.getElementById('targetPnLInput');
+            let value = parseFloat(input.value) + 0.05;
+            if (value > 3.0) value = 3.0;
+            updateTargetPnL(value);
+        }
+        
+        function decrementTargetPnL() {
+            const input = document.getElementById('targetPnLInput');
+            let value = parseFloat(input.value) - 0.05;
+            if (value < 0.2) value = 0.2;
+            updateTargetPnL(value);
+        }
+        
+        // 🎯 NOUVELLE FONCTION: Mettre à jour la limite de positions bot
+        function updateBotLimit(value) {
+            let botLimit = parseInt(value);
+            
+            // Validation des limites
+            if (botLimit < 2) botLimit = 2;
+            if (botLimit > 15) botLimit = 15;
+            
+            // Mettre à jour la configuration
+            config.maxBotPositions = botLimit;
+            
+            // Mettre à jour l'input
+            document.getElementById('botLimitInput').value = botLimit;
+            
+            // Mettre à jour l'affichage du statut
+            const botPositionsCount = document.getElementById('botPositionsCount');
+            if (botPositionsCount) {
+                const currentCount = typeof openPositions !== 'undefined' ? openPositions.filter(pos => pos.isBotManaged === true).length : 0;
+                botPositionsCount.textContent = `${currentCount}/${botLimit}`;
+            }
+            
+            // Log de confirmation
+            if (typeof log === 'function') {
+                log(`🔄 Limite bot modifiée: ${botLimit} positions max`, 'SUCCESS');
+            }
+        }
+        
+        // 🎯 Incrémenter/Décrémenter la limite bot
+        function incrementBotLimit() {
+            const input = document.getElementById('botLimitInput');
+            let value = parseInt(input.value) + 1;
+            if (value > 15) value = 15;
+            updateBotLimit(value);
+        }
+        
+        function decrementBotLimit() {
+            const input = document.getElementById('botLimitInput');
+            let value = parseInt(input.value) - 1;
+            if (value < 2) value = 2;
+            updateBotLimit(value);
+        }
+        
+        // 🎯 NOUVELLE FONCTION: Mettre à jour le levier
+        function updateLeverage(value) {
+            const leverage = parseInt(value);
+            
+            // Mettre à jour la configuration
+            config.leverage = leverage;
+            
+            // Mettre à jour l'affichage
+            document.getElementById('leverageDisplay').textContent = `x${leverage}`;
+            
+            // Log de confirmation
+            if (typeof log === 'function') {
+                log(`📈 Levier modifié: x${leverage}`, 'SUCCESS');
             }
         }
         
         // 🔄 Initialiser l'affichage au chargement de la page
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialiser tous les curseurs de configuration
-            if (typeof initializeConfigSliders === 'function') {
-                initializeConfigSliders();
-            } else {
-                // Fallback pour l'initialisation manuelle
-            const initialValue = document.getElementById('targetPnLRange').value;
-            updateTargetPnL(initialValue);
-                
-                const initialBotLimit = document.getElementById('botLimitRange').value;
-                updateBotLimit(initialBotLimit);
-            }
+            // Initialiser les valeurs
+            const initialPnL = document.getElementById('targetPnLInput').value;
+            updateTargetPnL(initialPnL);
+            
+            const initialBotLimit = document.getElementById('botLimitInput').value;
+            updateBotLimit(initialBotLimit);
+            
+            const initialLeverage = document.getElementById('leverageRange').value;
+            updateLeverage(initialLeverage);
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
