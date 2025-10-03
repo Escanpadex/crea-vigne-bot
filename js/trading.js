@@ -1155,7 +1155,12 @@ function updatePositionsDisplay() {
             const managementText = isBotManaged ? 'Bot' : 'Manuel';
             const managementColor = isBotManaged ? '#3b82f6' : '#f59e0b';
             const managementBg = isBotManaged ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)';
-            const autoCloseText = isBotManaged ? `Auto-close +${position.targetPnL || 2}%` : 'Gestion manuelle';
+            const autoCloseText = isBotManaged ? `Auto-close +${position.targetPnL || 2}%` : '';
+            
+            // 🎯 NOUVELLES INFOS: Realized PNL, Taille position, Levier
+            const realizedPnL = position.realizedPnL || 0;
+            const positionSize = position.size || (position.quantity && position.entryPrice ? position.quantity * position.entryPrice : 0);
+            const leverage = position.leverage || config.leverage || 2;
             
             // Animation de pulsation pour les gains
             const pulseAnimation = isPositive && pnlPercent > 1 ? 'animation: pulse 2s infinite;' : '';
@@ -1252,11 +1257,20 @@ function updatePositionsDisplay() {
                             <span style="display: inline-block; background: rgba(0,0,0,0.3); color: #ffffff; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
                                 ⏱️ ${timeDisplay}
                 </span>
-                            <span style="display: inline-block; background: ${managementBg}; color: ${managementColor}; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
+                            <span style="display: inline-block; background: ${managementBg}; color: ${managementColor}; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
                                 ${managementIcon} ${managementText}
                             </span>
-                            <span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
+                            ${autoCloseText ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
                                 🎯 ${autoCloseText}
+                            </span>` : ''}
+                            <span style="display: inline-block; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
+                                💰 ${positionSize.toFixed(0)}$
+                            </span>
+                            <span style="display: inline-block; background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
+                                📈 x${leverage}
+                            </span>
+                            <span style="display: inline-block; background: rgba(139, 92, 246, 0.2); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
+                                📊 R-PnL: ${realizedPnL >= 0 ? '+' : ''}${realizedPnL.toFixed(2)}$
                             </span>
             </div>
                         
