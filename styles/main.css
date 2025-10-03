@@ -1382,6 +1382,17 @@ body.dark-mode {
     text-align: center;
 }
 
+.leverage-unit {
+    background: #f59e0b;
+    color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 40px;
+    text-align: center;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .config-grid {
