@@ -93,21 +93,39 @@
                                 <div class="config-grid">
                                     <div class="config-item">
                                         <div class="config-label">💰 Capital par trade</div>
-                                        <div class="config-value">50% du solde</div>
+                                        <div class="number-input-container">
+                                            <input type="number" 
+                                                   id="capitalPercentInput" 
+                                                   min="10" 
+                                                   max="90" 
+                                                   step="5" 
+                                                   value="50" 
+                                                   class="number-input"
+                                                   oninput="updateCapitalPercent(this.value)">
+                                            <div class="arrow-buttons">
+                                                <button class="arrow-btn" onclick="incrementCapitalPercent()">▲</button>
+                                                <button class="arrow-btn" onclick="decrementCapitalPercent()">▼</button>
+                                            </div>
+                                            <span class="pnl-unit">%</span>
+                                        </div>
                                     </div>
                                     
                                     <div class="config-item">
                                         <div class="config-label">📈 Levier</div>
-                                        <div class="leverage-slider-container">
-                                            <input type="range" 
-                                                   id="leverageRange" 
+                                        <div class="number-input-container">
+                                            <input type="number" 
+                                                   id="leverageInput" 
                                                    min="2" 
                                                    max="5" 
                                                    step="1" 
                                                    value="2" 
-                                                   class="leverage-slider"
+                                                   class="number-input"
                                                    oninput="updateLeverage(this.value)">
-                                            <span id="leverageDisplay" class="leverage-display">x2</span>
+                                            <div class="arrow-buttons">
+                                                <button class="arrow-btn" onclick="incrementLeverage()">▲</button>
+                                                <button class="arrow-btn" onclick="decrementLeverage()">▼</button>
+                                            </div>
+                                            <span class="leverage-unit">x</span>
                                         </div>
                                     </div>
                                     
@@ -117,7 +135,7 @@
                                     </div>
                                     
                                     <div class="config-item">
-                                        <div class="config-label">🔄 Limite bot</div>
+                                        <div class="config-label">🔄 Nombre de positions simultanées</div>
                                         <div class="number-input-container">
                                             <input type="number" 
                                                    id="botLimitInput" 
@@ -330,20 +348,77 @@
             updateBotLimit(value);
         }
         
+        // 🎯 NOUVELLE FONCTION: Mettre à jour le capital %
+        function updateCapitalPercent(value) {
+            let capitalPercent = parseInt(value);
+            
+            // Validation des limites
+            if (capitalPercent < 10) capitalPercent = 10;
+            if (capitalPercent > 90) capitalPercent = 90;
+            
+            // Arrondir à 5%
+            capitalPercent = Math.round(capitalPercent / 5) * 5;
+            
+            // Mettre à jour la configuration
+            config.capitalPercent = capitalPercent;
+            
+            // Mettre à jour l'input
+            document.getElementById('capitalPercentInput').value = capitalPercent;
+            
+            // Log de confirmation
+            if (typeof log === 'function') {
+                log(`💰 Capital par trade modifié: ${capitalPercent}%`, 'SUCCESS');
+            }
+        }
+        
+        // 🎯 Incrémenter/Décrémenter le capital %
+        function incrementCapitalPercent() {
+            const input = document.getElementById('capitalPercentInput');
+            let value = parseInt(input.value) + 5;
+            if (value > 90) value = 90;
+            updateCapitalPercent(value);
+        }
+        
+        function decrementCapitalPercent() {
+            const input = document.getElementById('capitalPercentInput');
+            let value = parseInt(input.value) - 5;
+            if (value < 10) value = 10;
+            updateCapitalPercent(value);
+        }
+        
         // 🎯 NOUVELLE FONCTION: Mettre à jour le levier
         function updateLeverage(value) {
-            const leverage = parseInt(value);
+            let leverage = parseInt(value);
+            
+            // Validation des limites
+            if (leverage < 2) leverage = 2;
+            if (leverage > 5) leverage = 5;
             
             // Mettre à jour la configuration
             config.leverage = leverage;
             
-            // Mettre à jour l'affichage
-            document.getElementById('leverageDisplay').textContent = `x${leverage}`;
+            // Mettre à jour l'input
+            document.getElementById('leverageInput').value = leverage;
             
             // Log de confirmation
             if (typeof log === 'function') {
                 log(`📈 Levier modifié: x${leverage}`, 'SUCCESS');
             }
+        }
+        
+        // 🎯 Incrémenter/Décrémenter le levier
+        function incrementLeverage() {
+            const input = document.getElementById('leverageInput');
+            let value = parseInt(input.value) + 1;
+            if (value > 5) value = 5;
+            updateLeverage(value);
+        }
+        
+        function decrementLeverage() {
+            const input = document.getElementById('leverageInput');
+            let value = parseInt(input.value) - 1;
+            if (value < 2) value = 2;
+            updateLeverage(value);
         }
         
         // 🔄 Initialiser l'affichage au chargement de la page
@@ -355,7 +430,10 @@
             const initialBotLimit = document.getElementById('botLimitInput').value;
             updateBotLimit(initialBotLimit);
             
-            const initialLeverage = document.getElementById('leverageRange').value;
+            const initialCapital = document.getElementById('capitalPercentInput').value;
+            updateCapitalPercent(initialCapital);
+            
+            const initialLeverage = document.getElementById('leverageInput').value;
             updateLeverage(initialLeverage);
         });
     </script>
