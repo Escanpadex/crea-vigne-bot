@@ -224,6 +224,12 @@ function getBotManagedPositionsCount() {
     return openPositions.filter(pos => pos.isBotManaged === true).length;
 }
 
+// 🎯 CORRECTION: Fonction utilitaire pour arrondir le targetPnL (éviter 0.3500000000000000003%)
+function formatTargetPnL(targetPnL) {
+    // Arrondir à 2 décimales pour éviter les problèmes de précision flottante
+    return parseFloat(targetPnL.toFixed(2));
+}
+
 // 🆕 NOUVELLE FONCTION: Sélectionner une paire aléatoire parmi les positives
 function selectRandomPositivePair(excludeSymbols = []) {
     // 🔧 CORRECTION: Vérifier seulement les positions du bot, pas les manuelles
@@ -681,7 +687,7 @@ async function openPosition(symbol, selectedPair) {
             highestPrice: currentPrice,
             reason: `Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`,
             change24h: selectedPair.change24h,
-            targetPnL: config.targetPnL, // 🆕 Objectif configurable
+            targetPnL: formatTargetPnL(config.targetPnL), // 🆕 Objectif configurable (arrondi)
             isBotManaged: true // 🔧 NOUVEAU: Marquer comme position gérée par le bot
         };
         
@@ -1478,7 +1484,7 @@ async function importExistingPositions() {
                         currentPrice: markPrice,
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
-                        targetPnL: config.targetPnL || 2.0, // 🔧 AJOUT: Target PnL pour la nouvelle stratégie
+                        targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
                         reason: '📥 Position importée depuis Bitget',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
                         isBotManaged: false // 🔧 NOUVEAU: Position manuelle, pas gérée par le bot
@@ -1929,7 +1935,7 @@ window.debugImportDetailed = async function() {
                         currentPrice: markPrice,
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
-                        targetPnL: config.targetPnL || 2.0,
+                        targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                         reason: '📥 Position importée depuis Bitget'
                     };
                     
@@ -2237,7 +2243,7 @@ async function syncNewManualPositions() {
                     currentPrice: markPrice,
                     unrealizedPnL: unrealizedPL,
                     pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
-                    targetPnL: config.targetPnL || 2.0,
+                    targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                     reason: '👤 Position manuelle détectée automatiquement',
                     lastPnLLog: 0,
                     isBotManaged: false // Position manuelle
@@ -2326,7 +2332,7 @@ window.createTestPositions = function(count = 15) {
             highestPrice: Math.max(entryPrice, currentPrice),
             unrealizedPnL: unrealizedPnL,
             pnlPercentage: pnlPercent,
-            targetPnL: config.targetPnL || 2.0,
+            targetPnL: formatTargetPnL(config.targetPnL || 2.0),
             reason: `🧪 Position de test #${i + 1}`,
             change24h: Math.random() * 10 - 2, // ±2% à +8%
             lastPnLLog: 0
@@ -3306,7 +3312,12 @@ window.markPositionAsCounted = markPositionAsCounted;
 window.countClosedPosition = countClosedPosition;
 window.showStatsTracking = showStatsTracking;
 
-// 🎯 EXPORT: Alias pour la fonction de sélection de paires (compatibilité avec main.js)
+// 🎯 EXPORTS: Rendre les fonctions de trading accessibles globalement (pour main.js)
+window.getPositivePairs = getPositivePairs;
 window.selectRandomPositivePairNotInUse = selectRandomPositivePair;
+window.openPosition = openPosition;
+window.monitorPnLAndClose = monitorPnLAndClose;
+window.syncAndCheckPositions = syncAndCheckPositions;
+window.formatTargetPnL = formatTargetPnL;
 
-console.log('✅ trading.js chargé: Stats tracking anti-double-comptage activé');
+console.log('✅ trading.js chargé: Stats tracking anti-double-comptage + Arrondi targetPnL + Exports globaux configurés');
