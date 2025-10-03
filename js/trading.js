@@ -599,15 +599,16 @@ async function openPosition(symbol, selectedPair) {
     const positionValue = calculatePositionSize();
     
     try {
-        // 🎯 NOUVELLE STRATÉGIE: Toujours levier x2
-        await setLeverage(symbol, 2);
+        // 🎯 STRATÉGIE: Appliquer le levier configuré
+        const leverage = config.leverage || 2;
+        await setLeverage(symbol, leverage);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const currentPrice = selectedPair.price;
         const quantity = (positionValue / currentPrice).toFixed(6);
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-        log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x2)`, 'INFO');
+        log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x${leverage})`, 'INFO');
         log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
         // 🔧 CORRECTION: Validation des paramètres d'ordre
