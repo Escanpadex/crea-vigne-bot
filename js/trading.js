@@ -3306,4 +3306,7 @@ window.markPositionAsCounted = markPositionAsCounted;
 window.countClosedPosition = countClosedPosition;
 window.showStatsTracking = showStatsTracking;
 
+// 🎯 EXPORT: Alias pour la fonction de sélection de paires (compatibilité avec main.js)
+window.selectRandomPositivePairNotInUse = selectRandomPositivePair;
+
 console.log('✅ trading.js chargé: Stats tracking anti-double-comptage activé');
