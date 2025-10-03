@@ -1,7 +1,16 @@
 // Utility functions
 console.log('📁 Loading utils.js...');
 
-function log(message, type = 'INFO') { /* logging UI removed */ }
+// 🧹 OPTIMISATION: Option pour désactiver les logs DEBUG (économie mémoire)
+const ENABLE_DEBUG_LOGS = false; // Mettre à false pour désactiver les logs DEBUG
+
+function log(message, type = 'INFO') { 
+    // 🧹 Filtrer les logs DEBUG si désactivés
+    if (type === 'DEBUG' && !ENABLE_DEBUG_LOGS) {
+        return;
+    }
+    /* logging UI removed */ 
+}
 
 function clearLogs() { /* no-op: logs removed */ }
 

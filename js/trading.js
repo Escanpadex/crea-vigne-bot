@@ -2,6 +2,16 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
+// 🧹 OPTIMISATION: Nettoyer la console toutes les 10 minutes pour éviter la surcharge mémoire
+let lastConsoleClear = Date.now();
+function autoCleanConsole() {
+    if (Date.now() - lastConsoleClear > 600000) { // 10 minutes
+        console.clear();
+        console.log('🧹 Console nettoyée automatiquement (optimisation mémoire)');
+        lastConsoleClear = Date.now();
+    }
+}
+
 // 🎯 FIX: Correction du double comptage des positions gagnantes/perdantes
 // 🔧 TRACKING: Set pour tracker les positions déjà comptées dans les stats
 let countedPositions = new Set(); // Stocke les IDs des positions déjà comptées
@@ -243,7 +253,8 @@ function selectRandomPositivePair(excludeSymbols = []) {
     
     // 🔧 PROTECTION ANTI-DOUBLON: Récupérer toutes les paires déjà ouvertes
     const openedSymbols = openPositions.map(pos => pos.symbol);
-    log(`🔍 Paires déjà ouvertes: ${openedSymbols.join(', ') || 'Aucune'}`, 'DEBUG');
+    // Log réduit pour économiser la mémoire (commenté car déjà visible dans les logs suivants)
+    // log(`🔍 Paires déjà ouvertes: ${openedSymbols.join(', ') || 'Aucune'}`, 'DEBUG');
     
     // Filtrer les paires disponibles en excluant celles déjà ouvertes
     const availablePairs = positivePairs.filter(pair => 
@@ -769,6 +780,9 @@ async function createEmergencyStopLoss(position, stopPrice) {
 async function monitorPnLAndClose() {
     if (!botRunning || openPositions.length === 0) return;
     
+    // 🧹 OPTIMISATION: Nettoyer la console périodiquement
+    autoCleanConsole();
+    
     try {
         // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
         const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
@@ -786,7 +800,11 @@ async function monitorPnLAndClose() {
                 const initialValue = position.quantity * position.entryPrice;
                 pnlPercent = (position.unrealizedPnL / initialValue) * 100;
                 dataSource = 'API_UNREALIZED_PNL';
-                log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                // Log réduit: seulement toutes les 5 minutes
+                if (!position.lastApiPnLLog || Date.now() - position.lastApiPnLLog > 300000) {
+                    log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                    position.lastApiPnLLog = Date.now();
+                }
             } else {
                 // Fallback: essayer getCurrentPrice
                 const currentPrice = await getCurrentPrice(position.symbol);
@@ -810,6 +828,28 @@ async function monitorPnLAndClose() {
             
             // 🎯 DÉTECTION: Cette position doit-elle être fermée ?
             if (pnlPercent >= position.targetPnL) {
+                // 🕐 NOUVEAU: Système de confirmation avec délai de 3 secondes
+                if (!position.tpConfirmationStartTime) {
+                    // Premier passage au-dessus du TP : démarrer le chrono
+                    position.tpConfirmationStartTime = Date.now();
+                    log(`⏱️ ${position.symbol}: TP atteint (+${pnlPercent.toFixed(2)}%) - Chrono 3 sec démarré pour confirmation`, 'INFO');
+                    continue; // Passer à la prochaine position
+                }
+                
+                // Vérifier si les 3 secondes sont écoulées
+                const elapsedTime = (Date.now() - position.tpConfirmationStartTime) / 1000;
+                if (elapsedTime < 3) {
+                    // Toujours en attente de confirmation (log seulement toutes les secondes)
+                    if (!position.lastConfirmationLog || Date.now() - position.lastConfirmationLog > 1000) {
+                        log(`⏳ ${position.symbol}: Confirmation TP en cours... ${(3 - elapsedTime).toFixed(1)}s restantes (+${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                        position.lastConfirmationLog = Date.now();
+                    }
+                    continue;
+                }
+                
+                // 3 secondes écoulées ET toujours >= TP : OK pour fermer
+                log(`✅ ${position.symbol}: TP confirmé après 3 sec (+${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}%)`, 'SUCCESS');
+                
                 // 💰 Calculer les frais d'entrée (0.06% maker/taker fee sur Bitget)
                 const entryFee = position.size * 0.0006;
                 const exitFee = position.size * 0.0006;
@@ -825,9 +865,15 @@ async function monitorPnLAndClose() {
                     realizedPnL
                 });
                 
-                log(`🎯 ${position.symbol}: Objectif atteint +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
+                log(`🎯 ${position.symbol}: Objectif confirmé +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
                 log(`💰 Position: $${position.size.toFixed(2)} | PnL brut: +$${grossPnL.toFixed(2)} | Frais: -$${totalFees.toFixed(2)} | PnL net: +$${realizedPnL.toFixed(2)}`, 'SUCCESS');
             } else {
+                // 🔄 RÉINITIALISATION: Si le PnL redescend sous le TP, annuler le chrono
+                if (position.tpConfirmationStartTime) {
+                    log(`🔄 ${position.symbol}: PnL redescendu sous TP (+${pnlPercent.toFixed(2)}% < +${position.targetPnL}%) - Chrono annulé`, 'WARNING');
+                    delete position.tpConfirmationStartTime;
+                }
+                
                 // Log de suivi (moins fréquent pour éviter le spam avec surveillance 1s)
                 if (Date.now() - (position.lastPnLLog || 0) > 60000) { // Toutes les 60 secondes
                     log(`📊 ${position.symbol}: PnL ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (Objectif: +${position.targetPnL}%)`, 'DEBUG');
