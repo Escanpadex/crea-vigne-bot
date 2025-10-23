@@ -144,16 +144,16 @@ async function getPositivePairs() {
                 const change24hPercent = change24hDecimal * 100; // Convertir en pourcentage
                 const volume = parseFloat(ticker.quoteVolume || ticker.usdtVolume || ticker.baseVolume || 0);
                 
-                // 🔧 AMÉLIORATION: Réduire le volume minimum et ajouter plus de logs
-                const isPositive = change24hPercent > 0.1; // Au moins +0.1% pour éviter le bruit
+                // 🎯 NOUVELLE RESTRICTION: Performance 24h entre +5% et +20%
+                const isInRange = change24hPercent >= 5.0 && change24hPercent <= 20.0;
                 const hasVolume = volume > 100000; // Volume en USDT
                 const isUSDT = ticker.symbol && ticker.symbol.includes('USDT');
                 
-                if (isPositive && hasVolume && isUSDT) {
+                if (isInRange && hasVolume && isUSDT) {
                     log(`✅ Paire valide: ${ticker.symbol} (+${change24hPercent.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
                 }
                 
-                return isPositive && hasVolume && isUSDT;
+                return isInRange && hasVolume && isUSDT;
             })
             .map(ticker => ({
                 symbol: ticker.symbol, // Garder le format original
@@ -163,16 +163,26 @@ async function getPositivePairs() {
             }))
             .sort((a, b) => b.change24h - a.change24h); // Trier par performance décroissante
         
-        log(`✅ ${positive24hPairs.length} paires futures positives trouvées sur 24h`, 'SUCCESS');
+        log(`✅ ${positive24hPairs.length} paires trouvées avec performance entre +5% et +20% sur 24h`, 'SUCCESS');
         
-        // Log des 10 meilleures paires
+        // Vérifier si assez de paires pour le nombre de positions requises
+        const maxBotPositions = getMaxBotPositions();
+        if (positive24hPairs.length < maxBotPositions) {
+            log(`⚠️ Seulement ${positive24hPairs.length} paires disponibles pour ${maxBotPositions} positions`, 'WARNING');
+            log(`⏳ Le bot ouvrira uniquement ${positive24hPairs.length} position(s) et attendra de nouvelles opportunités`, 'INFO');
+        } else {
+            log(`✅ Suffisamment de paires disponibles (${positive24hPairs.length}) pour ${maxBotPositions} positions`, 'SUCCESS');
+        }
+        
+        // Log des meilleures paires disponibles
         if (positive24hPairs.length > 0) {
-            log(`🔥 Top 10 paires positives:`, 'INFO');
-            positive24hPairs.slice(0, 10).forEach((pair, index) => {
+            const displayCount = Math.min(positive24hPairs.length, 10);
+            log(`🔥 Top ${displayCount} paires disponibles (entre +5% et +20%):`, 'INFO');
+            positive24hPairs.slice(0, displayCount).forEach((pair, index) => {
                 log(`   ${index + 1}. ${pair.symbol}: +${pair.change24h.toFixed(2)}% (Vol: ${formatNumber(pair.volume24h)})`, 'INFO');
             });
         } else {
-            log('⚠️ Aucune paire positive trouvée - Vérification des données...', 'WARNING');
+            log('⚠️ Aucune paire dans la fourchette +5% à +20% - Vérification des données...', 'WARNING');
             // Log de quelques exemples pour debug
             if (tickers.length > 0) {
                 log('📊 Exemples de tickers reçus:', 'DEBUG');
@@ -265,15 +275,15 @@ function selectRandomPositivePair(excludeSymbols = []) {
     );
     
     if (availablePairs.length === 0) {
-        log('⚠️ Aucune paire positive disponible - Toutes les paires sont soit ouvertes, soit en cooldown', 'WARNING');
-        log(`📊 Paires positives totales: ${positivePairs.length}`, 'INFO');
+        log('⚠️ Aucune paire disponible - Toutes les paires sont soit ouvertes, soit en cooldown', 'WARNING');
+        log(`📊 Paires dans la fourchette (+5% à +20%): ${positivePairs.length}`, 'INFO');
         log(`📊 Paires déjà ouvertes: ${openedSymbols.length}`, 'INFO');
         log(`📊 Slots bot disponibles: ${availableSlots}/${getMaxBotPositions()}`, 'INFO');
         
         // 🎯 NOUVEAU: Si pas assez de paires, le bot attend
         if (positivePairs.length < getMaxBotPositions()) {
-            log(`🔴 Pas assez de paires positives (${positivePairs.length}) pour ${getMaxBotPositions()} positions simultanées`, 'WARNING');
-            log('⏳ Le bot attend de nouvelles opportunités...', 'INFO');
+            log(`🔴 Pas assez de paires dans la fourchette (+5% à +20%): ${positivePairs.length} disponibles pour ${getMaxBotPositions()} positions`, 'WARNING');
+            log('⏳ Le bot attend que de nouvelles paires entrent dans la fourchette +5% à +20%...', 'INFO');
         }
         
         return null;
@@ -572,10 +582,10 @@ function canOpenNewPosition(symbol) {
         return { canOpen: false, reason: `Limite bot atteinte: ${botPositionsCount}/${getMaxBotPositions()} positions automatiques (${openPositions.length} total)` };
     }
     
-    // Vérifier le cooldown (1 minute après fermeture)
+    // Vérifier le cooldown (6 heures après fermeture)
     if (isPairInCooldown(symbol)) {
-        const remainingMinutes = getRemainingCooldown(symbol);
-        return { canOpen: false, reason: `${symbol} en cooldown encore ${remainingMinutes} minutes` };
+        const remainingTime = getRemainingCooldown(symbol);
+        return { canOpen: false, reason: `${symbol} en cooldown encore ${remainingTime}` };
     }
     
     // 🆕 AMÉLIORATION: Vérifier le cooldown 12h pour paires déjà tradées
@@ -1020,14 +1030,14 @@ async function closePositionFlash(position) {
     }
 }
 
-// 🆕 NOUVELLE FONCTION: Ajouter un cooldown après fermeture de position (1 minute)
+// 🆕 NOUVELLE FONCTION: Ajouter un cooldown après fermeture de position (6 heures)
 function addPositionCooldown(symbol) {
-    const cooldownEnd = Date.now() + (60 * 1000); // 1 minute
+    const cooldownEnd = Date.now() + (6 * 60 * 60 * 1000); // 6 heures
     positionCooldowns.set(symbol, cooldownEnd);
-    log(`⏰ Cooldown 1min activé pour ${symbol}`, 'INFO');
+    log(`⏰ Cooldown 6h activé pour ${symbol} (réouverture interdite jusqu'à ${new Date(cooldownEnd).toLocaleTimeString()})`, 'INFO');
 }
 
-// 🆕 NOUVELLE FONCTION: Vérifier si une paire est en cooldown (1 minute)
+// 🆕 NOUVELLE FONCTION: Vérifier si une paire est en cooldown (6 heures)
 function isPairInCooldown(symbol) {
     const cooldownEnd = positionCooldowns.get(symbol);
     if (!cooldownEnd) return false;
@@ -1062,13 +1072,19 @@ function isTradedPairInCooldown(symbol) {
     return true;
 }
 
-// 🆕 AMÉLIORATION: Obtenir le temps restant du cooldown 1 minute
+// 🆕 AMÉLIORATION: Obtenir le temps restant du cooldown 6 heures
 function getRemainingCooldown(symbol) {
     const cooldownEnd = positionCooldowns.get(symbol);
     if (!cooldownEnd) return 0;
     
     const remaining = Math.max(0, cooldownEnd - Date.now());
-    return Math.ceil(remaining / 60000); // En minutes
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const minutes = Math.ceil((remaining % (60 * 60 * 1000)) / 60000);
+    
+    if (hours > 0) {
+        return `${hours}h${minutes > 0 ? minutes + 'min' : ''}`;
+    }
+    return `${minutes}min`;
 }
 
 // 🆕 AMÉLIORATION: Obtenir le temps restant du cooldown 12h
