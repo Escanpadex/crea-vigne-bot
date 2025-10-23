@@ -50,8 +50,8 @@ function updateStats() {
     if (elements.totalSignals) elements.totalSignals.textContent = botStats.totalSignals;
     if (elements.totalOpenPositions) elements.totalOpenPositions.textContent = openPositions.length;
     if (elements.totalClosedPositions) elements.totalClosedPositions.textContent = botStats.totalClosedPositions;
-    if (elements.winningPositions) elements.winningPositions.textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(0)}$)`;
-    if (elements.losingPositions) elements.losingPositions.textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(0)}$)`;
+    if (elements.winningPositions) elements.winningPositions.textContent = `${botStats.winningPositions} (+${botStats.totalWinAmount.toFixed(2)}$)`;
+    if (elements.losingPositions) elements.losingPositions.textContent = `${botStats.losingPositions} (-${Math.abs(botStats.totalLossAmount).toFixed(2)}$)`;
     
     // Mise à jour nouveaux éléments
     if (elements.botPositionsCount) elements.botPositionsCount.textContent = `${botPositions.length}/${MAX_BOT_POSITIONS}`;
