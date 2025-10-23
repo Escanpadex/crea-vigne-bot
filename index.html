@@ -130,8 +130,22 @@
                                     </div>
                                     
                                     <div class="config-item">
-                                        <div class="config-label">⏰ Cooldown</div>
-                                        <div class="config-value">1 min après fermeture</div>
+                                        <div class="config-label">🎯 Objectif PnL</div>
+                                        <div class="number-input-container">
+                                            <input type="number" 
+                                                   id="targetPnLInput" 
+                                                   min="0.2" 
+                                                   max="3.0" 
+                                                   step="0.05" 
+                                                   value="2.0" 
+                                                   class="number-input"
+                                                   oninput="updateTargetPnL(this.value)">
+                                            <div class="arrow-buttons">
+                                                <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
+                                                <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
+                                            </div>
+                                            <span class="pnl-unit">%</span>
+                                        </div>
                                     </div>
                                     
                                     <div class="config-item">
@@ -150,25 +164,6 @@
                                                 <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="pnl-config">
-                                    <div class="config-label">🎯 Objectif PnL</div>
-                                    <div class="number-input-container">
-                                        <input type="number" 
-                                               id="targetPnLInput" 
-                                               min="0.2" 
-                                               max="3.0" 
-                                               step="0.05" 
-                                               value="2.0" 
-                                               class="number-input"
-                                               oninput="updateTargetPnL(this.value)">
-                                        <div class="arrow-buttons">
-                                            <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
-                                            <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
-                                        </div>
-                                        <span class="pnl-unit">%</span>
                                     </div>
                                 </div>
                             </div>
