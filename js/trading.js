@@ -1285,9 +1285,9 @@ function updatePositionsDisplay() {
         const isPositive = totalPnL >= 0;
         const pnlColor = isPositive ? '#10b981' : '#ef4444';
         const pnlBgColor = isPositive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
-        const pnlSign = isPositive ? '+' : '';
         
-        totalPnLDisplayEl.textContent = `${pnlSign}$${totalPnL.toFixed(2)}`;
+        // 🔧 CORRECTION: Gérer correctement le signe négatif
+        totalPnLDisplayEl.textContent = `${totalPnL >= 0 ? '+' : '-'}$${Math.abs(totalPnL).toFixed(2)}`;
         totalPnLDisplayEl.style.color = pnlColor;
         totalPnLDisplayEl.style.background = pnlBgColor;
         totalPnLDisplayEl.style.fontWeight = 'bold';
@@ -1534,7 +1534,7 @@ function updatePositionsDisplay() {
                         font-size: 12px;
                         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                     ">
-                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
+                        ${isNaN(pnlDollar) ? 'N/A' : (pnlDollar >= 0 ? '+' : '') + '$' + Math.abs(pnlDollar).toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : (pnlPercent >= 0 ? '+' : '') + Math.abs(pnlPercent).toFixed(1) + '%'})
                     </div>
                 </div>
             `;
