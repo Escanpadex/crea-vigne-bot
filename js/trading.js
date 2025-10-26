@@ -854,6 +854,29 @@ async function monitorPnLAndClose() {
             const maxTimeMs = config.maxPositionTimeHours * 60 * 60 * 1000;
             
             if (positionAge >= maxTimeMs) {
+                // 🏦 PROTECTION: Vérifier si c'est une action tokenisée et si les marchés sont fermés
+                if (window.isTokenizedStock && window.isTokenizedStock(position.symbol)) {
+                    if (!window.areStockMarketsOpen || !window.areStockMarketsOpen()) {
+                        // Marchés fermés pour cette action tokenisée
+                        const nextOpen = window.getNextMarketOpenTime ? window.getNextMarketOpenTime() : null;
+                        const nextOpenStr = nextOpen ? nextOpen.toLocaleString('fr-FR', { 
+                            weekday: 'short', 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            timeZone: 'UTC'
+                        }) : 'prochaine ouverture';
+                        
+                        // Log seulement toutes les 5 minutes pour éviter le spam
+                        if (!position.lastMarketClosedLog || Date.now() - position.lastMarketClosedLog > 300000) {
+                            log(`🏦 ${position.symbol}: Action tokenisée - Marchés fermés - Report fermeture jusqu'à ${nextOpenStr} UTC`, 'WARNING');
+                            position.lastMarketClosedLog = Date.now();
+                        }
+                        continue; // Passer à la position suivante sans essayer de fermer
+                    } else {
+                        log(`🏦 ${position.symbol}: Action tokenisée - Marchés ouverts - Fermeture autorisée`, 'INFO');
+                    }
+                }
+                
                 // Position trop ancienne, fermeture automatique
                 log(`⏱️ ${position.symbol}: Temps maximum dépassé (${config.maxPositionTimeHours}h) - Fermeture automatique`, 'WARNING');
                 
@@ -1064,6 +1087,24 @@ async function closePositionFlash(position) {
                     log(`⚠️ Position n'existe plus côté Bitget - Nettoyage local`, 'WARNING');
                     return true;
                 }
+                
+                // 🏦 NOUVEAU: Détecter si le marché est fermé (actions tokenisées)
+                const errorMsg = (failure.errorMsg || '').toLowerCase();
+                const isMarketClosedError = 
+                    errorMsg.includes('market') && errorMsg.includes('closed') ||
+                    errorMsg.includes('trading') && errorMsg.includes('suspended') ||
+                    errorMsg.includes('not available') ||
+                    errorMsg.includes('unavailable') ||
+                    failure.errorCode === '40777' || // Code possible pour marché fermé
+                    failure.errorCode === '40778';   // Code possible pour trading suspendu
+                
+                if (isMarketClosedError) {
+                    log(`🏦 ${position.symbol}: Marché fermé détecté - Tentative reportée`, 'WARNING');
+                    // Marquer la position pour éviter de réessayer immédiatement
+                    position.marketClosedDetected = true;
+                    position.lastMarketClosedAttempt = Date.now();
+                }
+                
                 return false;
             } else {
                 log(`⚠️ Position déjà fermée: ${position.symbol}`, 'WARNING');
@@ -1081,6 +1122,23 @@ async function closePositionFlash(position) {
             if (bitgetCode === '22002') {
                 log(`⚠️ Position n'existe plus - Nettoyage local`, 'WARNING');
                 return true;
+            }
+            
+            // 🏦 NOUVEAU: Détecter si le marché est fermé (actions tokenisées)
+            const msgLower = (bitgetMsg || '').toLowerCase();
+            const isMarketClosedError = 
+                msgLower.includes('market') && msgLower.includes('closed') ||
+                msgLower.includes('trading') && msgLower.includes('suspended') ||
+                msgLower.includes('not available') ||
+                msgLower.includes('unavailable') ||
+                bitgetCode === '40777' || // Code possible pour marché fermé
+                bitgetCode === '40778';   // Code possible pour trading suspendu
+            
+            if (isMarketClosedError) {
+                log(`🏦 ${position.symbol}: Marché fermé détecté (code: ${bitgetCode}) - Tentative reportée`, 'WARNING');
+                // Marquer la position pour éviter de réessayer immédiatement
+                position.marketClosedDetected = true;
+                position.lastMarketClosedAttempt = Date.now();
             }
             
             return false;
@@ -1484,6 +1542,18 @@ function updatePositionsDisplay() {
                         ${timeRemainingDisplay ? `<span style="color: ${timeRemainingColor}; font-size: 10px; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-weight: bold;">
                             ${timeRemainingDisplay}
                         </span>` : ''}
+                        ${(() => {
+                            // 🏦 NOUVEAU: Indicateur pour actions tokenisées avec marchés fermés
+                            if (window.isTokenizedStock && window.isTokenizedStock(position.symbol)) {
+                                const marketsOpen = window.areStockMarketsOpen && window.areStockMarketsOpen();
+                                if (!marketsOpen) {
+                                    return `<span style="color: #fbbf24; font-size: 10px; background: rgba(251, 191, 36, 0.2); padding: 2px 6px; border-radius: 4px; font-weight: bold; animation: pulse 2s infinite;">
+                                        🏦 Marché fermé
+                                    </span>`;
+                                }
+                            }
+                            return '';
+                        })()}
                     </div>
                     
                     <!-- PnL compact -->
