@@ -588,6 +588,7 @@ async function openPosition(symbol, selectedPair) {
             size: positionValue,
             quantity: quantity,
             entryPrice: currentPrice,
+            leverage: leverage, // 🔧 AJOUT: Stocker le levier pour calculs futurs
             status: 'OPEN',
             timestamp: new Date().toISOString(),
             orderId: orderResult.data.orderId,
@@ -704,22 +705,50 @@ async function monitorPnLAndClose() {
             let pnlPercent = 0;
             let dataSource = 'UNKNOWN';
             
-            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
-            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-                // Calculer le pourcentage depuis unrealizedPnL (plus fiable)
-                const initialValue = position.quantity * position.entryPrice;
-                pnlPercent = (position.unrealizedPnL / initialValue) * 100;
-                dataSource = 'API_UNREALIZED_PNL';
+            // 🔧 AMÉLIORATION: Prioriser pnlPercentage de l'API (plus fiable que le calcul manuel)
+            if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                // 🎯 MEILLEURE SOURCE: Utiliser directement le % de l'API
+                pnlPercent = position.pnlPercentage;
+                dataSource = 'API_PERCENTAGE';
                 // Log réduit: seulement toutes les 5 minutes
                 if (!position.lastApiPnLLog || Date.now() - position.lastApiPnLLog > 300000) {
-                    log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                    log(`📊 ${position.symbol}: PnL depuis API - ${pnlPercent.toFixed(2)}%`, 'DEBUG');
                     position.lastApiPnLLog = Date.now();
+                }
+            } else if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
+                // 🔧 CORRECTION: Calculer % depuis la variation de prix, pas depuis unrealizedPnL/initialValue
+                if (position.entryPrice && position.entryPrice > 0) {
+                    const currentPrice = await getCurrentPrice(position.symbol);
+                    if (currentPrice) {
+                        pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                        position.currentPrice = currentPrice;
+                        dataSource = 'CALCULATED_FROM_PRICE';
+                    } else {
+                        // Dernier recours: calculer depuis unrealizedPnL (peut être faussé par le levier)
+                        let initialValue = 0;
+                        if (position.quantity && position.entryPrice) {
+                            initialValue = position.quantity * position.entryPrice;
+                        } else if (position.size) {
+                            const leverage = position.leverage || config.leverage || 1;
+                            initialValue = position.size / leverage;
+                        }
+                        if (initialValue > 0) {
+                            pnlPercent = (position.unrealizedPnL / initialValue) * 100;
+                            dataSource = 'API_UNREALIZED_PNL_FALLBACK';
+                        } else {
+                            log(`⚠️ ${position.symbol}: Impossible de calculer le PnL - données manquantes`, 'WARNING');
+                            continue;
+                        }
+                    }
+                } else {
+                    log(`⚠️ ${position.symbol}: EntryPrice manquant`, 'WARNING');
+                    continue;
                 }
             } else {
                 // Fallback: essayer getCurrentPrice
                 const currentPrice = await getCurrentPrice(position.symbol);
                 if (!currentPrice) {
-                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL`, 'WARNING');
+                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de données API`, 'WARNING');
                     continue;
                 }
                 
@@ -767,11 +796,19 @@ async function monitorPnLAndClose() {
                 // Position trop ancienne, fermeture automatique
                 log(`⏱️ ${position.symbol}: Temps maximum dépassé (${config.maxPositionTimeHours}h) - Fermeture automatique`, 'WARNING');
                 
-                // Calculer les frais
-                const entryFee = position.size * 0.0006;
-                const exitFee = position.size * 0.0006;
+                // 🔧 CORRECTION: Calculer les frais sur la vraie valeur investie (SANS levier)
+                let positionValue = 0;
+                if (position.quantity && position.entryPrice) {
+                    positionValue = position.quantity * position.entryPrice;
+                } else if (position.size) {
+                    const leverage = position.leverage || config.leverage || 1;
+                    positionValue = position.size / leverage;
+                }
+                
+                const entryFee = positionValue * 0.0006;
+                const exitFee = positionValue * 0.0006;
                 const totalFees = entryFee + exitFee;
-                const grossPnL = position.size * (pnlPercent / 100);
+                const grossPnL = positionValue * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
                 positionsToClose.push({
@@ -812,11 +849,20 @@ async function monitorPnLAndClose() {
                 // 3 secondes écoulées ET toujours >= TP : OK pour fermer
                 log(`✅ ${position.symbol}: TP confirmé après 3 sec (+${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}%)`, 'SUCCESS');
                 
+                // 🔧 CORRECTION: Calculer les frais sur la vraie valeur investie (SANS levier)
+                let positionValue = 0;
+                if (position.quantity && position.entryPrice) {
+                    positionValue = position.quantity * position.entryPrice;
+                } else if (position.size) {
+                    const leverage = position.leverage || config.leverage || 1;
+                    positionValue = position.size / leverage;
+                }
+                
                 // 💰 Calculer les frais d'entrée (0.06% maker/taker fee sur Bitget)
-                const entryFee = position.size * 0.0006;
-                const exitFee = position.size * 0.0006;
+                const entryFee = positionValue * 0.0006;
+                const exitFee = positionValue * 0.0006;
                 const totalFees = entryFee + exitFee;
-                const grossPnL = position.size * (pnlPercent / 100);
+                const grossPnL = positionValue * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
                 positionsToClose.push({
@@ -830,7 +876,7 @@ async function monitorPnLAndClose() {
                 });
                 
                 log(`🎯 ${position.symbol}: Objectif confirmé +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
-                log(`💰 Position: $${position.size.toFixed(2)} | PnL brut: +$${grossPnL.toFixed(2)} | Frais: -$${totalFees.toFixed(2)} | PnL net: +$${realizedPnL.toFixed(2)}`, 'SUCCESS');
+                log(`💰 Position: $${positionValue.toFixed(2)} | PnL brut: +$${grossPnL.toFixed(2)} | Frais: -$${totalFees.toFixed(2)} | PnL net: +$${realizedPnL.toFixed(2)}`, 'SUCCESS');
             } else {
                 // 🔄 RÉINITIALISATION: Si le PnL redescend sous le TP, annuler le chrono
                 if (position.tpConfirmationStartTime) {
@@ -1202,15 +1248,33 @@ function updatePositionsDisplay() {
         if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
             pnlDollar = position.unrealizedPnL;
             validPnLCount++;
-        } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.quantity && position.entryPrice) {
-            const initialValue = position.quantity * position.entryPrice;
-            pnlDollar = (initialValue * position.pnlPercentage) / 100;
-            validPnLCount++;
-        } else if (position.currentPrice && position.entryPrice && position.quantity) {
+        } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+            // 🔧 CORRECTION: Calculer initialValue SANS levier
+            let initialValue = 0;
+            if (position.quantity && position.entryPrice) {
+                initialValue = position.quantity * position.entryPrice;
+            } else if (position.size) {
+                const leverage = position.leverage || config.leverage || 1;
+                initialValue = position.size / leverage;
+            }
+            if (initialValue > 0) {
+                pnlDollar = (initialValue * position.pnlPercentage) / 100;
+                validPnLCount++;
+            }
+        } else if (position.currentPrice && position.entryPrice) {
             const pnlPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
-            const initialValue = position.quantity * position.entryPrice;
-            pnlDollar = (initialValue * pnlPercent) / 100;
-            validPnLCount++;
+            // 🔧 CORRECTION: Calculer initialValue SANS levier
+            let initialValue = 0;
+            if (position.quantity && position.entryPrice) {
+                initialValue = position.quantity * position.entryPrice;
+            } else if (position.size) {
+                const leverage = position.leverage || config.leverage || 1;
+                initialValue = position.size / leverage;
+            }
+            if (initialValue > 0) {
+                pnlDollar = (initialValue * pnlPercent) / 100;
+                validPnLCount++;
+            }
         }
         
         totalPnL += pnlDollar;
@@ -1330,38 +1394,62 @@ function updatePositionsDisplay() {
             let dataSource = 'UNKNOWN';
             
             // 🎯 TOUJOURS calculer la valeur initiale de manière cohérente
-            // initialValue = quantity * entryPrice (seule source de vérité)
+            // initialValue = quantity * entryPrice (seule source de vérité - SANS LEVIER)
             let initialValue = 0;
             if (position.quantity && position.entryPrice && position.entryPrice > 0) {
                 initialValue = position.quantity * position.entryPrice;
             } else if (position.size && position.size > 0) {
-                // Fallback si quantity/entryPrice ne sont pas disponibles
+                // 🔧 ATTENTION: position.size peut contenir la valeur AVEC levier
+                // On le divise par le levier pour obtenir la vraie valeur investie
+                const leverage = position.leverage || config.leverage || 1;
+                initialValue = position.size / leverage;
+            }
+
+            // 🔧 CORRECTION CRUCIALE: Si initialValue semble être AVEC levier, le corriger
+            // Indicateur: si unrealizedPnL/initialValue donne un % très faible comparé à la variation de prix
+            if (initialValue === 0 && position.size > 0) {
+                // Dernier recours: utiliser size brut (peut causer des erreurs mais mieux que 0)
                 initialValue = position.size;
             }
 
-            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
-            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && initialValue > 0) {
+            // 1. Priorité absolue à unrealizedPnL + pnlPercentage de l'API (données officielles)
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && 
+                typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                // 🎯 MEILLEURE SOURCE: Utiliser directement les deux valeurs de l'API
+                pnlDollar = position.unrealizedPnL;
+                pnlPercent = position.pnlPercentage;
+                dataSource = 'API_FULL';
+            }
+            // 2. Si on a unrealizedPnL mais pas le %, calculer le % depuis les prix
+            else if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
                 dataSource = 'API_UNREALIZED_PNL';
                 
-                // 🔧 CORRECTION: Toujours diviser par initialValue (pas size qui peut être actuel pour positions importées)
-                pnlPercent = (pnlDollar / initialValue) * 100;
+                // 🔧 CORRECTION: Calculer le % depuis la variation de prix, pas depuis le dollar
+                if (position.entryPrice && position.entryPrice > 0 && currentPrice) {
+                    pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                } else if (initialValue > 0) {
+                    // Fallback: utiliser le ratio dollar/initialValue (peut être faussé par le levier)
+                    pnlPercent = (pnlDollar / initialValue) * 100;
+                }
             }
-            // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
+            // 3. Si on a le % de l'API, l'utiliser et recalculer le dollar
             else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && initialValue > 0) {
                 pnlPercent = position.pnlPercentage;
                 dataSource = 'API_PERCENTAGE';
                 
-                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
+                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale SANS levier
                 pnlDollar = (initialValue * pnlPercent) / 100;
             }
-            // 3. Calcul de secours basé sur les prix actuels
-            else if (initialValue > 0) {
+            // 4. Calcul de secours basé sur les prix actuels
+            else if (position.entryPrice && position.entryPrice > 0 && currentPrice) {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
                 dataSource = 'CALCULATED';
                 
-                // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
-                pnlDollar = (initialValue * pnlPercent) / 100;
+                // 🔧 CORRECTION: Utiliser la valeur initiale SANS levier pour le calcul dollar
+                if (initialValue > 0) {
+                    pnlDollar = (initialValue * pnlPercent) / 100;
+                }
             }
 
             // Log discret pour debug (toutes les 60 secondes par position)
@@ -1546,20 +1634,25 @@ async function importExistingPositions() {
                     
                     // 🔧 CORRECTION: Calculer quantity et size correctement pour positions importées
                     // quantity = nombre de tokens/coins (ex: 1.5 BTC)
-                    // size = valeur en USDT (ex: 1.5 * 40000 = 60000 USDT)
-                    const quantity = parseFloat(apiPos.size || total / averageOpenPrice); // apiPos.size = quantité en coins
-                    const size = quantity * averageOpenPrice; // Taille de la position en USDT
+                    // size = valeur en USDT SANS levier (ex: 1.5 * 40000 = 60000 USDT)
+                    const quantity = parseFloat(apiPos.size || 0);
+                    const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
                     
-                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}, quantity=${quantity}, size=${size}`, 'DEBUG');
+                    // 🎯 CRUCIAL: size doit être la valeur INVESTIE (sans levier)
+                    // Si apiPos.total contient la valeur avec levier, on divise par leverage
+                    const size = quantity * averageOpenPrice; // Valeur de la position en USDT
+                    
+                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, leverage=${leverage}, quantity=${quantity}, size=${size}`, 'DEBUG');
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: size, // 🔧 CORRECTION: Valeur INITIALE de la position (quantity * entryPrice)
+                        size: size, // 🔧 CORRECTION: Valeur de la position = quantity * entryPrice
                         quantity: quantity, // Nombre de tokens/coins
                         entryPrice: averageOpenPrice,
+                        leverage: leverage, // 🔧 AJOUT: Stocker le levier pour calculs futurs
                         status: 'OPEN',
                         timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(), // 🔧 AMÉLIORATION: Utiliser le timestamp réel si disponible
                         orderId: `imported_${Date.now()}`,
@@ -2335,14 +2428,18 @@ async function syncNewManualPositions() {
                 const markPrice = parseFloat(apiPos.markPrice || 0);
                 const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                 const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                const quantity = parseFloat(apiPos.size || 0);
+                const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
+                const size = quantity * averageOpenPrice; // Valeur SANS levier
                 
                 const position = {
                     id: Date.now() + Math.random(),
                     symbol: apiPos.symbol,
                     side: side,
-                    size: total,
-                    quantity: parseFloat(apiPos.size || total / markPrice),
+                    size: size,
+                    quantity: quantity,
                     entryPrice: averageOpenPrice,
+                    leverage: leverage,
                     status: 'OPEN',
                     timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),
                     orderId: `manual_${Date.now()}`,
@@ -2829,14 +2926,18 @@ window.forceFullPositionRefresh = async function() {
             const markPrice = parseFloat(apiPos.markPrice || 0);
             const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
             const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+            const quantity = parseFloat(apiPos.size || 0);
+            const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
+            const size = quantity * averageOpenPrice; // Valeur SANS levier
             
             const position = {
                 id: Date.now() + Math.random(),
                 symbol: apiPos.symbol,
                 side: side,
-                size: total,
-                quantity: parseFloat(apiPos.size || total / markPrice),
+                size: size,
+                quantity: quantity,
                 entryPrice: averageOpenPrice,
+                leverage: leverage,
                 status: 'OPEN',
                 timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),
                 orderId: `refresh_${Date.now()}`,
