@@ -716,6 +716,16 @@ async function openPosition(symbol, selectedPair) {
         openPositions.push(position);
         botStats.totalPositions++;
         
+        // 💾 PERSISTANCE: Sauvegarder la position du bot
+        if (window.addBotPositionToPersistence) {
+            try {
+                window.addBotPositionToPersistence(position);
+                log(`💾 Position du bot sauvegardée: ${position.symbol}`, 'DEBUG');
+            } catch (persistError) {
+                console.warn('⚠️ Erreur persistance position bot:', persistError);
+            }
+        }
+        
         // 📝 LOGGER: Enregistrer l'ouverture de position
         if (window.positionLogger) {
             try {
@@ -926,6 +936,16 @@ async function monitorPnLAndClose() {
                         
                         // 🎯 CORRECTION: Utiliser le PnL NET (avec frais déduits) pour les stats
                         countClosedPosition(data.position, data.realizedPnL, 'monitorPnLAndClose');
+                        
+                        // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
+                        if (data.position.isBotManaged && window.removeBotPositionFromPersistence) {
+                            try {
+                                window.removeBotPositionFromPersistence(data.position.symbol);
+                                log(`💾 Position du bot retirée de la sauvegarde: ${data.position.symbol}`, 'DEBUG');
+                            } catch (persistError) {
+                                console.warn('⚠️ Erreur retrait position bot:', persistError);
+                            }
+                        }
                         
                         // 📝 LOGGER: Enregistrer la fermeture de position
                         if (window.positionLogger) {
@@ -1275,13 +1295,12 @@ function updatePositionsDisplay() {
         </div>
     `;
     } else {
-        // 🎯 CONFIGURATION: Toujours utiliser l'affichage compact (plus lisible et concis)
-        const useCompactDisplay = true; // 🔧 MODIFICATION: Toujours en mode compact (demande utilisateur)
+        // 🎯 AFFICHAGE COMPACT PERMANENT (demande utilisateur - plus lisible et concis)
         const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
         const displayedPositions = openPositions.slice(0, maxDisplayed);
         const hiddenCount = openPositions.length - maxDisplayed;
         
-        log(`📊 Affichage ${displayedPositions.length} positions (compact permanent)${hiddenCount > 0 ? `, ${hiddenCount} masquées` : ''}`, 'DEBUG');
+        log(`📊 Affichage COMPACT de ${displayedPositions.length} positions${hiddenCount > 0 ? ` (${hiddenCount} masquées)` : ''}`, 'DEBUG');
         
         const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
@@ -1532,6 +1551,13 @@ async function importExistingPositions() {
                     
                     log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
+                    // 💾 VÉRIFIER SI C'EST UNE POSITION DU BOT
+                    const isBotPosition = window.isBotManagedPosition ? 
+                        window.isBotManagedPosition({
+                            symbol: apiPos.symbol,
+                            entryPrice: averageOpenPrice
+                        }) : false;
+                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
@@ -1549,16 +1575,18 @@ async function importExistingPositions() {
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
-                        reason: '📥 Position importée depuis Bitget',
+                        reason: isBotPosition ? '🤖 Position du bot reconnue' : '📥 Position importée depuis Bitget',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
-                        isBotManaged: false // 🔧 NOUVEAU: Position manuelle, pas gérée par le bot
+                        isBotManaged: isBotPosition // 💾 NOUVEAU: Reconnaître automatiquement les positions du bot
                     };
                     
                     if (position.symbol && position.size > 0 && position.entryPrice > 0) {
                         openPositions.push(position);
                         imported++;
                         
-                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT)`, 'SUCCESS');
+                        const typeIcon = isBotPosition ? '🤖' : '👤';
+                        const typeText = isBotPosition ? 'Bot' : 'Manuelle';
+                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT) [${typeIcon} ${typeText}]`, 'SUCCESS');
                     } else {
                         log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides`, 'WARNING');
                     }
@@ -2340,6 +2368,15 @@ async function syncNewManualPositions() {
                 const pnl = closedPos.unrealizedPnL || 0;
                 countClosedPosition(closedPos, pnl, 'syncNewManualPositions');
                 
+                // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
+                if (closedPos.isBotManaged && window.removeBotPositionFromPersistence) {
+                    try {
+                        window.removeBotPositionFromPersistence(closedPos.symbol);
+                    } catch (persistError) {
+                        console.warn('⚠️ Erreur retrait position bot (sync):', persistError);
+                    }
+                }
+                
                 // 📝 LOGGER: Enregistrer les fermetures détectées lors de la synchronisation
                 if (window.positionLogger) {
                     try {
@@ -3037,6 +3074,15 @@ window.forceTakeProfit = async function() {
                 if (closed) {
                     forcedClosed++;
                     console.log(`✅ ${position.symbol}: Position fermée avec succès (+${pnlPercent.toFixed(3)}%)`);
+                    
+                    // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
+                    if (position.isBotManaged && window.removeBotPositionFromPersistence) {
+                        try {
+                            window.removeBotPositionFromPersistence(position.symbol);
+                        } catch (persistError) {
+                            console.warn('⚠️ Erreur retrait position bot:', persistError);
+                        }
+                    }
                     
                     // 📝 LOGGER: Enregistrer la fermeture forcée
                     if (window.positionLogger) {
