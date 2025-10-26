@@ -1630,6 +1630,22 @@ async function importExistingPositions() {
                 }
             }
             
+            // 🤖 FORCER TOUTES LES POSITIONS EN MODE AUTOMATIQUE (demande utilisateur)
+            log('🤖 Conversion de toutes les positions en mode automatique...', 'INFO');
+            let convertedCount = 0;
+            openPositions.forEach(pos => {
+                if (pos.isBotManaged !== true) {
+                    pos.isBotManaged = true;
+                    pos.reason = '🤖 Position gérée par le bot';
+                    pos.targetPnL = formatTargetPnL(config.targetPnL || 2.0);
+                    convertedCount++;
+                }
+            });
+            
+            if (convertedCount > 0) {
+                log(`✅ ${convertedCount} position(s) convertie(s) en mode automatique`, 'SUCCESS');
+            }
+            
             if (imported > 0) {
                 log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
                 log(`📊 État final après import: ${openPositions.length}/${getMaxBotPositions()} positions actives`, 'INFO');
@@ -1638,7 +1654,7 @@ async function importExistingPositions() {
                 openPositions.forEach((pos, idx) => {
                     const pnl = pos.pnlPercentage || 0;
                     const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}%` : `${pnl.toFixed(2)}%`;
-                    log(`   ${idx + 1}. ${pos.symbol} ${pos.side} ${pos.size.toFixed(2)}$ @ ${pos.entryPrice.toFixed(4)} (${pnlText})`, 'INFO');
+                    log(`   ${idx + 1}. ${pos.symbol} ${pos.side} ${pos.size.toFixed(2)}$ @ ${pos.entryPrice.toFixed(4)} (${pnlText}) [🤖 Bot]`, 'INFO');
                 });
                 
                 log('🔄 Mise à jour de l\'affichage des positions...', 'DEBUG');
@@ -1678,6 +1694,23 @@ async function importExistingPositions() {
                 
             } else {
                 log('ℹ️ Toutes les positions existantes sont déjà dans le système', 'INFO');
+                
+                // 🤖 FORCER QUAND MÊME TOUTES LES POSITIONS EN MODE AUTOMATIQUE
+                log('🤖 Vérification et conversion des positions en mode automatique...', 'INFO');
+                let convertedCount = 0;
+                openPositions.forEach(pos => {
+                    if (pos.isBotManaged !== true) {
+                        pos.isBotManaged = true;
+                        pos.reason = '🤖 Position gérée par le bot';
+                        pos.targetPnL = formatTargetPnL(config.targetPnL || 2.0);
+                        convertedCount++;
+                    }
+                });
+                
+                if (convertedCount > 0) {
+                    log(`✅ ${convertedCount} position(s) convertie(s) en mode automatique`, 'SUCCESS');
+                }
+                
                 log(`📊 État: ${openPositions.length}/${getMaxBotPositions()} positions actives`, 'INFO');
                 
                 // Même si aucune position n'est importée, s'assurer que l'affichage est correct
