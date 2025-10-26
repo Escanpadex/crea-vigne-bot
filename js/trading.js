@@ -716,6 +716,19 @@ async function openPosition(symbol, selectedPair) {
         openPositions.push(position);
         botStats.totalPositions++;
         
+        // 📝 LOGGER: Enregistrer l'ouverture de position
+        if (window.positionLogger) {
+            try {
+                window.positionLogger.logPositionOpen(position, {
+                    change24h: selectedPair.change24h,
+                    volume24h: selectedPair.volume24h,
+                    strategy: 'Paires positives 24h'
+                });
+            } catch (logError) {
+                console.warn('⚠️ Erreur logging ouverture position:', logError);
+            }
+        }
+        
         log(`🚀 Position complète: ${symbol} LONG ${positionValue.toFixed(2)} USDT @ ${currentPrice.toFixed(4)}`, 'SUCCESS');
         log(`🎯 Objectif: Fermeture automatique à +${config.targetPnL}% de PnL`, 'INFO');
         log(`📈 Performance 24h: +${selectedPair.change24h.toFixed(2)}%`, 'INFO');
@@ -911,9 +924,24 @@ async function monitorPnLAndClose() {
                         // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
                         addPositionCooldown(data.position.symbol);
                         
-                        // 🎯 CORRECTION: Utiliser countClosedPosition pour éviter double comptage
-                        const pnl = (data.position.size * data.pnlPercent / 100);
-                        countClosedPosition(data.position, pnl, 'monitorPnLAndClose');
+                        // 🎯 CORRECTION: Utiliser le PnL NET (avec frais déduits) pour les stats
+                        countClosedPosition(data.position, data.realizedPnL, 'monitorPnLAndClose');
+                        
+                        // 📝 LOGGER: Enregistrer la fermeture de position
+                        if (window.positionLogger) {
+                            try {
+                                window.positionLogger.logPositionClose(data.position, {
+                                    exitPrice: data.currentPrice,
+                                    pnlDollar: data.realizedPnL,
+                                    pnlPercent: data.pnlPercent,
+                                    reason: 'TARGET_PNL_REACHED',
+                                    grossPnL: data.grossPnL,
+                                    totalFees: data.totalFees
+                                });
+                            } catch (logError) {
+                                console.warn('⚠️ Erreur logging fermeture position:', logError);
+                            }
+                        }
                         
                         // Supprimer de la liste des positions ouvertes
                         const index = openPositions.findIndex(p => p.id === data.position.id);
@@ -1172,6 +1200,7 @@ function updatePositionsDisplay() {
     
     const positionCountEl = document.getElementById('positionCount');
     const positionsListEl = document.getElementById('positionsList');
+    const totalPnLDisplayEl = document.getElementById('totalPnLDisplay');
     
     if (!positionCountEl || !positionsListEl) {
         log('❌ Éléments d\'affichage des positions non trouvés dans le DOM', 'ERROR');
@@ -1182,6 +1211,51 @@ function updatePositionsDisplay() {
     // Mettre à jour le compteur (sans limite)
     positionCountEl.textContent = openPositions.length;
     log(`📊 Compteur mis à jour: ${openPositions.length} positions`, 'DEBUG');
+    
+    // 🆕 NOUVEAU: Calculer et afficher le PNL total des positions non clôturées
+    let totalPnL = 0;
+    let validPnLCount = 0;
+    
+    openPositions.forEach(position => {
+        // Utiliser unrealizedPnL si disponible, sinon calculer
+        let pnlDollar = 0;
+        
+        if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
+            pnlDollar = position.unrealizedPnL;
+            validPnLCount++;
+        } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.quantity && position.entryPrice) {
+            const initialValue = position.quantity * position.entryPrice;
+            pnlDollar = (initialValue * position.pnlPercentage) / 100;
+            validPnLCount++;
+        } else if (position.currentPrice && position.entryPrice && position.quantity) {
+            const pnlPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            const initialValue = position.quantity * position.entryPrice;
+            pnlDollar = (initialValue * pnlPercent) / 100;
+            validPnLCount++;
+        }
+        
+        totalPnL += pnlDollar;
+    });
+    
+    // Mettre à jour l'affichage du PNL total
+    if (totalPnLDisplayEl) {
+        const isPositive = totalPnL >= 0;
+        const pnlColor = isPositive ? '#10b981' : '#ef4444';
+        const pnlBgColor = isPositive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+        const pnlSign = isPositive ? '+' : '';
+        
+        totalPnLDisplayEl.textContent = `${pnlSign}$${totalPnL.toFixed(2)}`;
+        totalPnLDisplayEl.style.color = pnlColor;
+        totalPnLDisplayEl.style.background = pnlBgColor;
+        totalPnLDisplayEl.style.fontWeight = 'bold';
+        
+        // Animation si profit important
+        if (isPositive && totalPnL > 5) {
+            totalPnLDisplayEl.style.animation = 'pulse 2s infinite';
+        } else {
+            totalPnLDisplayEl.style.animation = 'none';
+        }
+    }
     
     // Mettre à jour la liste des positions avec un design optimisé pour de nombreuses positions
     if (openPositions.length === 0) {
@@ -1201,13 +1275,13 @@ function updatePositionsDisplay() {
         </div>
     `;
     } else {
-        // 🎯 CONFIGURATION: Utiliser les paramètres configurables pour l'affichage
-        const useCompactDisplay = openPositions.length > (config.displaySettings?.compactDisplayThreshold || 10);
+        // 🎯 CONFIGURATION: Toujours utiliser l'affichage compact (plus lisible et concis)
+        const useCompactDisplay = true; // 🔧 MODIFICATION: Toujours en mode compact (demande utilisateur)
         const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
         const displayedPositions = openPositions.slice(0, maxDisplayed);
         const hiddenCount = openPositions.length - maxDisplayed;
         
-        log(`📊 Affichage ${displayedPositions.length} positions (${useCompactDisplay ? 'compact' : 'normal'})${hiddenCount > 0 ? `, ${hiddenCount} masquées` : ''}`, 'DEBUG');
+        log(`📊 Affichage ${displayedPositions.length} positions (compact permanent)${hiddenCount > 0 ? `, ${hiddenCount} masquées` : ''}`, 'DEBUG');
         
         const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
@@ -1318,123 +1392,50 @@ function updatePositionsDisplay() {
             // Animation de pulsation pour les gains
             const pulseAnimation = isPositive && pnlPercent > 1 ? 'animation: pulse 2s infinite;' : '';
             
-            // 🎯 AFFICHAGE ADAPTATIF: Compact si beaucoup de positions, normal sinon
-            if (useCompactDisplay) {
-                // AFFICHAGE COMPACT pour beaucoup de positions
-                return `
-                    <div style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        background: ${isPositive ? 'linear-gradient(90deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(90deg, #2a2a2a 0%, #404040 100%)'}; 
-                        border-radius: 8px; 
-                        padding: 8px 12px; 
-                        margin-bottom: 6px; 
-                        border-left: 4px solid ${isPositive ? '#10b981' : '#6b7280'};
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-                        transition: all 0.2s ease;
-                        ${pulseAnimation}
-                    " onmouseover="this.style.transform='scale(1.01)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.2)'">
-                        
-                        <!-- Info compacte -->
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="color: #ffffff; font-weight: bold; font-size: 14px;">
-                                ${pnlIcon} ${position.symbol.replace('USDT', '')}
-                            </span>
-                            <span style="color: ${managementColor}; font-size: 10px; background: ${managementBg}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
-                                ${managementIcon} ${managementText}
-                            </span>
-                            <span style="color: #d1d5db; font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">
-                                ${timeDisplay}
-                            </span>
-                        </div>
-                        
-                        <!-- PnL compact -->
-                        <div style="
-                            background: ${isPositive ? '#10b981' : '#ef4444'};
-                            color: #ffffff;
-                            padding: 4px 8px;
-                            border-radius: 6px;
-                            font-weight: bold;
-                            font-size: 12px;
-                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-                        ">
-                            ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
-                        </div>
-                    </div>
-                `;
-            } else {
-                // AFFICHAGE NORMAL pour peu de positions
-                return `
-                    <div style="
-                        background: ${isPositive ? 'linear-gradient(135deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #404040 100%)'}; 
-                        border-radius: 12px; 
-                        padding: 16px; 
-                        margin-bottom: 12px; 
-                        border: 2px solid ${isPositive ? '#10b981' : '#6b7280'};
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                        transition: all 0.3s ease;
-                        ${pulseAnimation}
-                    " onmouseover="this.style.transform='scale(1.02)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'">
+            // 🎯 AFFICHAGE COMPACT PERMANENT (plus lisible et concis)
+            // AFFICHAGE COMPACT pour toutes les positions
+            return `
+                <div style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: ${isPositive ? 'linear-gradient(90deg, #0f4c3a 0%, #1a5f4a 100%)' : 'linear-gradient(90deg, #2a2a2a 0%, #404040 100%)'}; 
+                    border-radius: 8px; 
+                    padding: 8px 12px; 
+                    margin-bottom: 6px; 
+                    border-left: 4px solid ${isPositive ? '#10b981' : '#6b7280'};
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                    transition: all 0.2s ease;
+                    ${pulseAnimation}
+                " onmouseover="this.style.transform='scale(1.01)'; this.style.boxShadow='0 4px 10px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.2)'">
                     
-                    <!-- Header de la position -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <div style="display: flex; align-items: center;">
-                            <span style="font-size: 18px; margin-right: 10px;">${pnlIcon}</span>
-                            <span style="color: #ffffff; font-weight: bold; font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
-                                ${position.symbol.replace('USDT', '')}
-                            </span>
-                            <span style="color: #d1d5db; font-size: 12px; margin-left: 6px; font-weight: 500;">
-                                USDT
-                            </span>
-                        </div>
-                        
-                        <!-- Badge PnL -->
-                        <div style="
-                            background: ${isPositive ? '#10b981' : '#ef4444'};
-                            color: #ffffff;
-                            padding: 6px 12px;
-                            border-radius: 8px;
-                            font-weight: bold;
-                            font-size: 13px;
-                            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-                            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-                        ">
-                            ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(2)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(2) + '%'})
-            </div>
+                    <!-- Info compacte -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: #ffffff; font-weight: bold; font-size: 14px;">
+                            ${pnlIcon} ${position.symbol.replace('USDT', '')}
+                        </span>
+                        <span style="color: ${managementColor}; font-size: 10px; background: ${managementBg}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                            ${managementIcon} ${managementText}
+                        </span>
+                        <span style="color: #d1d5db; font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">
+                            ${timeDisplay}
+                        </span>
                     </div>
                     
-                    <!-- Détails de la position -->
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="color: #e5e7eb; font-size: 12px;">
-                            <span style="display: inline-block; background: rgba(0,0,0,0.3); color: #ffffff; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
-                                ⏱️ ${timeDisplay}
-                </span>
-                            <span style="display: inline-block; background: ${managementBg}; color: ${managementColor}; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
-                                ${managementIcon} ${managementText}
-                            </span>
-                            ${autoCloseText ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
-                                🎯 ${autoCloseText}
-                            </span>` : ''}
-                            <span style="display: inline-block; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
-                                💰 ${positionSize.toFixed(0)}$
-                            </span>
-                            <span style="display: inline-block; background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 4px 8px; border-radius: 6px; margin-right: 6px; font-weight: 500;">
-                                📈 x${leverage}
-                            </span>
-                            <span style="display: inline-block; background: rgba(139, 92, 246, 0.2); color: #a78bfa; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
-                                📊 R-PnL: ${realizedPnL >= 0 ? '+' : ''}${realizedPnL.toFixed(2)}$
-                            </span>
-            </div>
-                        
-                        <!-- Indicateur de progression -->
-                        <div style="color: ${isPositive ? '#34d399' : '#9ca3af'}; font-size: 11px; font-weight: 600;">
-                            ${isPositive ? '🚀' : '⏳'} ${isPositive ? 'En profit' : 'En cours'}
-                        </div>
+                    <!-- PnL compact -->
+                    <div style="
+                        background: ${isPositive ? '#10b981' : '#ef4444'};
+                        color: #ffffff;
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        font-size: 12px;
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                    ">
+                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
                     </div>
                 </div>
             `;
-            }
         }).join('');
         
         // 🎯 AMÉLIORATION: Ajouter un indicateur si des positions sont masquées (configurable)
@@ -2338,6 +2339,20 @@ async function syncNewManualPositions() {
                 // 🎯 CORRECTION: Utiliser countClosedPosition pour éviter double comptage
                 const pnl = closedPos.unrealizedPnL || 0;
                 countClosedPosition(closedPos, pnl, 'syncNewManualPositions');
+                
+                // 📝 LOGGER: Enregistrer les fermetures détectées lors de la synchronisation
+                if (window.positionLogger) {
+                    try {
+                        window.positionLogger.logPositionClose(closedPos, {
+                            exitPrice: closedPos.currentPrice || closedPos.entryPrice,
+                            pnlDollar: pnl,
+                            pnlPercent: closedPos.pnlPercentage || ((pnl / (closedPos.size || 1)) * 100),
+                            reason: 'MANUAL_CLOSE_OR_EXTERNAL'
+                        });
+                    } catch (logError) {
+                        console.warn('⚠️ Erreur logging position fermée (sync):', logError);
+                    }
+                }
             }
             
             // Supprimer les positions fermées
@@ -3022,6 +3037,20 @@ window.forceTakeProfit = async function() {
                 if (closed) {
                     forcedClosed++;
                     console.log(`✅ ${position.symbol}: Position fermée avec succès (+${pnlPercent.toFixed(3)}%)`);
+                    
+                    // 📝 LOGGER: Enregistrer la fermeture forcée
+                    if (window.positionLogger) {
+                        try {
+                            window.positionLogger.logPositionClose(position, {
+                                exitPrice: currentPrice,
+                                pnlDollar: pnlDollar,
+                                pnlPercent: pnlPercent,
+                                reason: 'FORCED_CLOSE'
+                            });
+                        } catch (logError) {
+                            console.warn('⚠️ Erreur logging fermeture forcée:', logError);
+                        }
+                    }
                     
                     // Supprimer de la liste
                     const index = openPositions.findIndex(p => p.id === position.id);

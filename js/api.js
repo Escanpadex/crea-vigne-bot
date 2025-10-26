@@ -483,6 +483,31 @@ async function fetchActivePositionsFromAPI() {
     }
 }
 
+// 🆕 FONCTION: Récupérer l'historique des fills avec PnL réel et frais
+async function getOrderFills(symbol, orderId) {
+    try {
+        const params = new URLSearchParams({
+            symbol: symbol,
+            productType: 'USDT-FUTURES'
+        });
+        
+        if (orderId) {
+            params.append('orderId', orderId);
+        }
+        
+        const result = await makeRequest(`/bitget/api/v2/mix/order/fills?${params.toString()}`);
+        
+        if (result && result.code === '00000' && result.data) {
+            return result.data;
+        }
+        
+        return [];
+    } catch (error) {
+        console.error(`❌ Erreur récupération fills ${symbol}:`, error);
+        return [];
+    }
+}
+
 async function getCurrentPrice(symbol) {
     try {
         // 🔧 CORRECTION: Utiliser la même URL que pour les autres appels API
@@ -759,7 +784,43 @@ window.testGetCurrentPrice = async function(symbol = 'BTCUSDT') {
     }
 };
 
+// 🧪 FONCTION DE TEST: Tester getOrderFills
+window.testGetOrderFills = async function(symbol = null) {
+    console.log('🧪 Test de getOrderFills - Récupération historique avec frais réels...');
+    
+    try {
+        const fills = await getOrderFills(symbol || 'BTCUSDT', null);
+        
+        if (fills && fills.length > 0) {
+            console.log(`✅ ${fills.length} fills récupérés`);
+            console.log('\n📊 Exemple de fill (dernier):');
+            const lastFill = fills[0];
+            console.log('Détails complets:', lastFill);
+            console.log('\n🔑 Champs disponibles:');
+            console.log(`  orderId: ${lastFill.orderId}`);
+            console.log(`  symbol: ${lastFill.symbol}`);
+            console.log(`  side: ${lastFill.side}`);
+            console.log(`  fillPrice: ${lastFill.fillPrice}`);
+            console.log(`  baseVolume: ${lastFill.baseVolume}`);
+            console.log(`  quoteVolume: ${lastFill.quoteVolume || lastFill.fillTotalAmount}`);
+            console.log(`  fee: ${lastFill.fee} ${lastFill.feeCcy}`);
+            console.log(`  profit: ${lastFill.profit || 'N/A'}`);
+            console.log(`  cTime: ${new Date(parseInt(lastFill.cTime)).toLocaleString()}`);
+            
+            return fills;
+        } else {
+            console.log('⚠️ Aucun fill trouvé');
+            console.log('💡 Astuce: Fermez une position manuellement et réessayez');
+            return [];
+        }
+    } catch (error) {
+        console.error('❌ Erreur test getOrderFills:', error);
+        return null;
+    }
+};
+
 // Rendre les fonctions accessibles globalement
 window.testMacd4hAPI = testMacd4hAPI;
 window.testSpecificPairMacd = testSpecificPairMacd;
-window.getCurrentPrice = getCurrentPrice; // 🔧 AJOUT: Export pour la surveillance PnL 
+window.getCurrentPrice = getCurrentPrice; // 🔧 AJOUT: Export pour la surveillance PnL
+window.getOrderFills = getOrderFills; // 🆕 AJOUT: Export pour récupérer les fills avec frais réels 
