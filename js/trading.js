@@ -716,16 +716,6 @@ async function openPosition(symbol, selectedPair) {
         openPositions.push(position);
         botStats.totalPositions++;
         
-        // 💾 PERSISTANCE: Sauvegarder la position du bot
-        if (window.addBotPositionToPersistence) {
-            try {
-                window.addBotPositionToPersistence(position);
-                log(`💾 Position du bot sauvegardée: ${position.symbol}`, 'DEBUG');
-            } catch (persistError) {
-                console.warn('⚠️ Erreur persistance position bot:', persistError);
-            }
-        }
-        
         // 📝 LOGGER: Enregistrer l'ouverture de position
         if (window.positionLogger) {
             try {
@@ -859,7 +849,36 @@ async function monitorPnLAndClose() {
                 position.highestPrice = position.currentPrice;
             }
             
-            // 🎯 DÉTECTION: Cette position doit-elle être fermée ?
+            // ⏱️ NOUVEAU: Vérifier si la position dépasse le temps maximum
+            const positionAge = Date.now() - new Date(position.timestamp).getTime();
+            const maxTimeMs = config.maxPositionTimeHours * 60 * 60 * 1000;
+            
+            if (positionAge >= maxTimeMs) {
+                // Position trop ancienne, fermeture automatique
+                log(`⏱️ ${position.symbol}: Temps maximum dépassé (${config.maxPositionTimeHours}h) - Fermeture automatique`, 'WARNING');
+                
+                // Calculer les frais
+                const entryFee = position.size * 0.0006;
+                const exitFee = position.size * 0.0006;
+                const totalFees = entryFee + exitFee;
+                const grossPnL = position.size * (pnlPercent / 100);
+                const realizedPnL = grossPnL - totalFees;
+                
+                positionsToClose.push({
+                    position,
+                    pnlPercent,
+                    grossPnL,
+                    totalFees,
+                    realizedPnL,
+                    currentPrice: position.currentPrice || position.entryPrice,
+                    reason: 'TIMEOUT'
+                });
+                
+                log(`⏱️ ${position.symbol}: Fermeture timeout après ${config.maxPositionTimeHours}h | PnL: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% | Net: ${realizedPnL >= 0 ? '+' : ''}$${realizedPnL.toFixed(2)}`, 'WARNING');
+                continue; // Passer à la prochaine position
+            }
+            
+            // 🎯 DÉTECTION: Cette position doit-elle être fermée par TP ?
             if (pnlPercent >= position.targetPnL) {
                 // 🕐 NOUVEAU: Système de confirmation avec délai de 3 secondes
                 if (!position.tpConfirmationStartTime) {
@@ -895,7 +914,9 @@ async function monitorPnLAndClose() {
                     pnlPercent,
                     grossPnL,
                     totalFees,
-                    realizedPnL
+                    realizedPnL,
+                    currentPrice: position.currentPrice || position.entryPrice,
+                    reason: 'TARGET_PNL_REACHED'
                 });
                 
                 log(`🎯 ${position.symbol}: Objectif confirmé +${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}% - Fermeture automatique!`, 'SUCCESS');
@@ -929,23 +950,16 @@ async function monitorPnLAndClose() {
                     
                     const closed = await closePositionFlash(data.position);
                     if (closed) {
-                        log(`✅ Position fermée avec succès: ${data.position.symbol} | Taille: $${data.position.size.toFixed(2)} | PnL réalisé: +$${data.realizedPnL.toFixed(2)} (+${data.pnlPercent.toFixed(2)}%)`, 'SUCCESS');
+                        const reasonText = data.reason === 'TIMEOUT' ? 'TIMEOUT' : 'TP ATTEINT';
+                        const emoji = data.reason === 'TIMEOUT' ? '⏱️' : '✅';
+                        
+                        log(`${emoji} Position fermée avec succès: ${data.position.symbol} | Taille: $${data.position.size.toFixed(2)} | PnL réalisé: ${data.realizedPnL >= 0 ? '+' : ''}$${data.realizedPnL.toFixed(2)} (${data.pnlPercent >= 0 ? '+' : ''}${data.pnlPercent.toFixed(2)}%) | Raison: ${reasonText}`, 'SUCCESS');
                         
                         // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
                         addPositionCooldown(data.position.symbol);
                         
                         // 🎯 CORRECTION: Utiliser le PnL NET (avec frais déduits) pour les stats
                         countClosedPosition(data.position, data.realizedPnL, 'monitorPnLAndClose');
-                        
-                        // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
-                        if (data.position.isBotManaged && window.removeBotPositionFromPersistence) {
-                            try {
-                                window.removeBotPositionFromPersistence(data.position.symbol);
-                                log(`💾 Position du bot retirée de la sauvegarde: ${data.position.symbol}`, 'DEBUG');
-                            } catch (persistError) {
-                                console.warn('⚠️ Erreur retrait position bot:', persistError);
-                            }
-                        }
                         
                         // 📝 LOGGER: Enregistrer la fermeture de position
                         if (window.positionLogger) {
@@ -954,7 +968,7 @@ async function monitorPnLAndClose() {
                                     exitPrice: data.currentPrice,
                                     pnlDollar: data.realizedPnL,
                                     pnlPercent: data.pnlPercent,
-                                    reason: 'TARGET_PNL_REACHED',
+                                    reason: data.reason || 'TARGET_PNL_REACHED',
                                     grossPnL: data.grossPnL,
                                     totalFees: data.totalFees
                                 });
@@ -1305,6 +1319,9 @@ function updatePositionsDisplay() {
         const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
             let timeDisplay = '0min';
+            let timeRemainingDisplay = '';
+            let timeRemainingColor = '#9ca3af';
+            
             try {
                 const openTime = new Date(position.timestamp);
                 const now = new Date();
@@ -1326,6 +1343,31 @@ function updatePositionsDisplay() {
                         const days = Math.floor(diffMinutes / 1440);
                         const hours = Math.floor((diffMinutes % 1440) / 60);
                         timeDisplay = hours > 0 ? `${days}j${hours}h` : `${days}j`;
+                    }
+                    
+                    // ⏱️ NOUVEAU: Calculer le temps restant avant fermeture automatique
+                    const maxTimeMs = config.maxPositionTimeHours * 60 * 60 * 1000;
+                    const remainingMs = maxTimeMs - diffMs;
+                    
+                    if (remainingMs > 0) {
+                        const remainingMinutes = Math.floor(remainingMs / 60000);
+                        const remainingHours = Math.floor(remainingMinutes / 60);
+                        const remainingMins = remainingMinutes % 60;
+                        
+                        // Couleur selon le temps restant
+                        if (remainingHours < 1) {
+                            timeRemainingColor = '#ef4444'; // Rouge si moins d'1h
+                            timeRemainingDisplay = `⏱️ ${remainingMins}min`;
+                        } else if (remainingHours < 3) {
+                            timeRemainingColor = '#f59e0b'; // Orange si moins de 3h
+                            timeRemainingDisplay = `⏱️ ${remainingHours}h${remainingMins > 0 ? remainingMins + 'min' : ''}`;
+                        } else {
+                            timeRemainingColor = '#9ca3af'; // Gris sinon
+                            timeRemainingDisplay = `⏱️ ${remainingHours}h`;
+                        }
+                    } else {
+                        timeRemainingDisplay = '⏱️ FERMETURE';
+                        timeRemainingColor = '#ef4444';
                     }
                 } else {
                     log(`⚠️ Timestamp invalide pour ${position.symbol}: ${position.timestamp}`, 'WARNING');
@@ -1439,6 +1481,9 @@ function updatePositionsDisplay() {
                         <span style="color: #d1d5db; font-size: 11px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">
                             ${timeDisplay}
                         </span>
+                        ${timeRemainingDisplay ? `<span style="color: ${timeRemainingColor}; font-size: 10px; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; font-weight: bold;">
+                            ${timeRemainingDisplay}
+                        </span>` : ''}
                     </div>
                     
                     <!-- PnL compact -->
@@ -1551,13 +1596,7 @@ async function importExistingPositions() {
                     
                     log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
-                    // 💾 VÉRIFIER SI C'EST UNE POSITION DU BOT
-                    const isBotPosition = window.isBotManagedPosition ? 
-                        window.isBotManagedPosition({
-                            symbol: apiPos.symbol,
-                            entryPrice: averageOpenPrice
-                        }) : false;
-                    
+                    // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
@@ -1575,18 +1614,16 @@ async function importExistingPositions() {
                         unrealizedPnL: unrealizedPL,
                         pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
-                        reason: isBotPosition ? '🤖 Position du bot reconnue' : '📥 Position importée depuis Bitget',
+                        reason: '🤖 Position gérée par le bot',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
-                        isBotManaged: isBotPosition // 💾 NOUVEAU: Reconnaître automatiquement les positions du bot
+                        isBotManaged: true // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES
                     };
                     
                     if (position.symbol && position.size > 0 && position.entryPrice > 0) {
                         openPositions.push(position);
                         imported++;
                         
-                        const typeIcon = isBotPosition ? '🤖' : '👤';
-                        const typeText = isBotPosition ? 'Bot' : 'Manuelle';
-                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT) [${typeIcon} ${typeText}]`, 'SUCCESS');
+                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT) [🤖 Bot]`, 'SUCCESS');
                     } else {
                         log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides`, 'WARNING');
                     }
@@ -2368,15 +2405,6 @@ async function syncNewManualPositions() {
                 const pnl = closedPos.unrealizedPnL || 0;
                 countClosedPosition(closedPos, pnl, 'syncNewManualPositions');
                 
-                // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
-                if (closedPos.isBotManaged && window.removeBotPositionFromPersistence) {
-                    try {
-                        window.removeBotPositionFromPersistence(closedPos.symbol);
-                    } catch (persistError) {
-                        console.warn('⚠️ Erreur retrait position bot (sync):', persistError);
-                    }
-                }
-                
                 // 📝 LOGGER: Enregistrer les fermetures détectées lors de la synchronisation
                 if (window.positionLogger) {
                     try {
@@ -3074,15 +3102,6 @@ window.forceTakeProfit = async function() {
                 if (closed) {
                     forcedClosed++;
                     console.log(`✅ ${position.symbol}: Position fermée avec succès (+${pnlPercent.toFixed(3)}%)`);
-                    
-                    // 💾 PERSISTANCE: Retirer la position du bot de la sauvegarde
-                    if (position.isBotManaged && window.removeBotPositionFromPersistence) {
-                        try {
-                            window.removeBotPositionFromPersistence(position.symbol);
-                        } catch (persistError) {
-                            console.warn('⚠️ Erreur retrait position bot:', persistError);
-                        }
-                    }
                     
                     // 📝 LOGGER: Enregistrer la fermeture forcée
                     if (window.positionLogger) {
