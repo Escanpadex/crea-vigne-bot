@@ -5,8 +5,7 @@
 const LOGGER_CONFIG = {
     storageKey: 'trading_bot_position_logs',
     maxLogs: 200, // 🔧 RÉDUIT: 200 logs max au lieu de 1000 (environ 1 mois d'historique)
-    maxDownloadLogs: 100, // 🔧 RÉDUIT: 100 logs max pour téléchargement (~1200 lignes) au lieu de 500
-    maxDownloadLines: 10000, // 🆕 NOUVEAU: Limite stricte du nombre de lignes dans le fichier exporté
+    maxDownloadLogs: 500, // 🆕 NOUVEAU: Limite pour le téléchargement (500 derniers logs)
     enableConsole: true, // Afficher aussi dans la console
     includeTimestamp: true,
     includeDetails: true,
@@ -256,68 +255,46 @@ class PositionLogger {
         text += '                     HISTORIQUE DÉTAILLÉ\n';
         text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
 
-        // 🔧 CORRECTION: Compter les lignes et respecter la limite
-        let lineCount = text.split('\n').length;
-        let logsExported = 0;
-        
         // 🔧 CORRECTION: Utiliser logsToExport au lieu de this.logs
         logsToExport.reverse().forEach((log, index) => {
             const date = new Date(log.timestamp).toLocaleString('fr-FR');
-            let logText = '';
             
             if (log.type === 'POSITION_OPEN') {
-                logText += `[${date}] 📈 OUVERTURE\n`;
-                logText += `  Symbol: ${log.symbol}\n`;
-                logText += `  Prix d'entrée: ${log.entryPrice}\n`;
-                logText += `  Quantité: ${log.quantity}\n`;
-                logText += `  Taille: $${log.size.toFixed(2)}\n`;
-                logText += `  Levier: x${log.leverage}\n`;
-                logText += `  Objectif PnL: +${log.targetPnL}%\n`;
-                logText += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
+                text += `[${date}] 📈 OUVERTURE\n`;
+                text += `  Symbol: ${log.symbol}\n`;
+                text += `  Prix d'entrée: ${log.entryPrice}\n`;
+                text += `  Quantité: ${log.quantity}\n`;
+                text += `  Taille: $${log.size.toFixed(2)}\n`;
+                text += `  Levier: x${log.leverage}\n`;
+                text += `  Objectif PnL: +${log.targetPnL}%\n`;
+                text += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
                 if (log.details.change24h !== 'N/A') {
-                    logText += `  Performance 24h: +${log.details.change24h}%\n`;
+                    text += `  Performance 24h: +${log.details.change24h}%\n`;
                 }
-                logText += `  Stratégie: ${log.details.strategy || 'N/A'}\n`;
+                text += `  Stratégie: ${log.details.strategy || 'N/A'}\n`;
             } else if (log.type === 'POSITION_CLOSE') {
                 const isProfit = log.pnlDollar >= 0;
-                logText += `[${date}] ${isProfit ? '✅' : '❌'} FERMETURE\n`;
-                logText += `  Symbol: ${log.symbol}\n`;
-                logText += `  Prix d'entrée: ${log.entryPrice}\n`;
-                logText += `  Prix de sortie: ${log.exitPrice}\n`;
-                logText += `  Quantité: ${log.quantity}\n`;
-                logText += `  Taille: $${log.size.toFixed(2)}\n`;
-                logText += `  Levier: x${log.leverage}\n`;
-                logText += `  PnL: ${isProfit ? '+' : ''}$${log.pnlDollar.toFixed(2)} (${isProfit ? '+' : ''}${log.pnlPercent.toFixed(2)}%)\n`;
-                logText += `  Durée: ${log.duration}\n`;
-                logText += `  Raison de fermeture: ${log.closeReason}\n`;
-                logText += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
+                text += `[${date}] ${isProfit ? '✅' : '❌'} FERMETURE\n`;
+                text += `  Symbol: ${log.symbol}\n`;
+                text += `  Prix d'entrée: ${log.entryPrice}\n`;
+                text += `  Prix de sortie: ${log.exitPrice}\n`;
+                text += `  Quantité: ${log.quantity}\n`;
+                text += `  Taille: $${log.size.toFixed(2)}\n`;
+                text += `  Levier: x${log.leverage}\n`;
+                text += `  PnL: ${isProfit ? '+' : ''}$${log.pnlDollar.toFixed(2)} (${isProfit ? '+' : ''}${log.pnlPercent.toFixed(2)}%)\n`;
+                text += `  Durée: ${log.duration}\n`;
+                text += `  Raison de fermeture: ${log.closeReason}\n`;
+                text += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
                 if (log.details.highestPrice) {
-                    logText += `  Plus haut: ${log.details.highestPrice}\n`;
+                    text += `  Plus haut: ${log.details.highestPrice}\n`;
                 }
                 if (log.details.currentStopPrice) {
-                    logText += `  Stop Loss: ${log.details.currentStopPrice}\n`;
+                    text += `  Stop Loss: ${log.details.currentStopPrice}\n`;
                 }
             }
             
-            logText += '\n';
-            
-            // 🎯 NOUVEAU: Vérifier si ajouter ce log dépasserait la limite
-            const newLineCount = lineCount + logText.split('\n').length;
-            if (newLineCount < LOGGER_CONFIG.maxDownloadLines) {
-                text += logText;
-                lineCount = newLineCount;
-                logsExported++;
-            }
-            // Sinon, arrêter l'export (on a atteint la limite de lignes)
+            text += '\n';
         });
-        
-        // 🔧 NOUVEAU: Indiquer si des logs ont été omis pour respect de la limite de lignes
-        if (logsExported < logsToExport.length) {
-            text += '\n⚠️ ─────────────────────────────────────────────────────────\n';
-            text += `⚠️ Export limité: ${logsExported}/${logsToExport.length} logs exportés\n`;
-            text += `⚠️ Raison: Limite de ${LOGGER_CONFIG.maxDownloadLines} lignes atteinte\n`;
-            text += '⚠️ ─────────────────────────────────────────────────────────\n';
-        }
 
         return text;
     }

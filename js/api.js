@@ -248,33 +248,6 @@ function stopAutoSyncPositions() {
     return false;
 }
 
-// 🔄 NOUVELLE FONCTION: Rafraîchissement automatique du solde
-function startAutoBalanceRefresh() {
-    log('💰 Démarrage du rafraîchissement automatique du solde (toutes les 5 secondes)', 'INFO');
-    
-    // Arrêter l'ancien intervalle s'il existe
-    if (window.autoBalanceInterval) {
-        clearInterval(window.autoBalanceInterval);
-    }
-    
-    // Mise à jour immédiate
-    refreshBalance();
-    
-    // Programmer le rafraîchissement toutes les 5 secondes
-    window.autoBalanceInterval = setInterval(async () => {
-        await refreshBalance();
-    }, 5000); // 5 secondes
-}
-
-// 🛑 FONCTION: Arrêter le rafraîchissement automatique du solde
-function stopAutoBalanceRefresh() {
-    if (window.autoBalanceInterval) {
-        clearInterval(window.autoBalanceInterval);
-        window.autoBalanceInterval = null;
-        log('🛑 Rafraîchissement automatique du solde arrêté', 'INFO');
-    }
-}
-
 // 🔍 FONCTION DE DIAGNOSTIC: Vérifier l'état de la synchronisation automatique
 window.checkAutoSyncStatus = function() {
     console.log('🔍 DIAGNOSTIC - État de la synchronisation automatique:');
