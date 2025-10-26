@@ -1328,47 +1328,40 @@ function updatePositionsDisplay() {
 
             // 🔧 CORRECTION MAJEURE: Logique de calcul PnL corrigée
             let dataSource = 'UNKNOWN';
+            
+            // 🎯 TOUJOURS calculer la valeur initiale de manière cohérente
+            // initialValue = quantity * entryPrice (seule source de vérité)
+            let initialValue = 0;
+            if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                initialValue = position.quantity * position.entryPrice;
+            } else if (position.size && position.size > 0) {
+                // Fallback si quantity/entryPrice ne sont pas disponibles
+                initialValue = position.size;
+            }
 
             // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
-            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && initialValue > 0) {
                 pnlDollar = position.unrealizedPnL;
                 dataSource = 'API_UNREALIZED_PNL';
                 
-                // 🔧 CORRECTION: Calculer le pourcentage basé sur la valeur initiale de la position
-                // La valeur initiale = quantity * entryPrice (plus précis que position.size qui peut être la valeur actuelle)
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlPercent = (pnlDollar / initialValue) * 100;
-                } else if (position.size && position.size > 0) {
-                    // Fallback si quantity n'est pas disponible
-                    pnlPercent = (pnlDollar / position.size) * 100;
-                }
+                // 🔧 CORRECTION: Toujours diviser par initialValue (pas size qui peut être actuel pour positions importées)
+                pnlPercent = (pnlDollar / initialValue) * 100;
             }
             // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
-            else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+            else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && initialValue > 0) {
                 pnlPercent = position.pnlPercentage;
                 dataSource = 'API_PERCENTAGE';
                 
                 // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
-                }
+                pnlDollar = (initialValue * pnlPercent) / 100;
             }
             // 3. Calcul de secours basé sur les prix actuels
-            else {
+            else if (initialValue > 0) {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
                 dataSource = 'CALCULATED';
                 
                 // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
-                }
+                pnlDollar = (initialValue * pnlPercent) / 100;
             }
 
             // Log discret pour debug (toutes les 60 secondes par position)
