@@ -1,5 +1,5 @@
 // Configuration constants and variables
-console.log('📁 Loading config.js...');
+// console.log('📁 Loading config.js...'); // Supprimé pour réduire les logs
 const API_BASE = 'https://api.crea-vigne.fr/api';
 
 // Bot state variables
@@ -33,13 +33,13 @@ let config = {
     apiKey: '',
     secretKey: '',
     passphrase: '',
-    capitalPercent: 5,
-    leverage: 2,
+    capitalPercent: 5, // 🔧 RÉDUIT: 5% au lieu de 45% pour éviter "balance exceeded"
+    leverage: 5,
     trailingStop: 1.0,
     cooldownMinutes: 30,
-    targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
-    maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
-    maxPositionTimeHours: 24,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 24h)
+    targetPnL: 0.90,                // 🆕 NOUVEAU: Objectif PnL configurable (0.90% par défaut)
+    maxBotPositions: 12,            // 🆕 NOUVEAU: Limite configurable des positions bot (2-25)
+    maxPositionTimeHours: 12,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 12h)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
         maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)

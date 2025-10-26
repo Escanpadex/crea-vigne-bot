@@ -1,6 +1,5 @@
 // API Functions for Bitget Trading Bot
-console.log('📁 Loading api.js...');
-console.log('🔧 API.JS VERSION: 4H-FIX-v2 - Timeframe mapping corrigé');
+// Logs supprimés pour réduire le spam console
 
 // Auto-connection flag pour éviter les reconnexions multiples
 let autoConnectionAttempted = false;

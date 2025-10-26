@@ -1,6 +1,5 @@
 // Trading Functions - MACD Strategy & Position Management
-console.log('📁 Loading trading.js...');
-console.log('Assuming utils.js is loaded: using shared MACD functions');
+// Logs supprimés pour réduire le spam console
 
 // 🧹 OPTIMISATION: Nettoyer la console toutes les 10 minutes pour éviter la surcharge mémoire
 let lastConsoleClear = Date.now();
@@ -2267,16 +2266,7 @@ window.checkPositionsData = function() {
     });
 };
 
-console.log('✅ Trading fixes applied successfully - call testTradingFixes() to verify');
-console.log('🔧 Debug functions available:');
-console.log('   - debugImportDetailed() - Force import positions from console');
-console.log('   - forceUpdatePositions() - Force update position data from console');
-console.log('   - checkPositionsData() - Check current position data');
-console.log('   - testPositionUpdates() - Test complete position update cycle');
-console.log('   - testAPIData() - Test API data consistency');
-console.log('   - togglePositionDebug() - Toggle position update debug logs');
-console.log('   - checkUpdateIntervals() - Check if update intervals are working');
-console.log('   - forceAllUpdates() - Force manual update of all data');
+// Logs de debug supprimés - Utilisez togglePositionDebug() si nécessaire
 
 // 🧪 FONCTION DE DEBUG: Tester la cohérence des données API
 window.testAPIData = async function() {
@@ -3580,4 +3570,4 @@ window.monitorPnLAndClose = monitorPnLAndClose;
 window.syncAndCheckPositions = syncAndCheckPositions;
 window.formatTargetPnL = formatTargetPnL;
 
-console.log('✅ trading.js chargé: Stats tracking anti-double-comptage + Arrondi targetPnL + Exports globaux configurés');
+// console.log('✅ trading.js chargé'); // Supprimé

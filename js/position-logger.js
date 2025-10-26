@@ -1,6 +1,5 @@
 // 📝 SYSTÈME DE LOGS POUR POSITIONS
 // Ce module gère le logging persistant des ouvertures/fermetures de positions
-console.log('📁 Loading position-logger.js...');
 
 // Configuration du logger
 const LOGGER_CONFIG = {
@@ -17,7 +16,7 @@ const LOGGER_CONFIG = {
 class PositionLogger {
     constructor() {
         this.logs = this.loadLogs();
-        console.log(`✅ Position Logger initialisé avec ${this.logs.length} entrées`);
+        // console.log(`✅ Position Logger initialisé avec ${this.logs.length} entrées`); // Supprimé
     }
 
     // Charger les logs depuis localStorage
@@ -27,14 +26,9 @@ class PositionLogger {
             if (stored) {
                 let logs = JSON.parse(stored);
                 
-                // 🆕 NETTOYAGE AUTOMATIQUE: Supprimer les logs trop anciens
-                const cleanedLogs = this.cleanOldLogs(logs);
-                if (cleanedLogs.length !== logs.length) {
-                    console.log(`🗑️ ${logs.length - cleanedLogs.length} logs anciens supprimés (>${LOGGER_CONFIG.autoCleanupDays} jours)`);
-                    logs = cleanedLogs;
-                }
+                // 🆕 NETTOYAGE AUTOMATIQUE: Supprimer les logs trop anciens (silencieux)
+                logs = this.cleanOldLogs(logs);
                 
-                console.log(`📂 ${logs.length} logs chargés depuis le stockage`);
                 return logs;
             }
         } catch (error) {
@@ -57,10 +51,9 @@ class PositionLogger {
     // Sauvegarder les logs dans localStorage
     saveLogs() {
         try {
-            // Limiter le nombre de logs
+            // Limiter le nombre de logs (silencieux)
             if (this.logs.length > LOGGER_CONFIG.maxLogs) {
                 this.logs = this.logs.slice(-LOGGER_CONFIG.maxLogs);
-                console.log(`🗑️ Logs tronqués à ${LOGGER_CONFIG.maxLogs} entrées`);
             }
             
             localStorage.setItem(LOGGER_CONFIG.storageKey, JSON.stringify(this.logs));
@@ -379,5 +372,5 @@ window.cleanOldLogs = function(days) {
     return window.positionLogger.cleanOldLogsManually(days);
 };
 
-console.log('✅ Position Logger chargé et prêt à l\'emploi');
+// console.log('✅ Position Logger chargé et prêt à l\'emploi'); // Supprimé
 
