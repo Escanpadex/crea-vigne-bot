@@ -32,33 +32,18 @@ function markPositionAsCounted(positionId) {
     console.log(`📊 Position ${positionId} marquée comme comptée`);
 }
 
-// 🎯 FONCTION CENTRALISÉE: Compter une position fermée (évite les doublons)
+// 🎯 FONCTION SIMPLIFIÉE: Compter une position fermée
 function countClosedPosition(position, pnl, source = 'unknown') {
-    // Créer un ID unique pour la position
-    const positionId = position.id || `${position.symbol}_${position.timestamp}`;
-    
-    // Vérifier si déjà comptée
-    if (isPositionCounted(positionId)) {
-        console.log(`⚠️ Position ${position.symbol} déjà comptée (source: ${source}) - Ignoré`);
-        return false;
-    }
-    
-    // Marquer comme comptée
-    markPositionAsCounted(positionId);
-    
-    // Compter la position
     botStats.totalClosedPositions++;
     
     if (pnl > 0) {
         botStats.winningPositions++;
         botStats.totalWinAmount += Math.abs(pnl);
-        log(`🟢 Position gagnante comptée: ${position.symbol} +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions} gagnantes) [Source: ${source}]`, 'SUCCESS');
+        log(`🟢 Position gagnante: ${position.symbol} +${pnl.toFixed(2)}$ (Total: ${botStats.winningPositions}) [Source: ${source}]`, 'SUCCESS');
     } else if (pnl < 0) {
         botStats.losingPositions++;
         botStats.totalLossAmount += pnl; // Déjà négatif
-        log(`🔴 Position perdante comptée: ${position.symbol} ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions} perdantes) [Source: ${source}]`, 'WARNING');
-    } else {
-        log(`⚪ Position neutre comptée: ${position.symbol} ${pnl.toFixed(2)}$ [Source: ${source}]`, 'INFO');
+        log(`🔴 Position perdante: ${position.symbol} ${pnl.toFixed(2)}$ (Total: ${botStats.losingPositions}) [Source: ${source}]`, 'WARNING');
     }
     
     return true;
@@ -296,99 +281,6 @@ function selectRandomPositivePair(excludeSymbols = []) {
     log(`📊 ${availablePairs.length} paires disponibles (${openedSymbols.length} déjà ouvertes)`, 'INFO');
     
     return selectedPair;
-}
-
-// REMOVED: analyzeMultiTimeframeImproved function - replaced by new positive pairs strategy
-async function analyzeMultiTimeframeImproved(symbol) {
-    try {
-        console.log(`🔍 [TRADING] Analyse multi-timeframe améliorée pour ${symbol}`);
-        
-        // LOGIQUE AMÉLIORÉE : 4H et 1H utilisent des données étendues, 15M utilise des données standard
-        const timeframes = ['4h', '1h', '15m'];
-        const results = {};
-        
-        for (const tf of timeframes) {
-            let analysis;
-            
-            if (tf === '4h' || tf === '1h') {
-                // 🎯 AMÉLIORATION: Pour 4H et 1H, utiliser des données étendues (60 jours)
-                // pour trouver le dernier signal valide, pas forcément récent
-                console.log(`📊 [TRADING] ${tf}: Récupération de données étendues...`);
-                
-                // Utiliser des données étendues pour avoir le dernier état valide
-                let extendedData = await getExtendedHistoricalDataForTrading(symbol, tf, 60);
-                
-                if (extendedData.length === 0) {
-                    console.error(`❌ [TRADING] Aucune donnée étendue pour ${symbol} ${tf}`);
-                    results[tf] = { symbol, timeframe: tf, signal: 'INSUFFICIENT_DATA' };
-                    continue;
-                }
-                
-                // NEW: Fallback if still insufficient after fetch
-                const macdParams = getMACDParameters(tf);
-                const minRequired = macdParams.slow + macdParams.signal + 10;
-                if (extendedData.length < minRequired) {
-                    log(`⚠️ Données étendues insuffisantes pour ${symbol} ${tf} (${extendedData.length}/${minRequired}) - Tentative d'agrégation depuis 15m`, 'WARNING');
-                    extendedData = await aggregateDataFromLowerTimeframe(symbol, '15m', tf);
-                    // If aggregation fails, set to INSUFFICIENT_DATA as before
-                    if (extendedData.length < minRequired) {
-                        console.error(`❌ [TRADING] Agrégation échouée pour ${symbol} ${tf} - INSUFFICIENT_DATA`);
-                        results[tf] = { symbol, timeframe: tf, signal: 'INSUFFICIENT_DATA' };
-                        continue;
-                    } else {
-                        console.log(`✅ [TRADING] Agrégation réussie pour ${symbol} ${tf} - ${extendedData.length} bougies disponibles`);
-                    }
-                }
-                
-                // Analyser avec les données étendues pour avoir le dernier état
-                analysis = await analyzePairMACDWithData(symbol, tf, extendedData);
-                console.log(`📊 [TRADING] ${tf}: Signal = ${analysis.signal} (données étendues)`);
-                
-            } else {
-                // 🎯 Pour 15M, utiliser l'analyse standard (données récentes)
-                console.log(`📊 [TRADING] ${tf}: Analyse standard...`);
-                analysis = await analyzePairMACD(symbol, tf);
-                console.log(`📊 [TRADING] ${tf}: Signal = ${analysis.signal} (données standard)`);
-            }
-            
-            results[tf] = analysis;
-            
-            // Filtrage progressif: H4 et H1 doivent être haussiers (dernier état)
-            if ((tf === '4h' || tf === '1h') && analysis.signal !== 'BULLISH' && analysis.signal !== 'BUY') {
-                results.filtered = tf;
-                results.filterReason = `Filtré au ${tf}: dernier signal ${analysis.signal}`;
-                console.log(`❌ [TRADING] Filtré au ${tf}: ${analysis.signal} - ${analysis.reason}`);
-                break;
-            }
-        }
-        
-        if (!results.filtered) {
-            // Si H4 et H1 sont haussiers, vérifier le signal 15M
-            const signal15m = results['15m'];
-            if (signal15m.signal === 'BUY' && signal15m.crossover) {
-                results.finalDecision = 'BUY';
-                results.finalReason = 'H4 et H1 haussiers (données étendues) + croisement 15M détecté';
-                console.log(`✅ [TRADING] Signal BUY validé: ${results.finalReason}`);
-            } else if (signal15m.signal === 'BULLISH') {
-                results.finalDecision = 'WAIT';
-                results.finalReason = 'H4 et H1 haussiers (données étendues), 15M haussier mais pas de croisement';
-                console.log(`⏳ [TRADING] Signal WAIT: ${results.finalReason}`);
-            } else {
-                results.finalDecision = 'FILTERED';
-                results.filterReason = 'Filtré au 15M: signal non haussier';
-                console.log(`❌ [TRADING] Filtré au 15M: ${signal15m.signal}`);
-            }
-        } else {
-            results.finalDecision = 'FILTERED';
-        }
-        
-        return results;
-        
-    } catch (error) {
-        console.error(`❌ [TRADING] Erreur analyse multi-timeframe améliorée ${symbol}:`, error);
-        log(`❌ Erreur analyse multi-timeframe améliorée ${symbol}: ${error.message}`, 'ERROR');
-        return { symbol, error: error.message };
-    }
 }
 
 // 🆕 FONCTION UTILITAIRE: Analyser MACD avec des données fournies

@@ -197,48 +197,6 @@ async function refreshBalance() {
     }
 }
 
-async function scanTop30Volume() {
-    try {
-        const topCount = config.topVolumeCount || 30;
-        log(`🔍 Scan des volumes TOP ${topCount} en cours...`, 'INFO');
-        
-        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
-        const data = await response.json();
-        
-        if (data.code === '00000' && data.data) {
-            const validPairs = data.data
-                .filter(pair => {
-                    const volume = parseFloat(pair.usdtVolume || 0);
-                    return volume > 10000000 && pair.symbol.endsWith('USDT');
-                })
-                .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
-                .slice(0, topCount);
-            
-            // Ancien système TOP 30 désactivé - utiliser getAllAvailablePairs() à la place
-            // top30Pairs = validPairs;
-            // window.top30Pairs = validPairs;
-            // currentScanIndex = 0;
-            
-            const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
-            log(`✅ TOP ${topCount} mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
-            
-            validPairs.slice(0, Math.min(5, topCount)).forEach((pair, index) => {
-                log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
-            });
-            
-            // Ancien système d'affichage désactivé
-            // document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
-            return true;
-        } else {
-            log('❌ Erreur lors du scan des volumes', 'ERROR');
-            return false;
-        }
-    } catch (error) {
-        log(`❌ Erreur scanner: ${error.message}`, 'ERROR');
-        return false;
-    }
-}
-
 // 🔄 NOUVELLE FONCTION: Synchronisation automatique des positions
 function startAutoSyncPositions() {
     log('🔄 Démarrage de la synchronisation automatique des positions (toutes les 4 secondes)', 'INFO');

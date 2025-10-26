@@ -12,9 +12,7 @@ let stopLossManagementInterval = null;
 let positionSyncInterval = null;
 let botStartTime = null;
 
-// Data storage - ancien système TOP 30 supprimé
-// let top30Pairs = [];
-// let currentScanIndex = 0;
+// Data storage
 let openPositions = [];
 let recentAnalysis = new Map();
 let pairCooldown = new Map();
