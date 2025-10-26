@@ -1544,15 +1544,21 @@ async function importExistingPositions() {
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
                     const marginSize = parseFloat(apiPos.marginSize || 0); // Marge utilisée
                     
-                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
+                    // 🔧 CORRECTION: Calculer quantity et size correctement pour positions importées
+                    // quantity = nombre de tokens/coins (ex: 1.5 BTC)
+                    // size = valeur en USDT (ex: 1.5 * 40000 = 60000 USDT)
+                    const quantity = parseFloat(apiPos.size || total / averageOpenPrice); // apiPos.size = quantité en coins
+                    const size = quantity * averageOpenPrice; // Taille de la position en USDT
+                    
+                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}, quantity=${quantity}, size=${size}`, 'DEBUG');
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: total, // 🔧 CORRECTION: Utiliser la valeur totale de la position
-                        quantity: parseFloat(apiPos.size || total / markPrice), // 🔧 AMÉLIORATION: Utiliser apiPos.size si disponible
+                        size: size, // 🔧 CORRECTION: Valeur INITIALE de la position (quantity * entryPrice)
+                        quantity: quantity, // Nombre de tokens/coins
                         entryPrice: averageOpenPrice,
                         status: 'OPEN',
                         timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(), // 🔧 AMÉLIORATION: Utiliser le timestamp réel si disponible
@@ -1569,13 +1575,13 @@ async function importExistingPositions() {
                         isBotManaged: true // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES
                     };
                     
-                    if (position.symbol && position.size > 0 && position.entryPrice > 0) {
+                    if (position.symbol && position.quantity > 0 && position.entryPrice > 0) {
                         openPositions.push(position);
                         imported++;
                         
-                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.size.toFixed(2)} USDT @ ${position.entryPrice.toFixed(4)} (PnL: ${unrealizedPL.toFixed(2)} USDT) [🤖 Bot]`, 'SUCCESS');
+                        log(`📥 Position importée: ${position.symbol} ${position.side} ${position.quantity.toFixed(8)} coins @ ${position.entryPrice.toFixed(4)} USDT/coin = ${position.size.toFixed(2)} USDT total (PnL: ${unrealizedPL.toFixed(2)} USDT = ${position.pnlPercentage.toFixed(2)}%) [🤖 Bot]`, 'SUCCESS');
                     } else {
-                        log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides`, 'WARNING');
+                        log(`⚠️ Position ${apiPos.symbol} ignorée - Données invalides (quantity=${quantity}, entryPrice=${averageOpenPrice})`, 'WARNING');
                     }
                 }
             }
