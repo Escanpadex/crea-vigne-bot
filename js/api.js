@@ -34,6 +34,17 @@ async function makeRequest(endpoint, options = {}) {
             const statusInfo = `${response.status} ${response.statusText}`;
             const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
             log(`Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
+            
+            // 🔧 AMÉLIORATION: Log détaillé pour les erreurs 400
+            if (response.status === 400 && data) {
+                console.error('🔴 DÉTAILS ERREUR 400:', {
+                    endpoint: endpoint,
+                    code: data.code,
+                    msg: data.msg,
+                    data: data.data,
+                    fullResponse: data
+                });
+            }
         }
 
         return data;
