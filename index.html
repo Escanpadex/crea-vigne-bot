@@ -46,15 +46,35 @@
                             
                             <!-- Positions Actives - Design Sexy -->
                             <div class="panel panel-accent">
-                                <!-- Header avec icône animée -->
-                                <div class="panel-header">
-                                    <div style="background: rgba(255,255,255,0.06); border-radius: 50%; padding: 8px; margin-right: 10px;">
-                                        <span style="font-size: 18px;">⚡</span>
+                                <!-- Header avec icône animée et PNL total -->
+                                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                    <!-- Gauche : Icône + Titre -->
+                                    <div style="display: flex; align-items: center;">
+                                        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; padding: 8px; margin-right: 10px;">
+                                            <span style="font-size: 18px;">⚡</span>
+                                        </div>
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Positions Actives</h3>
+                                            <div style="font-size: 12px; color: var(--muted);">
+                                                <span id="positionCount">0</span> position(s) active(s)
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Positions Actives</h3>
-                                        <div style="font-size: 12px; text-align: center; color: var(--muted);">
-                                            <span id="positionCount">0</span> position(s) active(s)
+                                    
+                                    <!-- Droite : PNL Total en Live -->
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 11px; color: var(--muted); margin-bottom: 2px;">PNL Total</div>
+                                        <div id="totalPnLDisplay" style="
+                                            font-size: 16px;
+                                            font-weight: bold;
+                                            padding: 6px 12px;
+                                            border-radius: 8px;
+                                            background: rgba(107, 114, 128, 0.2);
+                                            color: #9ca3af;
+                                            min-width: 100px;
+                                            text-align: center;
+                                        ">
+                                            $0.00
                                         </div>
                                     </div>
                                 </div>
@@ -154,7 +174,7 @@
                                             <input type="number" 
                                                    id="botLimitInput" 
                                                    min="2" 
-                                                   max="15" 
+                                                   max="25" 
                                                    step="1" 
                                                    value="2" 
                                                    class="number-input"
@@ -237,9 +257,10 @@
                     
                     <!-- Section Contrôles en bas -->
                     <div class="section-footer">
-                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
                             <button class="btn btn-wide" onclick="startBot()" id="startBtn">▶️ Démarrer le Bot</button>
                             <button class="btn btn-danger btn-wide" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter le Bot</button>
+                            <button class="btn btn-wide" onclick="downloadPositionLogs()" style="background: linear-gradient(45deg, #8b5cf6, #7c3aed);">📥 Télécharger Logs</button>
                         </div>
                     </div>
         </div>
@@ -249,6 +270,7 @@
     <script src="js/utils.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/position-logger.js"></script>
     <script src="js/trading.js"></script>
     <script src="js/main.js"></script>
     
@@ -307,7 +329,7 @@
             
             // Validation des limites
             if (botLimit < 2) botLimit = 2;
-            if (botLimit > 15) botLimit = 15;
+            if (botLimit > 25) botLimit = 25;
             
             // Mettre à jour la configuration
             config.maxBotPositions = botLimit;
@@ -332,7 +354,7 @@
         function incrementBotLimit() {
             const input = document.getElementById('botLimitInput');
             let value = parseInt(input.value) + 1;
-            if (value > 15) value = 15;
+            if (value > 25) value = 25;
             updateBotLimit(value);
         }
         
