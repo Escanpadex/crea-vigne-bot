@@ -1635,11 +1635,16 @@ async function importExistingPositions() {
                     // 🔧 CORRECTION: Calculer quantity et size correctement pour positions importées
                     // quantity = nombre de tokens/coins (ex: 1.5 BTC)
                     // size = valeur en USDT SANS levier (ex: 1.5 * 40000 = 60000 USDT)
-                    const quantity = parseFloat(apiPos.size || 0);
+                    let quantity = parseFloat(apiPos.size || 0);
                     const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
                     
+                    // 🔧 FALLBACK: Si quantity est 0, calculer depuis total/price
+                    if (quantity === 0 && total > 0 && averageOpenPrice > 0) {
+                        quantity = total / averageOpenPrice;
+                        log(`🔧 ${apiPos.symbol}: Quantity calculée depuis total (${total}) / price (${averageOpenPrice}) = ${quantity}`, 'DEBUG');
+                    }
+                    
                     // 🎯 CRUCIAL: size doit être la valeur INVESTIE (sans levier)
-                    // Si apiPos.total contient la valeur avec levier, on divise par leverage
                     const size = quantity * averageOpenPrice; // Valeur de la position en USDT
                     
                     log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, leverage=${leverage}, quantity=${quantity}, size=${size}`, 'DEBUG');
@@ -2428,8 +2433,14 @@ async function syncNewManualPositions() {
                 const markPrice = parseFloat(apiPos.markPrice || 0);
                 const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                 const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
-                const quantity = parseFloat(apiPos.size || 0);
+                let quantity = parseFloat(apiPos.size || 0);
                 const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
+                
+                // 🔧 FALLBACK: Si quantity est 0, calculer depuis total/price
+                if (quantity === 0 && total > 0 && averageOpenPrice > 0) {
+                    quantity = total / averageOpenPrice;
+                }
+                
                 const size = quantity * averageOpenPrice; // Valeur SANS levier
                 
                 const position = {
@@ -2926,8 +2937,14 @@ window.forceFullPositionRefresh = async function() {
             const markPrice = parseFloat(apiPos.markPrice || 0);
             const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
             const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
-            const quantity = parseFloat(apiPos.size || 0);
+            let quantity = parseFloat(apiPos.size || 0);
             const leverage = parseFloat(apiPos.leverage || config.leverage || 1);
+            
+            // 🔧 FALLBACK: Si quantity est 0, calculer depuis total/price
+            if (quantity === 0 && total > 0 && averageOpenPrice > 0) {
+                quantity = total / averageOpenPrice;
+            }
+            
             const size = quantity * averageOpenPrice; // Valeur SANS levier
             
             const position = {
