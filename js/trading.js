@@ -1,10 +1,10 @@
 // Trading Functions - MACD Strategy & Position Management
 // Logs supprimés pour réduire le spam console
 
-// 🧹 OPTIMISATION: Nettoyer la console toutes les 10 minutes pour éviter la surcharge mémoire
+// 🧹 OPTIMISATION: Nettoyer la console toutes les 3 minutes pour éviter la surcharge mémoire
 let lastConsoleClear = Date.now();
 function autoCleanConsole() {
-    if (Date.now() - lastConsoleClear > 600000) { // 10 minutes
+    if (Date.now() - lastConsoleClear > 180000) { // 3 minutes
         console.clear();
         console.log('🧹 Console nettoyée automatiquement (optimisation mémoire)');
         lastConsoleClear = Date.now();
