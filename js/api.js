@@ -333,26 +333,39 @@ function updateTop30Display() {
 async function setLeverage(symbol, leverage) {
     log(`⚡ Configuration du levier ${leverage}x pour ${symbol}...`, 'INFO');
     
-    const leverageData = {
-        symbol: symbol,
-        productType: "USDT-FUTURES",
-        marginMode: "isolated", // 🔧 CORRECTION: Ajouter marginMode requis
-        marginCoin: "USDT",
-        leverage: leverage.toString()
-    };
+    // 🔧 AMÉLIORATION: Retry avec différents modes de marge
+    const marginModes = ['isolated', 'cross'];
     
-    const result = await makeRequest('/bitget/api/v2/mix/account/set-leverage', {
-        method: 'POST',
-        body: JSON.stringify(leverageData)
-    });
-    
-    if (result && result.code === '00000') {
-        log(`✅ Levier ${leverage}x configuré avec succès pour ${symbol}!`, 'SUCCESS');
-        return true;
-    } else {
-        log(`⚠️ Échec config levier ${symbol}: ${result?.msg || 'Erreur'}`, 'WARNING');
-        return false;
+    for (const marginMode of marginModes) {
+        const leverageData = {
+            symbol: symbol,
+            productType: "USDT-FUTURES",
+            marginMode: marginMode,
+            marginCoin: "USDT",
+            leverage: leverage.toString(),
+            holdSide: "long" // 🆕 AJOUT: Spécifier le côté
+        };
+        
+        const result = await makeRequest('/bitget/api/v2/mix/account/set-leverage', {
+            method: 'POST',
+            body: JSON.stringify(leverageData)
+        });
+        
+        if (result && result.code === '00000') {
+            log(`✅ Levier ${leverage}x configuré (${marginMode}) pour ${symbol}!`, 'SUCCESS');
+            return true;
+        } else if (marginMode === 'isolated') {
+            // Si isolated échoue, essayer cross
+            log(`⚠️ Échec config levier ${marginMode}, essai avec cross...`, 'WARNING');
+            continue;
+        } else {
+            log(`⚠️ Échec config levier ${symbol}: ${result?.msg || 'Erreur'}`, 'WARNING');
+            // Continuer quand même - le levier par défaut sera utilisé
+            return false;
+        }
     }
+    
+    return false;
 }
 
 async function getAllAvailablePairs() {

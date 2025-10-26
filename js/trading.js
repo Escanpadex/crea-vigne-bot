@@ -654,12 +654,8 @@ async function openPosition(symbol, selectedPair) {
             clientOid: `bot_${Date.now()}_${symbol}` // 🔧 Préfixe bot pour différencier
         };
         
-        // 🔧 DIAGNOSTIC: Log des données d'ordre pour debug
-        log(`🔍 Données ordre ${symbol}:`, 'DEBUG');
-        log(`   Symbol: ${orderData.symbol}`, 'DEBUG');
-        log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
-        log(`   Prix: ${currentPrice} (${typeof currentPrice})`, 'DEBUG');
-        log(`   Valeur position: ${positionValue}$`, 'DEBUG');
+        // 🔧 DIAGNOSTIC: Log des données d'ordre
+        log(`🔍 TENTATIVE OUVERTURE: ${symbol} | Valeur: ${positionValue.toFixed(2)}$ | Levier: x${leverage} | Quantité: ${quantity}`, 'INFO');
         
         const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
