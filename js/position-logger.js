@@ -5,10 +5,12 @@ console.log('📁 Loading position-logger.js...');
 // Configuration du logger
 const LOGGER_CONFIG = {
     storageKey: 'trading_bot_position_logs',
-    maxLogs: 1000, // Nombre maximum de logs conservés
+    maxLogs: 200, // 🔧 RÉDUIT: 200 logs max au lieu de 1000 (environ 1 mois d'historique)
+    maxDownloadLogs: 500, // 🆕 NOUVEAU: Limite pour le téléchargement (500 derniers logs)
     enableConsole: true, // Afficher aussi dans la console
     includeTimestamp: true,
-    includeDetails: true
+    includeDetails: true,
+    autoCleanupDays: 30 // 🆕 NOUVEAU: Supprimer automatiquement les logs > 30 jours
 };
 
 // Classe pour gérer les logs de positions
@@ -23,7 +25,15 @@ class PositionLogger {
         try {
             const stored = localStorage.getItem(LOGGER_CONFIG.storageKey);
             if (stored) {
-                const logs = JSON.parse(stored);
+                let logs = JSON.parse(stored);
+                
+                // 🆕 NETTOYAGE AUTOMATIQUE: Supprimer les logs trop anciens
+                const cleanedLogs = this.cleanOldLogs(logs);
+                if (cleanedLogs.length !== logs.length) {
+                    console.log(`🗑️ ${logs.length - cleanedLogs.length} logs anciens supprimés (>${LOGGER_CONFIG.autoCleanupDays} jours)`);
+                    logs = cleanedLogs;
+                }
+                
                 console.log(`📂 ${logs.length} logs chargés depuis le stockage`);
                 return logs;
             }
@@ -31,6 +41,17 @@ class PositionLogger {
             console.error('❌ Erreur chargement logs:', error);
         }
         return [];
+    }
+    
+    // 🆕 NOUVEAU: Nettoyer les logs trop anciens
+    cleanOldLogs(logs) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - LOGGER_CONFIG.autoCleanupDays);
+        
+        return logs.filter(log => {
+            const logDate = new Date(log.timestamp);
+            return logDate >= cutoffDate;
+        });
     }
 
     // Sauvegarder les logs dans localStorage
@@ -208,11 +229,20 @@ class PositionLogger {
 
     // Exporter les logs en texte formaté
     exportToText() {
+        // 🔧 AMÉLIORATION: Limiter le nombre de logs exportés pour réduire la taille du fichier
+        const logsToExport = this.logs.slice(-LOGGER_CONFIG.maxDownloadLogs);
+        const isLimited = logsToExport.length < this.logs.length;
+        
         let text = '═══════════════════════════════════════════════════════════════\n';
         text += '         BOT TRADING BITGET - HISTORIQUE DES POSITIONS\n';
         text += '═══════════════════════════════════════════════════════════════\n';
         text += `Généré le: ${new Date().toLocaleString('fr-FR')}\n`;
-        text += `Nombre total de logs: ${this.logs.length}\n\n`;
+        text += `Nombre total de logs: ${this.logs.length}\n`;
+        if (isLimited) {
+            text += `⚠️ Fichier limité aux ${logsToExport.length} derniers logs (config: max ${LOGGER_CONFIG.maxDownloadLogs})\n`;
+            text += `💡 Pour voir l'historique complet, consultez le localStorage dans la console\n`;
+        }
+        text += '\n';
 
         // Statistiques
         const stats = this.getStats();
@@ -232,7 +262,8 @@ class PositionLogger {
         text += '                     HISTORIQUE DÉTAILLÉ\n';
         text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
 
-        this.logs.reverse().forEach((log, index) => {
+        // 🔧 CORRECTION: Utiliser logsToExport au lieu de this.logs
+        logsToExport.reverse().forEach((log, index) => {
             const date = new Date(log.timestamp).toLocaleString('fr-FR');
             
             if (log.type === 'POSITION_OPEN') {
@@ -308,6 +339,24 @@ class PositionLogger {
         }
         return false;
     }
+    
+    // 🆕 NOUVEAU: Nettoyer manuellement les logs anciens
+    cleanOldLogsManually(days = LOGGER_CONFIG.autoCleanupDays) {
+        const beforeCount = this.logs.length;
+        this.logs = this.cleanOldLogs(this.logs);
+        const afterCount = this.logs.length;
+        const removed = beforeCount - afterCount;
+        
+        if (removed > 0) {
+            this.saveLogs();
+            log(`🗑️ ${removed} logs anciens (>${days} jours) supprimés`, 'INFO');
+            console.log(`✅ Nettoyage terminé: ${removed} logs supprimés, ${afterCount} logs conservés`);
+        } else {
+            log(`✅ Aucun log ancien à supprimer (tous < ${days} jours)`, 'INFO');
+        }
+        
+        return { removed, remaining: afterCount };
+    }
 }
 
 // Créer une instance globale du logger
@@ -324,6 +373,10 @@ window.clearPositionLogs = function() {
 
 window.getPositionLogsStats = function() {
     return window.positionLogger.getStats();
+};
+
+window.cleanOldLogs = function(days) {
+    return window.positionLogger.cleanOldLogsManually(days);
 };
 
 console.log('✅ Position Logger chargé et prêt à l\'emploi');
