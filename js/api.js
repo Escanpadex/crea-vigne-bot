@@ -1,5 +1,6 @@
 // API Functions for Bitget Trading Bot
-// Logs supprimés pour réduire le spam console
+console.log('📁 Loading api.js...');
+console.log('🔧 API.JS VERSION: 4H-FIX-v2 - Timeframe mapping corrigé');
 
 // Auto-connection flag pour éviter les reconnexions multiples
 let autoConnectionAttempted = false;
@@ -33,17 +34,6 @@ async function makeRequest(endpoint, options = {}) {
             const statusInfo = `${response.status} ${response.statusText}`;
             const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
             log(`Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
-            
-            // 🔧 AMÉLIORATION: Log détaillé pour les erreurs 400
-            if (response.status === 400 && data) {
-                console.error('🔴 DÉTAILS ERREUR 400:', {
-                    endpoint: endpoint,
-                    code: data.code,
-                    msg: data.msg,
-                    data: data.data,
-                    fullResponse: data
-                });
-            }
         }
 
         return data;
@@ -197,6 +187,48 @@ async function refreshBalance() {
     }
 }
 
+async function scanTop30Volume() {
+    try {
+        const topCount = config.topVolumeCount || 30;
+        log(`🔍 Scan des volumes TOP ${topCount} en cours...`, 'INFO');
+        
+        const response = await fetch(`${API_BASE}/bitget/api/v2/mix/market/tickers?productType=usdt-futures`);
+        const data = await response.json();
+        
+        if (data.code === '00000' && data.data) {
+            const validPairs = data.data
+                .filter(pair => {
+                    const volume = parseFloat(pair.usdtVolume || 0);
+                    return volume > 10000000 && pair.symbol.endsWith('USDT');
+                })
+                .sort((a, b) => parseFloat(b.usdtVolume) - parseFloat(a.usdtVolume))
+                .slice(0, topCount);
+            
+            // Ancien système TOP 30 désactivé - utiliser getAllAvailablePairs() à la place
+            // top30Pairs = validPairs;
+            // window.top30Pairs = validPairs;
+            // currentScanIndex = 0;
+            
+            const totalVolume = validPairs.reduce((sum, pair) => sum + parseFloat(pair.usdtVolume), 0);
+            log(`✅ TOP ${topCount} mis à jour: ${validPairs.length} paires, Volume total: ${formatNumber(totalVolume)}`, 'SUCCESS');
+            
+            validPairs.slice(0, Math.min(5, topCount)).forEach((pair, index) => {
+                log(`#${index + 1} ${pair.symbol}: ${formatNumber(pair.usdtVolume)} vol`, 'INFO');
+            });
+            
+            // Ancien système d'affichage désactivé
+            // document.getElementById('lastScanTime').textContent = new Date().toLocaleTimeString();
+            return true;
+        } else {
+            log('❌ Erreur lors du scan des volumes', 'ERROR');
+            return false;
+        }
+    } catch (error) {
+        log(`❌ Erreur scanner: ${error.message}`, 'ERROR');
+        return false;
+    }
+}
+
 // 🔄 NOUVELLE FONCTION: Synchronisation automatique des positions
 function startAutoSyncPositions() {
     log('🔄 Démarrage de la synchronisation automatique des positions (toutes les 4 secondes)', 'INFO');
@@ -248,33 +280,6 @@ function stopAutoSyncPositions() {
     return false;
 }
 
-// 🔄 NOUVELLE FONCTION: Rafraîchissement automatique du solde
-function startAutoBalanceRefresh() {
-    log('💰 Démarrage du rafraîchissement automatique du solde (toutes les 5 secondes)', 'INFO');
-    
-    // Arrêter l'ancien intervalle s'il existe
-    if (window.autoBalanceInterval) {
-        clearInterval(window.autoBalanceInterval);
-    }
-    
-    // Mise à jour immédiate
-    refreshBalance();
-    
-    // Programmer le rafraîchissement toutes les 5 secondes
-    window.autoBalanceInterval = setInterval(async () => {
-        await refreshBalance();
-    }, 5000); // 5 secondes
-}
-
-// 🛑 FONCTION: Arrêter le rafraîchissement automatique du solde
-function stopAutoBalanceRefresh() {
-    if (window.autoBalanceInterval) {
-        clearInterval(window.autoBalanceInterval);
-        window.autoBalanceInterval = null;
-        log('🛑 Rafraîchissement automatique du solde arrêté', 'INFO');
-    }
-}
-
 // 🔍 FONCTION DE DIAGNOSTIC: Vérifier l'état de la synchronisation automatique
 window.checkAutoSyncStatus = function() {
     console.log('🔍 DIAGNOSTIC - État de la synchronisation automatique:');
@@ -318,39 +323,26 @@ function updateTop30Display() {
 async function setLeverage(symbol, leverage) {
     log(`⚡ Configuration du levier ${leverage}x pour ${symbol}...`, 'INFO');
     
-    // 🔧 AMÉLIORATION: Retry avec différents modes de marge
-    const marginModes = ['isolated', 'cross'];
+    const leverageData = {
+        symbol: symbol,
+        productType: "USDT-FUTURES",
+        marginMode: "isolated", // 🔧 CORRECTION: Ajouter marginMode requis
+        marginCoin: "USDT",
+        leverage: leverage.toString()
+    };
     
-    for (const marginMode of marginModes) {
-        const leverageData = {
-            symbol: symbol,
-            productType: "USDT-FUTURES",
-            marginMode: marginMode,
-            marginCoin: "USDT",
-            leverage: leverage.toString(),
-            holdSide: "long" // 🆕 AJOUT: Spécifier le côté
-        };
-        
-        const result = await makeRequest('/bitget/api/v2/mix/account/set-leverage', {
-            method: 'POST',
-            body: JSON.stringify(leverageData)
-        });
-        
-        if (result && result.code === '00000') {
-            log(`✅ Levier ${leverage}x configuré (${marginMode}) pour ${symbol}!`, 'SUCCESS');
-            return true;
-        } else if (marginMode === 'isolated') {
-            // Si isolated échoue, essayer cross
-            log(`⚠️ Échec config levier ${marginMode}, essai avec cross...`, 'WARNING');
-            continue;
-        } else {
-            log(`⚠️ Échec config levier ${symbol}: ${result?.msg || 'Erreur'}`, 'WARNING');
-            // Continuer quand même - le levier par défaut sera utilisé
-            return false;
-        }
+    const result = await makeRequest('/bitget/api/v2/mix/account/set-leverage', {
+        method: 'POST',
+        body: JSON.stringify(leverageData)
+    });
+    
+    if (result && result.code === '00000') {
+        log(`✅ Levier ${leverage}x configuré avec succès pour ${symbol}!`, 'SUCCESS');
+        return true;
+    } else {
+        log(`⚠️ Échec config levier ${symbol}: ${result?.msg || 'Erreur'}`, 'WARNING');
+        return false;
     }
-    
-    return false;
 }
 
 async function getAllAvailablePairs() {
