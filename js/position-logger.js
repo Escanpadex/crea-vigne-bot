@@ -5,7 +5,7 @@ console.log('📁 Loading position-logger.js...');
 // Configuration du logger
 const LOGGER_CONFIG = {
     storageKey: 'trading_bot_position_logs',
-    maxLogs: 1000, // Nombre maximum de logs conservés
+    maxLogs: 300, // Nombre maximum de logs conservés
     enableConsole: true, // Afficher aussi dans la console
     includeTimestamp: true,
     includeDetails: true
@@ -233,40 +233,41 @@ class PositionLogger {
         text += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
 
         this.logs.reverse().forEach((log, index) => {
-            const date = new Date(log.timestamp).toLocaleString('fr-FR');
+            const date = new Date(log.timestamp).toLocaleString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).replace(',', '');
             
             if (log.type === 'POSITION_OPEN') {
-                text += `[${date}] 📈 OUVERTURE\n`;
-                text += `  Symbol: ${log.symbol}\n`;
-                text += `  Prix d'entrée: ${log.entryPrice}\n`;
-                text += `  Quantité: ${log.quantity}\n`;
-                text += `  Taille: $${log.size.toFixed(2)}\n`;
-                text += `  Levier: x${log.leverage}\n`;
-                text += `  Objectif PnL: +${log.targetPnL}%\n`;
-                text += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
+                text += `[${date}] 📈 OUVERTURE / Objectif PnL: +${log.targetPnL}%\n`;
+                text += ` Symbol: ${log.symbol} Prix d'entrée: ${log.entryPrice}\n`;
+                text += ` Quantité: ${log.quantity} / Taille: $${log.size.toFixed(2)} / Levier: x${log.leverage}\n`;
                 if (log.details.change24h !== 'N/A') {
-                    text += `  Performance 24h: +${log.details.change24h}%\n`;
+                    text += ` Performance 24h: +${log.details.change24h}%\n`;
                 }
-                text += `  Stratégie: ${log.details.strategy || 'N/A'}\n`;
+                text += ` Stratégie: ${log.details.strategy || 'N/A'}\n`;
+                text += ` Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
             } else if (log.type === 'POSITION_CLOSE') {
                 const isProfit = log.pnlDollar >= 0;
-                text += `[${date}] ${isProfit ? '✅' : '❌'} FERMETURE\n`;
-                text += `  Symbol: ${log.symbol}\n`;
-                text += `  Prix d'entrée: ${log.entryPrice}\n`;
-                text += `  Prix de sortie: ${log.exitPrice}\n`;
-                text += `  Quantité: ${log.quantity}\n`;
-                text += `  Taille: $${log.size.toFixed(2)}\n`;
-                text += `  Levier: x${log.leverage}\n`;
-                text += `  PnL: ${isProfit ? '+' : ''}$${log.pnlDollar.toFixed(2)} (${isProfit ? '+' : ''}${log.pnlPercent.toFixed(2)}%)\n`;
-                text += `  Durée: ${log.duration}\n`;
-                text += `  Raison de fermeture: ${log.closeReason}\n`;
-                text += `  Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
+                const pnlSign = isProfit ? '+' : '';
+                text += `[${date}] ${isProfit ? '✅' : '❌'} FERMETURE / PnL: ${pnlSign}$${log.pnlDollar.toFixed(2)} (${pnlSign}${log.pnlPercent.toFixed(2)}%) / Durée: ${log.duration}\n`;
+                text += ` Symbol: ${log.symbol} Prix d'entrée: ${log.entryPrice} / Prix de sortie: ${log.exitPrice}\n`;
+                text += ` Quantité: ${log.quantity} / Taille: $${log.size.toFixed(2)} / Levier: x${log.leverage}\n`;
+                text += ` Raison de fermeture: ${log.closeReason}\n`;
                 if (log.details.highestPrice) {
-                    text += `  Plus haut: ${log.details.highestPrice}\n`;
+                    text += ` Plus haut: ${log.details.highestPrice}`;
+                    if (log.details.currentStopPrice) {
+                        text += ` / Stop Loss: ${log.details.currentStopPrice}`;
+                    }
+                    text += '\n';
+                } else if (log.details.currentStopPrice) {
+                    text += ` Stop Loss: ${log.details.currentStopPrice}\n`;
                 }
-                if (log.details.currentStopPrice) {
-                    text += `  Stop Loss: ${log.details.currentStopPrice}\n`;
-                }
+                text += ` Gestion: ${log.isBotManaged ? '🤖 Bot' : '👤 Manuel'}\n`;
             }
             
             text += '\n';
