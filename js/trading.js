@@ -1615,9 +1615,10 @@ async function importExistingPositions() {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: total, // 🔧 CORRECTION: Utiliser la valeur totale de la position
+                        size: marginSize * parseFloat(apiPos.leverage || 1), // 🔧 CORRECTION: Taille réelle = marge × levier
                         quantity: parseFloat(apiPos.size || total / markPrice), // 🔧 AMÉLIORATION: Utiliser apiPos.size si disponible
                         entryPrice: averageOpenPrice,
+                        leverage: parseFloat(apiPos.leverage || 1), // 🔧 AJOUT: Sauvegarder le levier
                         status: 'OPEN',
                         timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(), // 🔧 AMÉLIORATION: Utiliser le timestamp réel si disponible
                         orderId: `imported_${Date.now()}`,
@@ -2088,19 +2089,23 @@ window.debugImportDetailed = async function() {
                     const markPrice = parseFloat(apiPos.markPrice || 0);
                     const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                    const marginSize = parseFloat(apiPos.marginSize || 0);
+                    const leverage = parseFloat(apiPos.leverage || 1);
                     
                     console.log(`   Side: ${side}`);
                     console.log(`   Total: ${total}`);
                     console.log(`   MarkPrice: ${markPrice}`);
                     console.log(`   AverageOpenPrice: ${averageOpenPrice}`);
                     console.log(`   UnrealizedPL: ${unrealizedPL}`);
+                    console.log(`   MarginSize: ${marginSize}, Leverage: ${leverage}`);
                     
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: total,
-                        quantity: total / markPrice,
+                        size: marginSize * leverage, // 🔧 CORRECTION: Taille réelle = marge × levier
+                        quantity: parseFloat(apiPos.size || total / markPrice),
+                        leverage: leverage,
                         entryPrice: averageOpenPrice,
                         status: 'OPEN',
                         timestamp: new Date().toISOString(),
@@ -2402,13 +2407,16 @@ async function syncNewManualPositions() {
                 const markPrice = parseFloat(apiPos.markPrice || 0);
                 const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                 const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+                const marginSize = parseFloat(apiPos.marginSize || 0);
+                const leverage = parseFloat(apiPos.leverage || 1);
                 
                 const position = {
                     id: Date.now() + Math.random(),
                     symbol: apiPos.symbol,
                     side: side,
-                    size: total,
+                    size: marginSize * leverage, // 🔧 CORRECTION: Taille réelle = marge × levier
                     quantity: parseFloat(apiPos.size || total / markPrice),
+                    leverage: leverage,
                     entryPrice: averageOpenPrice,
                     status: 'OPEN',
                     timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),
@@ -2896,13 +2904,16 @@ window.forceFullPositionRefresh = async function() {
             const markPrice = parseFloat(apiPos.markPrice || 0);
             const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
             const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
+            const marginSize = parseFloat(apiPos.marginSize || 0);
+            const leverage = parseFloat(apiPos.leverage || 1);
             
             const position = {
                 id: Date.now() + Math.random(),
                 symbol: apiPos.symbol,
                 side: side,
-                size: total,
+                size: marginSize * leverage, // 🔧 CORRECTION: Taille réelle = marge × levier
                 quantity: parseFloat(apiPos.size || total / markPrice),
+                leverage: leverage,
                 entryPrice: averageOpenPrice,
                 status: 'OPEN',
                 timestamp: apiPos.cTime ? new Date(parseInt(apiPos.cTime)).toISOString() : new Date().toISOString(),

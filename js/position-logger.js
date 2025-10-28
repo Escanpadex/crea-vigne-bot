@@ -99,6 +99,20 @@ class PositionLogger {
 
     // Ajouter un log de fermeture de position
     logPositionClose(position, closeDetails = {}) {
+        // 🔧 NOUVEAU: Éviter les doublons en vérifiant si cette fermeture existe déjà (même symbole dans les 60 dernières secondes)
+        const now = Date.now();
+        const recentDuplicate = this.logs.find(log => 
+            log.type === 'POSITION_CLOSE' &&
+            log.symbol === position.symbol &&
+            log.entryPrice === position.entryPrice &&
+            (now - new Date(log.timestamp).getTime()) < 60000 // Dans les 60 dernières secondes
+        );
+        
+        if (recentDuplicate) {
+            console.log(`⚠️ Log doublon détecté pour ${position.symbol} - Ignoré`);
+            return recentDuplicate;
+        }
+        
         const logEntry = {
             timestamp: new Date().toISOString(),
             type: 'POSITION_CLOSE',
