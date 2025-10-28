@@ -12,26 +12,28 @@
 <body>
     <div class="container my-4">
         <h1 class="text-center mb-4">🚀 Bot Trading Bitget Futures</h1>
-        
-        <!-- Navigation simplifiée avec balance et connexion -->
-        <div class="topbar">
-            <div class="topbar-title">⚙️ Configuration du Bot</div>
 
-            <div class="topbar-actions">
-                <!-- Balance -->
-                <div class="chip chip-balance">
-                    <span class="label">💳 Balance:</span>
-                    <span class="value" id="usdtBalance">--</span>
-                    <span class="unit">USDT</span>
-                </div>
+        <!-- Header: nom du bot, statut de connexion, solde -->
+        <div class="card">
+            <div class="topbar">
+                <div class="topbar-title">🤖 Bot Trading Bitget Futures</div>
 
-                <!-- Connexion API -->
-                <div class="chip chip-connection">
-                    <div class="status" style="margin-bottom:0;">
-                        <div class="status-dot" id="connectionStatus"></div>
-                        <span id="connectionText" class="connection-status-text">Déconnecté</span>
+                <div class="topbar-actions">
+                    <!-- Balance -->
+                    <div class="chip chip-balance">
+                        <span class="label">💳 Balance:</span>
+                        <span class="value" id="usdtBalance">--</span>
+                        <span class="unit">USDT</span>
                     </div>
-                    <button class="btn btn-ghost" onclick="testConnection()">Connecter</button>
+
+                    <!-- Connexion API -->
+                    <div class="chip chip-connection">
+                        <div class="status" style="margin-bottom:0;">
+                            <div class="status-dot" id="connectionStatus"></div>
+                            <span id="connectionText" class="connection-status-text">Déconnecté</span>
+                        </div>
+                        <button class="btn btn-ghost" onclick="testConnection()">Connecter</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -104,13 +106,13 @@
                                 <select id="leverage"><option value="2" selected>2x</option></select>
                             </div>
                             
-                            <!-- Configuration Stratégie - Design amélioré -->
-                            <div class="config-section">
+                            <!-- Panneau Paramètres du bot -->
+                            <div class="panel">
                                 <div class="section-header">
                                     <h4>⚙️ Configuration de Trading</h4>
                                 </div>
                                 
-                                <div class="config-grid">
+                                <div class="config-grid grid-2">
                                     <div class="config-item">
                                         <div class="config-label">💰 Capital par trade</div>
                                         <div class="number-input-container">
@@ -207,8 +209,8 @@
                                 </div>
                             </div>
                             
-                            <!-- Statut Bot - Design amélioré -->
-                            <div class="status-section">
+                            <!-- Panneau État du bot -->
+                            <div class="panel">
                                 <div class="section-header">
                                     <h4>📊 État du Bot</h4>
                                 </div>
@@ -247,28 +249,24 @@
                                 </div>
                             </div>
                             
-                            <!-- Statistiques Performance - Design amélioré -->
-                            <div class="stats-section">
+                            <!-- Panneau Performance -->
+                            <div class="panel">
                                 <div class="section-header">
                                     <h4>📈 Performance</h4>
                                 </div>
-                                
-                                <div class="performance-grid">
-                                    <div class="perf-item success">
-                                        <div class="perf-icon">✅</div>
-                                        <div class="perf-info">
-                                            <div class="perf-label">Gagnantes</div>
-                                            <div class="perf-value" id="winningPositions">0 (+0$)</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="perf-item danger">
-                                        <div class="perf-icon">❌</div>
-                                        <div class="perf-info">
-                                            <div class="perf-label">Perdantes</div>
-                                            <div class="perf-value" id="losingPositions">0 (-0$)</div>
-                                        </div>
-                                    </div>
+                                <div class="panel-inner">
+                                    <table style="width:100%; border-collapse:collapse;">
+                                        <tbody>
+                                            <tr>
+                                                <td style="padding:8px; color: var(--muted);">Gagnantes</td>
+                                                <td style="padding:8px; text-align:right; font-weight:600;" id="winningPositions">0 (+0$)</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding:8px; color: var(--muted);">Perdantes</td>
+                                                <td style="padding:8px; text-align:right; font-weight:600;" id="losingPositions">0 (-0$)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -279,7 +277,7 @@
                         <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
                             <button class="btn btn-wide" onclick="startBot()" id="startBtn">▶️ Démarrer le Bot</button>
                             <button class="btn btn-danger btn-wide" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter le Bot</button>
-                            <button class="btn btn-wide" onclick="downloadPositionLogs()" style="background: linear-gradient(45deg, #8b5cf6, #7c3aed);">📥 Télécharger Logs</button>
+                            <button class="btn btn-wide" onclick="downloadPositionLogs()">📥 Télécharger Logs</button>
                         </div>
                     </div>
         </div>
