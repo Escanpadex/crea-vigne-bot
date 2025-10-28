@@ -94,6 +94,20 @@ async function makeRequestWithRetry(endpoint, options, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const result = await makeRequest(endpoint, options);
+            
+            // Si on reçoit un code 429 (Too Many Requests), attendre plus longtemps avant de réessayer
+            if (result && (result.code === '429' || result.code === 429)) {
+                if (attempt < maxRetries) {
+                    const delay = 3000 + (attempt * 2000); // 3s, 5s, 7s
+                    log(`⚠️ Rate limit (429) - Attente ${delay}ms avant réessai ${attempt + 1}/${maxRetries}`, 'WARNING');
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                } else {
+                    log(`❌ Rate limit (429) - Nombre max de tentatives atteint`, 'ERROR');
+                    return result;
+                }
+            }
+            
             return result;
         } catch (error) {
             lastError = error;
@@ -945,8 +959,8 @@ async function monitorPnLAndClose() {
             // Lancer toutes les fermetures en parallèle avec un délai échelonné
             const closePromises = positionsToClose.map((data, index) => {
                 return new Promise(async (resolve) => {
-                    // Délai échelonné: 0ms, 200ms, 400ms, 600ms, etc.
-                    await new Promise(r => setTimeout(r, index * 200));
+                    // Délai échelonné: 0ms, 1000ms, 2000ms, 3000ms, etc. (pour éviter le rate limit 429)
+                    await new Promise(r => setTimeout(r, index * 1000));
                     
                     const closed = await closePositionFlash(data.position);
                     if (closed) {
