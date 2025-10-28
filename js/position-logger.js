@@ -39,7 +39,7 @@ class PositionLogger {
             // Limiter le nombre de logs
             if (this.logs.length > LOGGER_CONFIG.maxLogs) {
                 this.logs = this.logs.slice(-LOGGER_CONFIG.maxLogs);
-                console.log(`🗑️ Logs tronqués à ${LOGGER_CONFIG.maxLogs} entrées`);
+                // Silencieux - pas de log à chaque troncature
             }
             
             localStorage.setItem(LOGGER_CONFIG.storageKey, JSON.stringify(this.logs));
