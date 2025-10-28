@@ -952,7 +952,18 @@ async function monitorPnLAndClose() {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // 🎯 ÉTAPE 2: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai entre chaque)
+        // 🎯 ÉTAPE 2: Retirer IMMÉDIATEMENT les positions à fermer de la liste (avant l'API)
+        // Cela évite les tentatives de fermeture multiples si le monitoring se déclenche pendant la fermeture
+        if (positionsToClose.length > 0) {
+            positionsToClose.forEach(data => {
+                const index = openPositions.findIndex(p => p.id === data.position.id);
+                if (index !== -1) {
+                    openPositions.splice(index, 1);
+                }
+            });
+        }
+        
+        // 🎯 ÉTAPE 3: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai entre chaque)
         if (positionsToClose.length > 0) {
             log(`🚀 Fermeture de ${positionsToClose.length} position(s) en parallèle...`, 'INFO');
             
@@ -991,13 +1002,12 @@ async function monitorPnLAndClose() {
                             }
                         }
                         
-                        // Supprimer de la liste des positions ouvertes
-                        const index = openPositions.findIndex(p => p.id === data.position.id);
-                        if (index !== -1) {
-                            openPositions.splice(index, 1);
-                        }
+                        // NOTE: Position déjà retirée de openPositions à l'étape 2 (ligne 958)
                     } else {
                         log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
+                        // En cas d'échec, remettre la position dans openPositions pour réessayer plus tard
+                        openPositions.push(data.position);
+                        log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
                     }
                     
                     resolve(closed);
