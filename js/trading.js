@@ -163,11 +163,16 @@ async function getPositivePairs() {
                 const hasVolume = volume > 100000; // Volume en USDT
                 const isUSDT = ticker.symbol && ticker.symbol.includes('USDT');
                 
-                if (isInRange && hasVolume && isUSDT) {
+                // 🚫 EXCLUSION: Actions tokenisées (stocks)
+                const isNotExcluded = !config.excludedSymbols || !config.excludedSymbols.includes(ticker.symbol);
+                
+                if (isInRange && hasVolume && isUSDT && isNotExcluded) {
                     log(`✅ Paire valide: ${ticker.symbol} (+${change24hPercent.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
+                } else if (isInRange && hasVolume && isUSDT && !isNotExcluded) {
+                    log(`🚫 Paire exclue (action tokenisée): ${ticker.symbol} (+${change24hPercent.toFixed(2)}%)`, 'DEBUG');
                 }
                 
-                return isInRange && hasVolume && isUSDT;
+                return isInRange && hasVolume && isUSDT && isNotExcluded;
             })
             .map(ticker => ({
                 symbol: ticker.symbol, // Garder le format original
@@ -285,7 +290,8 @@ function selectRandomPositivePair(excludeSymbols = []) {
         !openedSymbols.includes(pair.symbol) &&  // 🎯 NOUVEAU: Pas déjà ouverte
         !excludeSymbols.includes(pair.symbol) && 
         !isPairInCooldown(pair.symbol) &&
-        !isTradedPairInCooldown(pair.symbol) // 🆕 Cooldown 12h pour paires déjà tradées
+        !isTradedPairInCooldown(pair.symbol) && // 🆕 Cooldown 12h pour paires déjà tradées
+        (!config.excludedSymbols || !config.excludedSymbols.includes(pair.symbol)) // 🚫 Exclure les actions tokenisées
     );
     
     if (availablePairs.length === 0) {
@@ -618,6 +624,12 @@ function canOpenNewPosition(symbol) {
 }
 
 async function openPosition(symbol, selectedPair) {
+    // 🚫 PROTECTION: Vérifier si la paire est une action tokenisée
+    if (config.excludedSymbols && config.excludedSymbols.includes(symbol)) {
+        log(`🚫 ${symbol}: Action tokenisée exclue - Ouverture annulée`, 'WARNING');
+        return false;
+    }
+    
     // 🎯 NOUVELLE VÉRIFICATION: Utiliser la fonction de vérification centralisée
     const canOpen = canOpenNewPosition(symbol);
     

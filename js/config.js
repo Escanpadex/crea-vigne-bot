@@ -28,6 +28,27 @@ let botStats = {
     totalLossAmount: 0
 };
 
+// 🚫 EXCLUSION: Actions tokenisées (stocks) disponibles sur Bitget
+// Ces instruments causent des problèmes et doivent être exclus du trading automatique
+const EXCLUDED_STOCK_TOKENS = [
+    'AAPLUST',   // Apple
+    'TSLASUIT',  // Tesla
+    'NVDAUSDT',  // NVIDIA
+    'GOOGLUSDT', // Google/Alphabet
+    'AMZNUSDT',  // Amazon
+    'MSFTUSDT',  // Microsoft
+    'METAUSDT',  // Meta/Facebook
+    'CRCLUST',   // Circle (potentiellement lié aux actions)
+    'NFLXUSDT',  // Netflix
+    'BABAUSET',  // Alibaba
+    'COINUSET',  // Coinbase
+    'SPYUSDT',   // S&P 500 ETF
+    'QQQUSDT',   // NASDAQ 100 ETF
+    'ARKUSDT',   // ARK ETF
+    'SPXUSDT',   // S&P 500
+    'NDXUSDT'    // NASDAQ 100
+];
+
 // Configuration object
 let config = {
     apiKey: '',
@@ -40,6 +61,7 @@ let config = {
     targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
     maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
     maxPositionTimeHours: 24,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 24h)
+    excludedSymbols: EXCLUDED_STOCK_TOKENS, // 🚫 NOUVEAU: Symboles à exclure (actions tokenisées)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
         maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)

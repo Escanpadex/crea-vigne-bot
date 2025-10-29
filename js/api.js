@@ -356,7 +356,11 @@ async function getAllAvailablePairs() {
             const allPairs = data.data
                 .filter(pair => {
                     const volume = parseFloat(pair.usdtVolume || 0);
-                    return volume > 1000000 && pair.symbol.endsWith('USDT'); // Volume minimum 1M
+                    const hasVolume = volume > 1000000;
+                    const isUSDT = pair.symbol.endsWith('USDT');
+                    // 🚫 EXCLUSION: Actions tokenisées (stocks)
+                    const isNotExcluded = !config.excludedSymbols || !config.excludedSymbols.includes(pair.symbol);
+                    return hasVolume && isUSDT && isNotExcluded; // Volume minimum 1M + pas d'actions
                 })
                 .map(pair => ({
                     symbol: pair.symbol,
