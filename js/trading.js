@@ -1504,14 +1504,23 @@ function updatePositionsDisplay() {
             }
             
             // Calculer le PnL actuel avec gestion des données manquantes
-            const currentPrice = position.currentPrice || position.entryPrice;
             let pnlPercent = 0;
             let pnlDollar = 0;
+            let dataSource = 'UNKNOWN';
 
             // 🔧 CORRECTION: Pourcentage = variation de PRIX (sans levier), Dollar = PnL réel de la position
-            let dataSource = 'UNKNOWN';
             
-            // TOUJOURS calculer le pourcentage depuis la variation de prix du token (sans levier)
+            // Déterminer le prix actuel (priorité aux données disponibles)
+            let currentPrice = position.entryPrice; // Fallback par défaut
+            
+            if (typeof position.currentPrice === 'number' && position.currentPrice > 0) {
+                currentPrice = position.currentPrice;
+            } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.entryPrice > 0) {
+                // Reconstruire le prix depuis le pourcentage si currentPrice non dispo
+                currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
+            }
+            
+            // Calculer le pourcentage depuis la variation de prix du token (sans levier)
             if (currentPrice > 0 && position.entryPrice > 0) {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
             }
@@ -1699,6 +1708,9 @@ async function importExistingPositions() {
                     log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
+                    // 🔧 CORRECTION: Calculer le pourcentage de variation de prix (sans levier)
+                    const priceChangePercent = averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0;
+                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
@@ -1715,9 +1727,9 @@ async function importExistingPositions() {
                         stopLossId: null,
                         currentStopPrice: null,
                         highestPrice: markPrice,
-                        currentPrice: markPrice,
-                        unrealizedPnL: unrealizedPL,
-                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                        currentPrice: markPrice, // 🔧 IMPORTANT: Prix actuel pour affichage immédiat
+                        unrealizedPnL: unrealizedPL, // 🔧 PnL en $ depuis l'API
+                        pnlPercentage: priceChangePercent, // 🔧 Variation de prix (sans levier) pour affichage
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
                         reason: '🤖 Position gérée par le bot',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
