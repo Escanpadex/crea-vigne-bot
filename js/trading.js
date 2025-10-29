@@ -1266,10 +1266,25 @@ async function updatePositionsPnL(verbose = false) {
                     // 🔧 AMÉLIORATION: Mise à jour complète des données
                     const newPrice = parseFloat(apiPos.markPrice || 0);
                     const newUnrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
-                    const newPnlPercentage = localPos.entryPrice > 0 ? ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100 : 0;
+                    
+                    // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
+                    // Pour LONG: profit si prix monte, donc (newPrice - entryPrice) / entryPrice * 100
+                    // Pour SHORT: profit si prix baisse, donc (entryPrice - newPrice) / entryPrice * 100
+                    const isShort = (localPos.side || '').toString().toUpperCase() === 'SHORT';
+                    let newPnlPercentage = 0;
+                    if (localPos.entryPrice > 0 && newPrice > 0) {
+                        if (isShort) {
+                            newPnlPercentage = ((localPos.entryPrice - newPrice) / localPos.entryPrice) * 100;
+                        } else {
+                            newPnlPercentage = ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
+                        }
+                    } else if (localPos.pnlPercentage !== undefined && localPos.pnlPercentage !== null) {
+                        // 🔧 CORRECTION: Si les données ne sont pas encore disponibles, préserver le pourcentage existant
+                        newPnlPercentage = localPos.pnlPercentage;
+                    }
                     
                     // 🔧 CORRECTION: Toujours mettre à jour si currentPrice n'est pas défini ou si les données ont changé significativement
-                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice);
+                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice) && localPos.currentPrice > 0;
                     const priceChanged = !currentPriceDefined || Math.abs(localPos.currentPrice - newPrice) > 0.0001;
                     const pnlChanged = Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01;
                     
@@ -1517,12 +1532,27 @@ function updatePositionsDisplay() {
                 currentPrice = position.currentPrice;
             } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.entryPrice > 0) {
                 // Reconstruire le prix depuis le pourcentage si currentPrice non dispo
-                currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
+                const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
+                if (isShort) {
+                    currentPrice = position.entryPrice * (1 - position.pnlPercentage / 100);
+                } else {
+                    currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
+                }
             }
             
             // Calculer le pourcentage depuis la variation de prix du token (sans levier)
+            // Pour LONG: profit si prix monte, donc (currentPrice - entryPrice) / entryPrice * 100
+            // Pour SHORT: profit si prix baisse, donc (entryPrice - currentPrice) / entryPrice * 100
             if (currentPrice > 0 && position.entryPrice > 0) {
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
+                if (isShort) {
+                    pnlPercent = ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+                } else {
+                    pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                }
+            } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                // 🔧 CORRECTION: Si le prix n'est pas disponible, utiliser le pourcentage stocké
+                pnlPercent = position.pnlPercentage;
             }
 
             // Pour le dollar PnL : utiliser unrealizedPnL de l'API si disponible, sinon calculer
@@ -1709,7 +1739,17 @@ async function importExistingPositions() {
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
                     // 🔧 CORRECTION: Calculer le pourcentage de variation de prix (sans levier)
-                    const priceChangePercent = averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0;
+                    // Pour LONG: profit si prix monte, donc (markPrice - averageOpenPrice) / averageOpenPrice * 100
+                    // Pour SHORT: profit si prix baisse, donc (averageOpenPrice - markPrice) / averageOpenPrice * 100
+                    const isShort = side === 'SHORT';
+                    let priceChangePercent = 0;
+                    if (averageOpenPrice > 0 && markPrice > 0) {
+                        if (isShort) {
+                            priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
+                        } else {
+                            priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
+                        }
+                    }
                     
                     const position = {
                         id: Date.now() + Math.random(),
@@ -1729,7 +1769,7 @@ async function importExistingPositions() {
                         highestPrice: markPrice,
                         currentPrice: markPrice, // 🔧 IMPORTANT: Prix actuel pour affichage immédiat
                         unrealizedPnL: unrealizedPL, // 🔧 PnL en $ depuis l'API
-                        pnlPercentage: priceChangePercent, // 🔧 Variation de prix (sans levier) pour affichage
+                        pnlPercentage: priceChangePercent, // 🔧 Variation de prix (sans levier) pour affichage - CORRIGÉ pour SHORT
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
                         reason: '🤖 Position gérée par le bot',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
@@ -2209,6 +2249,17 @@ window.debugImportDetailed = async function() {
                     console.log(`   UnrealizedPL: ${unrealizedPL}`);
                     console.log(`   MarginSize: ${marginSize}, Leverage: ${leverage}`);
                     
+                    // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
+                    const isShort = side === 'SHORT';
+                    let priceChangePercent = 0;
+                    if (averageOpenPrice > 0 && markPrice > 0) {
+                        if (isShort) {
+                            priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
+                        } else {
+                            priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
+                        }
+                    }
+                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
@@ -2225,7 +2276,7 @@ window.debugImportDetailed = async function() {
                         highestPrice: markPrice,
                         currentPrice: markPrice,
                         unrealizedPnL: unrealizedPL,
-                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                        pnlPercentage: priceChangePercent,
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                         reason: '📥 Position importée depuis Bitget'
                     };
@@ -2520,6 +2571,17 @@ async function syncNewManualPositions() {
                 const marginSize = parseFloat(apiPos.marginSize || 0);
                 const leverage = parseFloat(apiPos.leverage || 1);
                 
+                // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
+                const isShort = side === 'SHORT';
+                let priceChangePercent = 0;
+                if (averageOpenPrice > 0 && markPrice > 0) {
+                    if (isShort) {
+                        priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
+                    } else {
+                        priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
+                    }
+                }
+                
                 const position = {
                     id: Date.now() + Math.random(),
                     symbol: apiPos.symbol,
@@ -2536,7 +2598,7 @@ async function syncNewManualPositions() {
                     highestPrice: markPrice,
                     currentPrice: markPrice,
                     unrealizedPnL: unrealizedPL,
-                    pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                    pnlPercentage: priceChangePercent,
                     targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                     reason: '👤 Position manuelle détectée automatiquement',
                     lastPnLLog: 0,
@@ -3017,6 +3079,17 @@ window.forceFullPositionRefresh = async function() {
             const marginSize = parseFloat(apiPos.marginSize || 0);
             const leverage = parseFloat(apiPos.leverage || 1);
             
+            // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
+            const isShort = side === 'SHORT';
+            let priceChangePercent = 0;
+            if (averageOpenPrice > 0 && markPrice > 0) {
+                if (isShort) {
+                    priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
+                } else {
+                    priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
+                }
+            }
+            
             const position = {
                 id: Date.now() + Math.random(),
                 symbol: apiPos.symbol,
@@ -3033,7 +3106,7 @@ window.forceFullPositionRefresh = async function() {
                 highestPrice: markPrice,
                 currentPrice: markPrice,
                 unrealizedPnL: unrealizedPL,
-                pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
+                pnlPercentage: priceChangePercent,
                 reason: 'Position importée (refresh complet)',
                 isBotManaged: false // Marquer comme manuel par défaut
             };
