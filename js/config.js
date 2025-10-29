@@ -30,23 +30,50 @@ let botStats = {
 
 // 🚫 EXCLUSION: Actions tokenisées (stocks) disponibles sur Bitget
 // Ces instruments causent des problèmes et doivent être exclus du trading automatique
+// Liste complète fournie par l'utilisateur
 const EXCLUDED_STOCK_TOKENS = [
-    'AAPLUST',   // Apple
-    'TSLASUIT',  // Tesla
-    'NVDAUSDT',  // NVIDIA
-    'GOOGLUSDT', // Google/Alphabet
-    'AMZNUSDT',  // Amazon
-    'MSFTUSDT',  // Microsoft
-    'METAUSDT',  // Meta/Facebook
-    'CRCLUST',   // Circle (potentiellement lié aux actions)
-    'NFLXUSDT',  // Netflix
-    'BABAUSET',  // Alibaba
-    'COINUSET',  // Coinbase
-    'SPYUSDT',   // S&P 500 ETF
-    'QQQUSDT',   // NASDAQ 100 ETF
-    'ARKUSDT',   // ARK ETF
-    'SPXUSDT',   // S&P 500
-    'NDXUSDT'    // NASDAQ 100
+    // Actions tech & cryptos
+    'LINKUSDT', 'LINK',
+    'NVDAXUSDT', 'NVDAX',
+    'NVDAUSDT', 'NVDAon',
+    'AAPLXUSDT', 'AAPLX', 'AAPLon',
+    'GOOGLXUSDT', 'GOOGLX', 'GOOGLon',
+    'TSLAUSDT', 'TSLAon',
+    'METAXUSDT', 'METAX', 'METAon',
+    'MSFTUSDT', 'MSFTon',
+    'PLTRXUSDT', 'PLTRX',
+    'AMDUSDT', 'AMDon',
+    'OPENXUSDT', 'OPENX',
+    'INTCUSDT', 'INTCon',
+    'CSCOUSDT', 'CSCOon',
+    'IBMUSDT', 'IBMon',
+    
+    // Finance & banques
+    'COINXUSDT', 'COINX',
+    'HOODXUSDT', 'HOODX',
+    'JPMUSDT', 'JPMon',
+    
+    // ETFs & indices
+    'SPYXUSDT', 'SPYX',
+    'QQQXUSDT', 'QQQX',
+    'TQQQXUSDT', 'TQQQX',
+    'ITOTUSDT', 'ITOTon',
+    'IWNUSDT', 'IWNon',
+    'DFDVUSDT', 'DFDVx',
+    'GLDXUSDT', 'GLDX',
+    
+    // Autres actions
+    'CRCLXUSDT', 'CRCLX',
+    'LMTUSDT', 'LMTon',
+    'LLYUSDT', 'LLYon',
+    'KOUSDT', 'KOon',
+    'PFEUSDT', 'PFEon',
+    'PGUSDT', 'PGon',
+    'NVOUSDT', 'NVOon',
+    'PEPUSDT', 'PEPon',
+    'TMUSDT', 'TMon',
+    'WMTUSDT', 'WMTon',
+    'CVXUSDT', 'CVXon'
 ];
 
 // Configuration object
