@@ -1508,27 +1508,22 @@ function updatePositionsDisplay() {
             let pnlPercent = 0;
             let pnlDollar = 0;
 
-            // 🔧 CORRECTION MAJEURE: Logique de calcul PnL normalisée avec valeur initiale cohérente
+            // 🔧 CORRECTION: Pourcentage = variation de PRIX (sans levier), Dollar = PnL réel de la position
             let dataSource = 'UNKNOWN';
             
-            // Obtenir la valeur initiale normalisée pour tous les calculs
-            const initialValue = getInitialValueForPnL(position);
+            // TOUJOURS calculer le pourcentage depuis la variation de prix du token (sans levier)
+            if (currentPrice > 0 && position.entryPrice > 0) {
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            }
 
-            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte en $)
+            // Pour le dollar PnL : utiliser unrealizedPnL de l'API si disponible, sinon calculer
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
-                pnlPercent = initialValue > 0 ? (pnlDollar / initialValue) * 100 : 0;
                 dataSource = 'API_UNREALIZED_PNL';
             }
-            // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
-            else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
-                pnlPercent = position.pnlPercentage;
-                pnlDollar = initialValue > 0 ? (initialValue * pnlPercent) / 100 : 0;
-                dataSource = 'API_PERCENTAGE';
-            }
-            // 3. Calcul de secours basé sur les prix actuels
+            // Sinon calculer depuis la variation de prix × la valeur initiale normalisée
             else {
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                const initialValue = getInitialValueForPnL(position);
                 pnlDollar = initialValue > 0 ? (initialValue * pnlPercent) / 100 : 0;
                 dataSource = 'CALCULATED';
             }
