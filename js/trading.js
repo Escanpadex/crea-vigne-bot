@@ -813,16 +813,20 @@ async function createEmergencyStopLoss(position, stopPrice) {
     }
 }
 
+let tpMonitorRunning = false;
+
 // 🎯 FONCTION MODIFIÉE: Surveillance PnL et fermeture automatique UNIQUEMENT pour les positions du bot
 async function monitorPnLAndClose() {
     if (!botRunning || openPositions.length === 0) return;
+    if (tpMonitorRunning) return;
+    tpMonitorRunning = true;
     
     // 🧹 OPTIMISATION: Nettoyer la console périodiquement
     autoCleanConsole();
     
     try {
         // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
-        const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
+        const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true && pos.isClosing !== true && pos.isClosed !== true);
         
         // 🎯 ÉTAPE 1: Identifier toutes les positions à fermer (sans attendre)
         const positionsToClose = [];
@@ -878,6 +882,8 @@ async function monitorPnLAndClose() {
                 const grossPnL = position.size * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
+                // Marquer la position comme en fermeture pour éviter tout retraitement
+                position.isClosing = true;
                 positionsToClose.push({
                     position,
                     pnlPercent,
@@ -923,6 +929,8 @@ async function monitorPnLAndClose() {
                 const grossPnL = position.size * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
+                // Marquer la position comme en fermeture pour éviter tout retraitement
+                position.isClosing = true;
                 positionsToClose.push({
                     position,
                     pnlPercent,
@@ -949,14 +957,19 @@ async function monitorPnLAndClose() {
                 }
             }
             
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // removed per-position delay to improve TP reactivity
         }
         
         // 🎯 ÉTAPE 2: Retirer IMMÉDIATEMENT les positions à fermer de la liste (avant l'API)
         // Cela évite les tentatives de fermeture multiples si le monitoring se déclenche pendant la fermeture
         if (positionsToClose.length > 0) {
             positionsToClose.forEach(data => {
-                const index = openPositions.findIndex(p => p.id === data.position.id);
+                // S'assurer que la position est marquée et supprimée localement
+                data.position.isClosing = true;
+                let index = openPositions.findIndex(p => p.id === data.position.id);
+                if (index === -1) {
+                    index = openPositions.findIndex(p => p.symbol === data.position.symbol && p.entryPrice === data.position.entryPrice);
+                }
                 if (index !== -1) {
                     openPositions.splice(index, 1);
                 }
@@ -1001,12 +1014,20 @@ async function monitorPnLAndClose() {
                                 console.warn('⚠️ Erreur logging fermeture position:', logError);
                             }
                         }
+                        // Marquer la position comme fermée pour éviter tout retraitement
+                        data.position.isClosed = true;
+                        data.position.isClosing = false;
+                        data.position.closedAt = Date.now();
                         
                         // NOTE: Position déjà retirée de openPositions à l'étape 2 (ligne 958)
                     } else {
                         log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
-                        // En cas d'échec, remettre la position dans openPositions pour réessayer plus tard
-                        openPositions.push(data.position);
+                        // En cas d'échec, réautoriser le retraitement et réinsérer si absente
+                        data.position.isClosing = false;
+                        const exists = openPositions.find(p => p.id === data.position.id);
+                        if (!exists) {
+                            openPositions.push(data.position);
+                        }
                         log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
                     }
                     
@@ -1040,6 +1061,8 @@ async function monitorPnLAndClose() {
         
     } catch (error) {
         log(`❌ Erreur surveillance PnL: ${error.message}`, 'ERROR');
+    } finally {
+        tpMonitorRunning = false;
     }
 }
 
