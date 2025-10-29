@@ -589,6 +589,33 @@ function hasOpenPosition(symbol) {
     return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
 }
 
+// 🔧 CORRECTION: Obtenir la valeur initiale normalisée pour le calcul PnL
+function getInitialValueForPnL(position) {
+    // Priorité 1: quantity × entryPrice (valeur exacte de la position)
+    if (typeof position.quantity === 'number' && position.quantity > 0 && position.entryPrice > 0) {
+        return position.quantity * position.entryPrice;
+    }
+    // Priorité 2: initialMargin si disponible
+    if (typeof position.initialMargin === 'number' && position.initialMargin > 0) {
+        return position.initialMargin;
+    }
+    // Priorité 3: size / leverage pour retrouver la marge initiale
+    if (position.size > 0 && position.leverage > 0) {
+        return position.size / position.leverage;
+    }
+    // Fallback: size directement
+    if (position.size > 0) {
+        return position.size;
+    }
+    return 0;
+}
+
+// 🔧 CORRECTION: Formatter le pourcentage sans afficher -0.0%
+function formatPercent(x) {
+    const s = x.toFixed(1);
+    return s === '-0.0' ? '0.0' : s;
+}
+
 // 🆕 NOUVELLE FONCTION: Vérifier si on peut ouvrir une nouvelle position
 function canOpenNewPosition(symbol) {
     // Vérifier si on a déjà une position sur ce symbole
@@ -1291,6 +1318,32 @@ function updatePositionsDisplay() {
     // 🎯 FONCTION AMÉLIORÉE: Mettre à jour l'affichage de TOUTES les positions (pas de limite)
     log(`🔄 updatePositionsDisplay() appelé avec ${openPositions.length} positions`, 'DEBUG');
     
+    // 🚫 NETTOYAGE: Éliminer les doublons dans openPositions (même symbole)
+    const beforeCleanup = openPositions.length;
+    const uniqueMap = new Map();
+    
+    // Garder seulement la position la plus récente pour chaque symbole
+    openPositions.forEach(pos => {
+        if (!uniqueMap.has(pos.symbol)) {
+            uniqueMap.set(pos.symbol, pos);
+        } else {
+            // Comparer les timestamps et garder la plus récente
+            const existing = uniqueMap.get(pos.symbol);
+            const existingTime = new Date(existing.timestamp).getTime();
+            const currentTime = new Date(pos.timestamp).getTime();
+            
+            if (currentTime > existingTime) {
+                uniqueMap.set(pos.symbol, pos);
+            }
+        }
+    });
+    
+    openPositions = Array.from(uniqueMap.values());
+    
+    if (beforeCleanup !== openPositions.length) {
+        log(`🧹 Nettoyage doublons: ${beforeCleanup} → ${openPositions.length} positions (${beforeCleanup - openPositions.length} doublons supprimés)`, 'INFO');
+    }
+    
     const positionCountEl = document.getElementById('positionCount');
     const positionsListEl = document.getElementById('positionsList');
     const totalPnLDisplayEl = document.getElementById('totalPnLDisplay');
@@ -1368,12 +1421,27 @@ function updatePositionsDisplay() {
         </div>
     `;
     } else {
+        // 🚫 DÉDUPLICATION: Éliminer les doublons par symbole (garder la plus récente)
+        const uniquePositions = [];
+        const seenSymbols = new Set();
+        
+        // Parcourir en ordre inverse pour garder les positions les plus récentes
+        for (let i = openPositions.length - 1; i >= 0; i--) {
+            const pos = openPositions[i];
+            if (!seenSymbols.has(pos.symbol)) {
+                uniquePositions.unshift(pos);
+                seenSymbols.add(pos.symbol);
+            } else {
+                log(`⚠️ Doublon détecté et ignoré pour l'affichage: ${pos.symbol}`, 'DEBUG');
+            }
+        }
+        
         // 🎯 AFFICHAGE COMPACT PERMANENT (demande utilisateur - plus lisible et concis)
         const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
-        const displayedPositions = openPositions.slice(0, maxDisplayed);
-        const hiddenCount = openPositions.length - maxDisplayed;
+        const displayedPositions = uniquePositions.slice(0, maxDisplayed);
+        const hiddenCount = uniquePositions.length - maxDisplayed;
         
-        log(`📊 Affichage COMPACT de ${displayedPositions.length} positions${hiddenCount > 0 ? ` (${hiddenCount} masquées)` : ''}`, 'DEBUG');
+        log(`📊 Affichage COMPACT de ${displayedPositions.length} positions${hiddenCount > 0 ? ` (${hiddenCount} masquées)` : ''}${openPositions.length !== uniquePositions.length ? ` (${openPositions.length - uniquePositions.length} doublons filtrés)` : ''}`, 'DEBUG');
         
         const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
@@ -1440,49 +1508,29 @@ function updatePositionsDisplay() {
             let pnlPercent = 0;
             let pnlDollar = 0;
 
-            // 🔧 CORRECTION MAJEURE: Logique de calcul PnL corrigée
+            // 🔧 CORRECTION MAJEURE: Logique de calcul PnL normalisée avec valeur initiale cohérente
             let dataSource = 'UNKNOWN';
+            
+            // Obtenir la valeur initiale normalisée pour tous les calculs
+            const initialValue = getInitialValueForPnL(position);
 
-            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
+            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte en $)
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
+                pnlPercent = initialValue > 0 ? (pnlDollar / initialValue) * 100 : 0;
                 dataSource = 'API_UNREALIZED_PNL';
-                
-                // 🔧 CORRECTION: Calculer le pourcentage basé sur la valeur initiale de la position
-                // La valeur initiale = quantity * entryPrice (plus précis que position.size qui peut être la valeur actuelle)
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlPercent = (pnlDollar / initialValue) * 100;
-                } else if (position.size && position.size > 0) {
-                    // Fallback si quantity n'est pas disponible
-                    pnlPercent = (pnlDollar / position.size) * 100;
-                }
             }
             // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
             else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
                 pnlPercent = position.pnlPercentage;
+                pnlDollar = initialValue > 0 ? (initialValue * pnlPercent) / 100 : 0;
                 dataSource = 'API_PERCENTAGE';
-                
-                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
-                }
             }
             // 3. Calcul de secours basé sur les prix actuels
             else {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                pnlDollar = initialValue > 0 ? (initialValue * pnlPercent) / 100 : 0;
                 dataSource = 'CALCULATED';
-                
-                // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
-                    const initialValue = position.quantity * position.entryPrice;
-                    pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
-                }
             }
 
             // Log discret pour debug (toutes les 60 secondes par position)
@@ -1555,7 +1603,7 @@ function updatePositionsDisplay() {
                         font-size: 12px;
                         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                     ">
-                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
+                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : (pnlPercent >= 0 ? '+' : '') + formatPercent(pnlPercent) + '%'})
                     </div>
                 </div>
             `;
@@ -1660,7 +1708,9 @@ async function importExistingPositions() {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: marginSize * parseFloat(apiPos.leverage || 1), // 🔧 CORRECTION: Taille réelle = marge × levier
+                        size: marginSize, // 🔧 CORRECTION: Conserver la marge initiale pour cohérence PnL
+                        notional: marginSize * parseFloat(apiPos.leverage || 1), // Exposition totale
+                        initialMargin: marginSize, // 🔧 AJOUT: Marge initiale explicite pour calculs PnL
                         quantity: parseFloat(apiPos.size || total / markPrice), // 🔧 AMÉLIORATION: Utiliser apiPos.size si disponible
                         entryPrice: averageOpenPrice,
                         leverage: parseFloat(apiPos.leverage || 1), // 🔧 AJOUT: Sauvegarder le levier
