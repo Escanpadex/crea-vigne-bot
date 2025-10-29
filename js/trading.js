@@ -1271,12 +1271,21 @@ async function updatePositionsPnL(verbose = false) {
                     // Pour LONG: profit si prix monte, donc (newPrice - entryPrice) / entryPrice * 100
                     // Pour SHORT: profit si prix baisse, donc (entryPrice - newPrice) / entryPrice * 100
                     const isShort = (localPos.side || '').toString().toUpperCase() === 'SHORT';
-                    let newPnlPercentage = 0;
-                    if (localPos.entryPrice > 0 && newPrice > 0) {
+                    let newPnlPercentage = localPos.pnlPercentage || 0; // Préserver le pourcentage existant par défaut
+                    
+                    if (localPos.entryPrice > 0 && newPrice > 0 && newPrice !== localPos.entryPrice) {
+                        // Calculer seulement si les prix sont valides et différents
                         if (isShort) {
                             newPnlPercentage = ((localPos.entryPrice - newPrice) / localPos.entryPrice) * 100;
                         } else {
                             newPnlPercentage = ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
+                        }
+                    } else if (localPos.entryPrice > 0 && newPrice > 0 && newPrice === localPos.entryPrice) {
+                        // Si les prix sont identiques mais qu'il y a un unrealizedPL non nul, préserver le pourcentage existant
+                        if (newUnrealizedPnL !== 0 && localPos.pnlPercentage !== undefined && localPos.pnlPercentage !== null) {
+                            newPnlPercentage = localPos.pnlPercentage;
+                        } else {
+                            newPnlPercentage = 0; // Vraiment pas de variation
                         }
                     } else if (localPos.pnlPercentage !== undefined && localPos.pnlPercentage !== null) {
                         // 🔧 CORRECTION: Si les données ne sont pas encore disponibles, préserver le pourcentage existant
@@ -1525,34 +1534,42 @@ function updatePositionsDisplay() {
 
             // 🔧 CORRECTION: Pourcentage = variation de PRIX (sans levier), Dollar = PnL réel de la position
             
-            // Déterminer le prix actuel (priorité aux données disponibles)
-            let currentPrice = position.entryPrice; // Fallback par défaut
-            
-            if (typeof position.currentPrice === 'number' && position.currentPrice > 0) {
-                currentPrice = position.currentPrice;
-            } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.entryPrice > 0) {
-                // Reconstruire le prix depuis le pourcentage si currentPrice non dispo
-                const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
-                if (isShort) {
-                    currentPrice = position.entryPrice * (1 - position.pnlPercentage / 100);
-                } else {
-                    currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
-                }
-            }
-            
-            // Calculer le pourcentage depuis la variation de prix du token (sans levier)
-            // Pour LONG: profit si prix monte, donc (currentPrice - entryPrice) / entryPrice * 100
-            // Pour SHORT: profit si prix baisse, donc (entryPrice - currentPrice) / entryPrice * 100
-            if (currentPrice > 0 && position.entryPrice > 0) {
-                const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
-                if (isShort) {
-                    pnlPercent = ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
-                } else {
-                    pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                }
-            } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
-                // 🔧 CORRECTION: Si le prix n'est pas disponible, utiliser le pourcentage stocké
+            // 🎯 PRIORITÉ 1: Utiliser le pourcentage stocké s'il existe et est valide
+            if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
                 pnlPercent = position.pnlPercentage;
+                dataSource = 'STORED_PERCENTAGE';
+            } else {
+                // 🎯 PRIORITÉ 2: Calculer depuis les prix si disponible
+                let currentPrice = position.entryPrice; // Fallback par défaut
+                
+                if (typeof position.currentPrice === 'number' && position.currentPrice > 0) {
+                    currentPrice = position.currentPrice;
+                } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.entryPrice > 0) {
+                    // Reconstruire le prix depuis le pourcentage si currentPrice non dispo
+                    const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
+                    if (isShort) {
+                        currentPrice = position.entryPrice * (1 - position.pnlPercentage / 100);
+                    } else {
+                        currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
+                    }
+                }
+                
+                // Calculer le pourcentage depuis la variation de prix du token (sans levier)
+                // Pour LONG: profit si prix monte, donc (currentPrice - entryPrice) / entryPrice * 100
+                // Pour SHORT: profit si prix baisse, donc (entryPrice - currentPrice) / entryPrice * 100
+                if (currentPrice > 0 && position.entryPrice > 0 && currentPrice !== position.entryPrice) {
+                    const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
+                    if (isShort) {
+                        pnlPercent = ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+                    } else {
+                        pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                    }
+                    dataSource = 'CALCULATED_FROM_PRICE';
+                } else {
+                    // Si les prix sont identiques ou invalides, utiliser le pourcentage stocké même s'il est 0
+                    pnlPercent = typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) ? position.pnlPercentage : 0;
+                    dataSource = 'FALLBACK';
+                }
             }
 
             // Pour le dollar PnL : utiliser unrealizedPnL de l'API si disponible, sinon calculer
@@ -1731,23 +1748,61 @@ async function importExistingPositions() {
                     const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
                     const total = parseFloat(apiPos.total || 0); // Valeur totale de la position
                     const markPrice = parseFloat(apiPos.markPrice || 0);
-                    const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
+                    // 🔧 CORRECTION CRITIQUE: Ne pas utiliser markPrice comme fallback pour averageOpenPrice
+                    // Si averageOpenPrice n'existe pas, chercher dans d'autres champs possibles
+                    // Log tous les champs disponibles pour debug
+                    if (!apiPos.averageOpenPrice && apiPos.openPriceAvg === undefined) {
+                        log(`🔍 Champs disponibles pour ${apiPos.symbol}: ${Object.keys(apiPos).join(', ')}`, 'DEBUG');
+                    }
+                    let averageOpenPrice = parseFloat(apiPos.averageOpenPrice || apiPos.openPriceAvg || apiPos.openPrice || 0);
+                    // Si toujours 0, essayer de calculer depuis total et size
+                    if (averageOpenPrice === 0 && total > 0 && markPrice > 0) {
+                        // Essayer de trouver le prix d'entrée depuis d'autres sources
+                        const size = parseFloat(apiPos.size || 0);
+                        if (size > 0) {
+                            averageOpenPrice = total / size;
+                        }
+                    }
+                    // Si toujours 0, utiliser markPrice mais logger un avertissement
+                    if (averageOpenPrice === 0 && markPrice > 0) {
+                        log(`⚠️ averageOpenPrice non trouvé pour ${apiPos.symbol}, utilisation de markPrice comme fallback`, 'WARNING');
+                        averageOpenPrice = markPrice;
+                    }
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
                     const marginSize = parseFloat(apiPos.marginSize || 0); // Marge utilisée
                     
-                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
+                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, averageOpenPrice=${apiPos.averageOpenPrice}, unrealizedPL=${apiPos.unrealizedPL}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
                     // 🔧 CORRECTION: Calculer le pourcentage de variation de prix (sans levier)
                     // Pour LONG: profit si prix monte, donc (markPrice - averageOpenPrice) / averageOpenPrice * 100
-                    // Pour SHORT: profit si prix baisse, donc (averageOpenPrice - markPrice) / averageOpenPrice * 100
                     const isShort = side === 'SHORT';
                     let priceChangePercent = 0;
-                    if (averageOpenPrice > 0 && markPrice > 0) {
+                    
+                    // Vérifier que les prix sont valides et différents
+                    if (averageOpenPrice > 0 && markPrice > 0 && averageOpenPrice !== markPrice) {
                         if (isShort) {
                             priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
                         } else {
                             priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
+                        }
+                        log(`✅ Calcul pourcentage ${apiPos.symbol}: ${priceChangePercent.toFixed(4)}% (entry: ${averageOpenPrice}, current: ${markPrice})`, 'DEBUG');
+                    } else {
+                        // Si les prix ne sont pas disponibles ou identiques, essayer de calculer depuis unrealizedPL
+                        if (unrealizedPL !== 0 && averageOpenPrice > 0 && marginSize > 0) {
+                            // Approximer le pourcentage depuis unrealizedPL (sans levier)
+                            // unrealizedPL = marge * variation_prix_pourcentage / 100 (approximativement)
+                            const leverage = parseFloat(apiPos.leverage || 1);
+                            const notionalValue = marginSize * leverage;
+                            if (notionalValue > 0) {
+                                // Variation de prix approximative = unrealizedPL / valeur notionnelle (sans levier)
+                                const priceVariation = unrealizedPL / (marginSize * averageOpenPrice);
+                                priceChangePercent = priceVariation * 100;
+                                log(`⚠️ Calcul pourcentage ${apiPos.symbol} depuis unrealizedPL: ${priceChangePercent.toFixed(4)}% (fallback)`, 'DEBUG');
+                            }
+                        }
+                        if (priceChangePercent === 0) {
+                            log(`⚠️ Impossible de calculer le pourcentage pour ${apiPos.symbol} - markPrice=${markPrice}, averageOpenPrice=${averageOpenPrice}`, 'WARNING');
                         }
                     }
                     
