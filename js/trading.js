@@ -1780,9 +1780,17 @@ async function importExistingPositions() {
 
                 // 🔧 CORRECTION: Mise à jour IMMÉDIATE des PnL après import (sans délai)
                 log('📊 Mise à jour immédiate des prix en temps réel...', 'INFO');
-                await updatePositionsPnL(); // Mise à jour SYNCHRONE des PnL
+                await updatePositionsPnL(true); // Mise à jour SYNCHRONE des PnL avec verbose activé
                 updatePositionsDisplay(); // Refresh immédiat de l'affichage
                 log('✅ Données temps réel mises à jour après import', 'SUCCESS');
+
+                // 🔧 AJOUT: Forcer une deuxième mise à jour après un court délai pour s'assurer que les prix sont bien récupérés
+                setTimeout(async () => {
+                    log('🔄 Deuxième vérification des prix après import...', 'DEBUG');
+                    await updatePositionsPnL(true); // Verbose activé pour debug
+                    updatePositionsDisplay();
+                    log('✅ Deuxième mise à jour des prix terminée', 'DEBUG');
+                }, 1000);
                 
                 // Vérification immédiate et différée de l'affichage
                 const positionCountEl = document.getElementById('positionCount');
