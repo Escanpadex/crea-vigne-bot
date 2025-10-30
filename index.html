@@ -6,6 +6,7 @@
     <title>Bot Trading Bitget Futures - Stratégie Paires Positives</title>
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="styles/theme.css">
+    <link rel="stylesheet" href="styles/balance-history.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     
 </head>
@@ -280,8 +281,147 @@
                             <button class="btn btn-wide" onclick="startBot()" id="startBtn">▶️ Démarrer le Bot</button>
                             <button class="btn btn-danger btn-wide" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter le Bot</button>
                             <button class="btn btn-wide" onclick="downloadPositionLogs()" style="background: linear-gradient(45deg, #8b5cf6, #7c3aed);">📥 Télécharger Logs</button>
+                            <button class="btn btn-wide" onclick="toggleBalanceHistory()" style="background: linear-gradient(45deg, #f59e0b, #d97706);">📊 Historique Balance</button>
                         </div>
                     </div>
+        </div>
+        
+        <!-- 📊 NOUVELLE SECTION: Historique du Solde -->
+        <div class="card" id="balance-history-section" style="display: none; margin-top: 20px;">
+            <h4 class="section-title section-warning" style="text-align: center; margin-bottom: 20px;">📊 Historique du Solde</h4>
+            
+            <!-- Boutons de vue et contrôles -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sm active" id="view-hours-btn" onclick="switchBalanceView('hours')" style="min-width: 100px;">
+                        🕐 24 Heures
+                    </button>
+                    <button class="btn btn-sm" id="view-days-btn" onclick="switchBalanceView('days')" style="min-width: 100px;">
+                        📅 30 Jours
+                    </button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sm" onclick="takeManualSnapshot()" style="background: #10b981;">
+                        📸 Snapshot Manuel
+                    </button>
+                    <button class="btn btn-sm" onclick="exportBalanceHistory()" style="background: #8b5cf6;">
+                        💾 Exporter CSV
+                    </button>
+                    <button class="btn btn-sm" onclick="clearBalanceHistory()" style="background: #ef4444;">
+                        🗑️ Effacer
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Graphique -->
+            <div style="background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <canvas id="balanceChart" style="max-height: 300px;"></canvas>
+            </div>
+            
+            <!-- Statistiques détaillées -->
+            <h5 style="color: #10b981; margin-bottom: 15px; font-size: 16px; font-weight: bold;">📈 Statistiques Détaillées</h5>
+            
+            <!-- Grille de statistiques -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <!-- Solde actuel -->
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Solde Actuel</div>
+                        <div class="stat-value" id="stat-current">$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Solde initial -->
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Solde Initial</div>
+                        <div class="stat-value" id="stat-start">$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Profit total $ -->
+                <div class="stat-card">
+                    <div class="stat-icon">💵</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Profit Total</div>
+                        <div class="stat-value" id="stat-profit">+$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Profit % -->
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-label">ROI</div>
+                        <div class="stat-value" id="stat-profit-percent">+0.00%</div>
+                    </div>
+                </div>
+                
+                <!-- Solde Max -->
+                <div class="stat-card">
+                    <div class="stat-icon">🔝</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Solde Maximum</div>
+                        <div class="stat-value" id="stat-max">$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Solde Min -->
+                <div class="stat-card">
+                    <div class="stat-icon">📉</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Solde Minimum</div>
+                        <div class="stat-value" id="stat-min">$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Solde Moyen -->
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Solde Moyen</div>
+                        <div class="stat-value" id="stat-avg">$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Drawdown Max -->
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Drawdown Max</div>
+                        <div class="stat-value" id="stat-drawdown">-$0.00 (-0.00%)</div>
+                    </div>
+                </div>
+                
+                <!-- Meilleure période -->
+                <div class="stat-card">
+                    <div class="stat-icon">🚀</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Meilleure Période</div>
+                        <div class="stat-value" id="stat-best">+$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Pire période -->
+                <div class="stat-card">
+                    <div class="stat-icon">📉</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Pire Période</div>
+                        <div class="stat-value" id="stat-worst">-$0.00</div>
+                    </div>
+                </div>
+                
+                <!-- Win Rate -->
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Périodes Gagnantes</div>
+                        <div class="stat-value" id="stat-winrate">0% (0/0)</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -290,6 +430,7 @@
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/position-logger.js"></script>
+    <script src="js/balance-tracker.js"></script>
     <script src="js/trading.js"></script>
     <script src="js/main.js"></script>
     
@@ -490,6 +631,44 @@
             let value = parseInt(input.value) - 1;
             if (value < 3) value = 3;
             updateMaxTime(value);
+        }
+        
+        // 📊 FONCTIONS POUR L'HISTORIQUE DU SOLDE
+        function toggleBalanceHistory() {
+            const section = document.getElementById('balance-history-section');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                // Mettre à jour le graphique et les stats quand on ouvre la section
+                if (window.balanceTracker) {
+                    window.balanceTracker.updateChart();
+                    window.balanceTracker.updateStatsDisplay();
+                }
+            } else {
+                section.style.display = 'none';
+            }
+        }
+        
+        function switchBalanceView(view) {
+            if (window.balanceTracker) {
+                window.balanceTracker.switchView(view);
+            }
+        }
+        
+        function takeManualSnapshot() {
+            if (window.balanceTracker) {
+                const success = window.balanceTracker.takeSnapshot();
+                if (success) {
+                    window.balanceTracker.updateChart();
+                    window.balanceTracker.updateStatsDisplay();
+                    if (typeof log === 'function') {
+                        log('📸 Snapshot manuel pris avec succès', 'SUCCESS');
+                    }
+                } else {
+                    if (typeof log === 'function') {
+                        log('❌ Erreur lors de la prise du snapshot', 'ERROR');
+                    }
+                }
+            }
         }
         
         // 🔄 Initialiser l'affichage au chargement de la page
