@@ -679,10 +679,18 @@ async function openPosition(symbol, selectedPair) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const currentPrice = selectedPair.price;
+        
+        // 🔧 CORRECTION IMPORTANTE: Pour Bitget USDT-FUTURES, size = valeur en USDT, pas quantité de tokens
+        // Chaque contrat = 1 USDT, donc size doit être la valeur de la position en USDT
+        // La quantité réelle sera calculée automatiquement par Bitget
+        // Bitget peut exiger que size soit un nombre entier ou avec précision limitée
+        const sizeInUSDT = Math.floor(positionValue); // Arrondir à l'entier inférieur pour être sûr
+        
+        // Pour référence, calculer la quantité de tokens (mais ne pas l'envoyer comme size)
         const quantity = (positionValue / currentPrice).toFixed(6);
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-        log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x${leverage})`, 'INFO');
+        log(`💰 Prix: ${currentPrice} | Valeur: ${positionValue.toFixed(2)} USDT → Size: ${sizeInUSDT} USDT | Quantité tokens: ${quantity} (Levier x${leverage})`, 'INFO');
         log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
         // 🔧 CORRECTION: Validation des paramètres d'ordre
@@ -691,8 +699,9 @@ async function openPosition(symbol, selectedPair) {
             return false;
         }
         
-        if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
-            log(`❌ Quantité invalide: ${quantity}`, 'ERROR');
+        // 🔧 CORRECTION: Valider que la taille est suffisante (minimum généralement 5 USDT pour Bitget)
+        if (!sizeInUSDT || isNaN(sizeInUSDT) || sizeInUSDT < 5) {
+            log(`❌ Taille position invalide ou trop petite: ${sizeInUSDT} USDT (minimum: 5 USDT, positionValue: ${positionValue})`, 'ERROR');
             return false;
         }
         
@@ -701,7 +710,7 @@ async function openPosition(symbol, selectedPair) {
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
-            size: String(quantity), // 🔧 CORRECTION: Forcer en string
+            size: String(sizeInUSDT), // 🔧 CORRECTION: Valeur en USDT (nombre entier), pas quantité de tokens
             side: "buy",
             tradeSide: "open",
             orderType: "market",
@@ -715,6 +724,7 @@ async function openPosition(symbol, selectedPair) {
         log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
         log(`   Prix: ${currentPrice} (${typeof currentPrice})`, 'DEBUG');
         log(`   Valeur position: ${positionValue}$`, 'DEBUG');
+        log(`   Données complètes: ${JSON.stringify(orderData)}`, 'DEBUG');
         
         const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -722,16 +732,35 @@ async function openPosition(symbol, selectedPair) {
         });
         
         if (!orderResult || orderResult.code !== '00000') {
-            log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || orderResult?.code || 'Erreur inconnue'}`, 'ERROR');
+            const errorMsg = orderResult?.msg || orderResult?.message || orderResult?.raw || orderResult?.code || 'Erreur inconnue';
+            log(`❌ Échec ouverture position ${symbol}: ${errorMsg}`, 'ERROR');
             
             // 🔧 DIAGNOSTIC: Log de l'erreur complète
+            console.error('🔍 Détails erreur ouverture position:', {
+                symbol: symbol,
+                orderData: orderData,
+                apiResponse: orderResult,
+                quantity: quantity,
+                positionValue: positionValue,
+                currentPrice: currentPrice
+            });
+            
             if (orderResult) {
                 log(`🔍 Réponse API complète:`, 'ERROR');
-                log(`   Code: ${orderResult.code}`, 'ERROR');
-                log(`   Message: ${orderResult.msg}`, 'ERROR');
+                log(`   Code: ${orderResult.code || 'N/A'}`, 'ERROR');
+                log(`   Message: ${orderResult.msg || orderResult.message || 'N/A'}`, 'ERROR');
                 if (orderResult.data) {
                     log(`   Data: ${JSON.stringify(orderResult.data)}`, 'ERROR');
                 }
+                if (orderResult.raw) {
+                    log(`   Raw Response: ${orderResult.raw.substring(0, 500)}`, 'ERROR');
+                }
+            }
+            
+            // 🔧 CORRECTION: Arrêter la boucle si erreur 400 (Bad Request) pour éviter spam
+            if (orderResult?.code === '400' || orderResult?.code === '40017' || (orderResult?.msg && orderResult.msg.includes('400'))) {
+                log(`⚠️ Erreur 400 détectée - Arrêt de l'ouverture séquentielle pour éviter spam`, 'WARNING');
+                return false; // Le système de compteur dans main.js gérera l'arrêt
             }
             
             return false;

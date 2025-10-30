@@ -24,16 +24,36 @@ async function makeRequest(endpoint, options = {}) {
         
         const responseClone = response.clone();
         let data = null;
+        let responseText = null;
+        
         try {
-            data = await responseClone.json();
-        } catch (parseError) {
-            log(`Erreur API: Réponse non JSON (${parseError.message})`, 'ERROR');
+            responseText = await response.text();
+            if (responseText) {
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    // Si ce n'est pas du JSON, garder le texte brut
+                    log(`⚠️ Réponse API non-JSON reçue: ${responseText.substring(0, 200)}`, 'WARNING');
+                    data = { raw: responseText };
+                }
+            }
+        } catch (readError) {
+            log(`Erreur lecture réponse API: ${readError.message}`, 'ERROR');
         }
 
         if (!response.ok) {
             const statusInfo = `${response.status} ${response.statusText}`;
-            const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
-            log(`Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
+            const errorMessage = data?.msg || data?.message || (typeof data === 'string' ? data : JSON.stringify(data)) || responseText || 'No response body';
+            log(`❌ Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
+            
+            // 🔧 DEBUG: Log complet de l'erreur pour diagnostiquer
+            console.error('🔍 Détails erreur API:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: endpoint,
+                responseText: responseText,
+                parsedData: data
+            });
         }
 
         return data;

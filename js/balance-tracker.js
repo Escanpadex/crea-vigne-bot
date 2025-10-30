@@ -63,13 +63,39 @@ class BalanceTracker {
     }
 
     // Prendre un snapshot du solde actuel
-    takeSnapshot() {
+    async takeSnapshot() {
         try {
             const now = new Date();
-            const balance = this.getCurrentBalance();
             
-            if (balance === null || balance === undefined) {
+            // 🔧 AMÉLIORATION: Essayer de rafraîchir le solde avant de prendre le snapshot
+            if (typeof refreshBalance === 'function') {
+                try {
+                    await refreshBalance();
+                    // Attendre un peu pour que la balance soit mise à jour
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (refreshError) {
+                    console.warn('⚠️ Erreur lors du rafraîchissement du solde:', refreshError);
+                }
+            }
+            
+            let balance = this.getCurrentBalance();
+            
+            // 🔧 AMÉLIORATION: Si le solde n'est toujours pas disponible, essayer une dernière fois après un délai
+            if (balance === null || balance === undefined || balance === 0) {
+                console.warn('⚠️ Solde non disponible, tentative de récupération...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                balance = this.getCurrentBalance();
+            }
+            
+            if (balance === null || balance === undefined || balance === 0) {
                 console.warn('⚠️ Impossible de prendre un snapshot: solde non disponible');
+                console.log('🔍 Debug - Éléments disponibles:');
+                console.log('  - usdtBalance:', document.getElementById('usdtBalance')?.textContent);
+                console.log('  - balance:', document.getElementById('balance')?.textContent);
+                console.log('  - window.currentBalance:', window.currentBalance);
+                const globalBalance = typeof balance !== 'undefined' ? balance : null;
+                console.log('  - balance.totalEquity:', globalBalance?.totalEquity || 'undefined');
+                console.log('  - currentBalance:', typeof currentBalance !== 'undefined' ? currentBalance : 'undefined');
                 return false;
             }
 
@@ -78,8 +104,8 @@ class BalanceTracker {
                 balance: balance,
                 hour: now.getHours(),
                 date: now.toISOString().split('T')[0], // YYYY-MM-DD
-                positions: openPositions ? openPositions.length : 0,
-                botRunning: window.botRunning || false
+                positions: typeof openPositions !== 'undefined' && openPositions ? openPositions.length : 0,
+                botRunning: typeof window.botRunning !== 'undefined' ? window.botRunning : false
             };
 
             // Ajouter aux snapshots horaires
@@ -105,19 +131,46 @@ class BalanceTracker {
     // Obtenir le solde actuel depuis l'interface
     getCurrentBalance() {
         try {
-            // Essayer de récupérer depuis l'élément d'interface
-            const balanceEl = document.getElementById('balance');
-            if (balanceEl && balanceEl.textContent) {
-                const balanceText = balanceEl.textContent.replace('$', '').replace(',', '').trim();
+            // 🎯 PRIORITÉ 1: Essayer depuis l'élément d'interface usdtBalance
+            const usdtBalanceEl = document.getElementById('usdtBalance');
+            if (usdtBalanceEl && usdtBalanceEl.textContent) {
+                const balanceText = usdtBalanceEl.textContent.replace('$', '').replace(',', '').replace('USDT', '').trim();
                 const balance = parseFloat(balanceText);
-                if (!isNaN(balance)) {
+                if (!isNaN(balance) && balance > 0) {
                     return balance;
                 }
             }
             
-            // Fallback: essayer depuis la variable globale si elle existe
-            if (window.currentBalance !== undefined && window.currentBalance !== null) {
+            // 🎯 PRIORITÉ 2: Essayer depuis l'élément balance (si existe)
+            const balanceEl = document.getElementById('balance');
+            if (balanceEl && balanceEl.textContent) {
+                const balanceText = balanceEl.textContent.replace('$', '').replace(',', '').trim();
+                const balance = parseFloat(balanceText);
+                if (!isNaN(balance) && balance > 0) {
+                    return balance;
+                }
+            }
+            
+            // 🎯 PRIORITÉ 3: Essayer depuis window.currentBalance (mis à jour par api.js)
+            if (typeof window.currentBalance !== 'undefined' && window.currentBalance !== null && window.currentBalance > 0) {
                 return window.currentBalance;
+            }
+            
+            // 🎯 PRIORITÉ 4: Essayer depuis l'objet balance global (config.js)
+            if (typeof balance !== 'undefined' && balance && balance.totalEquity > 0) {
+                return balance.totalEquity;
+            }
+            
+            // 🎯 PRIORITÉ 5: Essayer depuis currentBalance (config.js)
+            if (typeof currentBalance !== 'undefined' && currentBalance !== null && currentBalance > 0) {
+                return currentBalance;
+            }
+            
+            // 🎯 DERNIER RECOURS: Essayer de forcer un refresh de la balance
+            if (typeof refreshBalance === 'function') {
+                console.log('🔄 Tentative de rafraîchissement du solde...');
+                // Note: refreshBalance est async, mais on ne peut pas attendre ici
+                // On retourne null et on essaiera au prochain snapshot
             }
             
             return null;
@@ -502,9 +555,9 @@ class BalanceTracker {
 window.balanceTracker = new BalanceTracker();
 
 // Prendre un snapshot automatiquement toutes les heures
-setInterval(() => {
+setInterval(async () => {
     if (window.balanceTracker && window.balanceTracker.shouldTakeSnapshot()) {
-        window.balanceTracker.takeSnapshot();
+        await window.balanceTracker.takeSnapshot();
         
         // Mettre à jour l'affichage si la section est visible
         const section = document.getElementById('balance-history-section');
@@ -516,9 +569,9 @@ setInterval(() => {
 }, 60000); // Vérifier toutes les minutes
 
 // Prendre un snapshot initial au chargement
-setTimeout(() => {
+setTimeout(async () => {
     if (window.balanceTracker) {
-        window.balanceTracker.takeSnapshot();
+        await window.balanceTracker.takeSnapshot();
     }
 }, 5000); // Attendre 5 secondes que le solde soit chargé
 
@@ -531,8 +584,8 @@ window.clearBalanceHistory = function() {
     return window.balanceTracker.clearHistory();
 };
 
-window.takeBalanceSnapshot = function() {
-    return window.balanceTracker.takeSnapshot();
+window.takeBalanceSnapshot = async function() {
+    return await window.balanceTracker.takeSnapshot();
 };
 
 console.log('✅ Balance Tracker chargé et prêt à l\'emploi');
