@@ -558,9 +558,9 @@ async function getCurrentPrice(symbol) {
             // Si c'est un array, prendre le premier élément
             if (Array.isArray(tickerData) && tickerData.length > 0) {
                 tickerData = tickerData[0];
-                console.log(`🔍 Données ticker ${symbol}:`, tickerData);
+                // Données ticker reçues
             } else if (!Array.isArray(tickerData)) {
-                console.log(`🔍 Données ticker ${symbol} (objet direct):`, tickerData);
+                // Objet ticker direct reçu
             } else {
                 console.log(`❌ Array vide pour ${symbol}:`, data.data);
                 return null;
@@ -573,13 +573,13 @@ async function getCurrentPrice(symbol) {
             for (const field of priceFields) {
                 if (tickerData[field] && !isNaN(parseFloat(tickerData[field]))) {
                     price = parseFloat(tickerData[field]);
-                    console.log(`✅ Prix trouvé dans le champ '${field}': ${price}`);
+                    // Prix trouvé
                     break;
                 }
             }
             
             if (price && price > 0) {
-                console.log(`✅ Prix ${symbol} trouvé: ${price}`);
+                // Prix récupéré avec succès
                 return price;
             } else {
                 console.log(`⚠️ Prix ${symbol} invalide dans:`, tickerData);
