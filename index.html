@@ -656,18 +656,24 @@
         
         function takeManualSnapshot() {
             if (window.balanceTracker) {
-                const success = window.balanceTracker.takeSnapshot();
-                if (success) {
-                    window.balanceTracker.updateChart();
-                    window.balanceTracker.updateStatsDisplay();
-                    if (typeof log === 'function') {
-                        log('📸 Snapshot manuel pris avec succès', 'SUCCESS');
+                window.balanceTracker.takeSnapshot().then(success => {
+                    if (success) {
+                        window.balanceTracker.updateChart();
+                        window.balanceTracker.updateStatsDisplay();
+                        if (typeof log === 'function') {
+                            log('📸 Snapshot manuel pris avec succès', 'SUCCESS');
+                        }
+                    } else {
+                        if (typeof log === 'function') {
+                            log('❌ Erreur lors de la prise du snapshot - Vérifiez que le solde est chargé', 'ERROR');
+                        }
                     }
-                } else {
+                }).catch(error => {
+                    console.error('Erreur snapshot:', error);
                     if (typeof log === 'function') {
                         log('❌ Erreur lors de la prise du snapshot', 'ERROR');
                     }
-                }
+                });
             }
         }
         
