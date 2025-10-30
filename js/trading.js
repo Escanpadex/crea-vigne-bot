@@ -904,35 +904,29 @@ async function monitorPnLAndClose() {
             let pnlPercent = 0;
             let dataSource = 'UNKNOWN';
             
-            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
-            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-                // Calculer le pourcentage depuis unrealizedPnL (plus fiable)
+            // 🔧 CORRECTION CRITIQUE: Toujours utiliser getCurrentPrice en priorité pour cohérence avec l'affichage
+            // L'unrealizedPnL de l'API peut inclure le levier ou être en retard
+            const currentPrice = await getCurrentPrice(position.symbol);
+            if (currentPrice && currentPrice > 0 && position.entryPrice > 0) {
+                // Calculer le PnL en pourcentage (variation de prix sans levier)
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                position.currentPrice = currentPrice;
+                dataSource = 'CALCULATED_PRICE';
+            } else if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
+                // Fallback: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
                 const initialValue = position.quantity * position.entryPrice;
                 pnlPercent = (position.unrealizedPnL / initialValue) * 100;
                 dataSource = 'API_UNREALIZED_PNL';
-                // Log réduit: seulement toutes les 5 minutes
-                if (!position.lastApiPnLLog || Date.now() - position.lastApiPnLLog > 300000) {
-                    log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
-                    position.lastApiPnLLog = Date.now();
-                }
+                log(`⚠️ ${position.symbol}: Utilisation fallback unrealizedPnL - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'WARNING');
             } else {
-                // Fallback: essayer getCurrentPrice
-                const currentPrice = await getCurrentPrice(position.symbol);
-                if (!currentPrice) {
-                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL`, 'WARNING');
-                    continue;
-                }
-                
-                // Calculer le PnL en pourcentage
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                position.currentPrice = currentPrice;
-                dataSource = 'CALCULATED';
+                log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL valide`, 'WARNING');
+                continue;
             }
             
             position.pnlPercent = pnlPercent;
             
             // Mettre à jour le prix le plus haut (seulement si on a un prix actuel)
-            if (dataSource === 'CALCULATED' && position.currentPrice > position.highestPrice) {
+            if (dataSource === 'CALCULATED_PRICE' && position.currentPrice > position.highestPrice) {
                 position.highestPrice = position.currentPrice;
             }
             
@@ -973,7 +967,10 @@ async function monitorPnLAndClose() {
                 if (!position.tpConfirmationStartTime) {
                     // Premier passage au-dessus du TP : démarrer le chrono
                     position.tpConfirmationStartTime = Date.now();
-                    log(`⏱️ ${position.symbol}: TP atteint (+${pnlPercent.toFixed(2)}%) - Chrono 3 sec démarré pour confirmation`, 'INFO');
+                    log(`⏱️ ${position.symbol}: TP atteint (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%) - Chrono 3 sec démarré [Source: ${dataSource}]`, 'INFO');
+                    if (currentPrice) {
+                        log(`   Prix: ${position.entryPrice.toFixed(6)} → ${currentPrice.toFixed(6)}`, 'INFO');
+                    }
                     continue; // Passer à la prochaine position
                 }
                 
@@ -982,14 +979,14 @@ async function monitorPnLAndClose() {
                 if (elapsedTime < 3) {
                     // Toujours en attente de confirmation (log seulement toutes les secondes)
                     if (!position.lastConfirmationLog || Date.now() - position.lastConfirmationLog > 1000) {
-                        log(`⏳ ${position.symbol}: Confirmation TP en cours... ${(3 - elapsedTime).toFixed(1)}s restantes (+${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                        log(`⏳ ${position.symbol}: Confirmation TP ${(3 - elapsedTime).toFixed(1)}s (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%)`, 'DEBUG');
                         position.lastConfirmationLog = Date.now();
                     }
                     continue;
                 }
                 
                 // 3 secondes écoulées ET toujours >= TP : OK pour fermer
-                log(`✅ ${position.symbol}: TP confirmé après 3 sec (+${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}%)`, 'SUCCESS');
+                log(`✅ ${position.symbol}: TP confirmé (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%) [Source: ${dataSource}]`, 'SUCCESS');
                 
                 // 💰 Calculer les frais d'entrée (0.06% maker/taker fee sur Bitget)
                 const entryFee = position.size * 0.0006;
