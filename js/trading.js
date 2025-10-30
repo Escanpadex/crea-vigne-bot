@@ -705,6 +705,7 @@ async function openPosition(symbol, selectedPair) {
             side: "buy",
             tradeSide: "open",
             orderType: "market",
+            force: "gtc", // 🔧 CORRECTION: Paramètre requis pour les ordres Bitget (Good Till Cancel)
             clientOid: `bot_${Date.now()}_${symbol}` // 🔧 Préfixe bot pour différencier
         };
         
