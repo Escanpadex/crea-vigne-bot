@@ -175,6 +175,14 @@ async function refreshBalance() {
         if (usdtBalanceEl) usdtBalanceEl.textContent = balance.totalEquity.toFixed(2);
         if (totalEquityEl) totalEquityEl.textContent = balance.totalEquity.toFixed(2);
         
+        // 📊 NOUVEAU: Mettre à jour le solde pour le balance tracker
+        if (typeof currentBalance !== 'undefined') {
+            currentBalance = balance.totalEquity;
+        }
+        if (typeof window.currentBalance !== 'undefined') {
+            window.currentBalance = balance.totalEquity;
+        }
+        
         const usedCapital = openPositions.reduce((sum, pos) => sum + pos.size, 0);
         const availableCapital = balance.totalEquity * (config.capitalPercent / 100) * config.leverage - usedCapital;
         

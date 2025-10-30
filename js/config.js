@@ -4,6 +4,7 @@ const API_BASE = 'https://api.crea-vigne.fr/api';
 
 // Bot state variables
 let botRunning = false;
+let currentBalance = 0; // Pour le balance tracker
 let volumeScanInterval = null;
 let tradingLoopInterval = null;
 let statsInterval = null;
