@@ -82,13 +82,13 @@ let config = {
     apiKey: '',
     secretKey: '',
     passphrase: '',
-    capitalPercent: 5,
-    leverage: 2,
+    capitalPercent: 50,
+    leverage: 5,
     trailingStop: 1.0,
     cooldownMinutes: 30,
-    targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
-    maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
-    maxPositionTimeHours: 24,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 24h)
+    targetPnL: 0.9,                 // 🆕 NOUVEAU: Objectif PnL configurable (0.9% par défaut)
+    maxBotPositions: 10,            // 🆕 NOUVEAU: Limite configurable des positions bot (10 par défaut)
+    maxPositionTimeHours: 4,        // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (4h par défaut)
     excludedSymbols: EXCLUDED_STOCK_TOKENS, // 🚫 NOUVEAU: Symboles à exclure (actions tokenisées)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
