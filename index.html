@@ -102,7 +102,7 @@
                                 <!-- Paramètres fixes pour la nouvelle stratégie -->
                                 <input type="number" id="capitalPercent" value="50">
                                 <input type="number" id="trailingStop" value="2">
-                                <select id="leverage"><option value="2" selected>2x</option></select>
+                                <select id="leverage"><option value="5" selected>5x</option></select>
                             </div>
                             
                             <!-- Configuration Stratégie - Design amélioré -->
@@ -112,99 +112,99 @@
                                 </div>
                                 
                                 <div class="config-grid">
-                                    <div class="config-item">
-                                        <div class="config-label">💰 Capital par trade</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="capitalPercentInput" 
-                                                   min="10" 
-                                                   max="90" 
-                                                   step="5" 
-                                                   value="50" 
-                                                   class="number-input"
-                                                   oninput="updateCapitalPercent(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementCapitalPercent()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementCapitalPercent()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">%</span>
-                                        </div>
+                            <div class="config-item">
+                                <div class="config-label">💰 Capital par trade</div>
+                                <div class="number-input-container">
+                                    <input type="number" 
+                                           id="capitalPercentInput" 
+                                           min="10" 
+                                           max="90" 
+                                           step="5" 
+                                           value="50" 
+                                           class="number-input"
+                                           oninput="updateCapitalPercent(this.value)">
+                                    <div class="arrow-buttons">
+                                        <button class="arrow-btn" onclick="incrementCapitalPercent()">▲</button>
+                                        <button class="arrow-btn" onclick="decrementCapitalPercent()">▼</button>
                                     </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">📈 Levier</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="leverageInput" 
-                                                   min="2" 
-                                                   max="5" 
-                                                   step="1" 
-                                                   value="2" 
-                                                   class="number-input"
-                                                   oninput="updateLeverage(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementLeverage()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementLeverage()">▼</button>
-                                            </div>
-                                            <span class="leverage-unit">x</span>
-                                        </div>
+                                    <span class="pnl-unit">%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="config-item">
+                                <div class="config-label">📈 Levier</div>
+                                <div class="number-input-container">
+                                    <input type="number" 
+                                           id="leverageInput" 
+                                           min="2" 
+                                           max="5" 
+                                           step="1" 
+                                           value="5" 
+                                           class="number-input"
+                                           oninput="updateLeverage(this.value)">
+                                    <div class="arrow-buttons">
+                                        <button class="arrow-btn" onclick="incrementLeverage()">▲</button>
+                                        <button class="arrow-btn" onclick="decrementLeverage()">▼</button>
                                     </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">🎯 Objectif PnL</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="targetPnLInput" 
-                                                   min="0.2" 
-                                                   max="3.0" 
-                                                   step="0.05" 
-                                                   value="2.0" 
-                                                   class="number-input"
-                                                   oninput="updateTargetPnL(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">%</span>
-                                        </div>
+                                    <span class="leverage-unit">x</span>
+                                </div>
+                            </div>
+                            
+                            <div class="config-item">
+                                <div class="config-label">🎯 Objectif PnL</div>
+                                <div class="number-input-container">
+                                    <input type="number" 
+                                           id="targetPnLInput" 
+                                           min="0.2" 
+                                           max="3.0" 
+                                           step="0.05" 
+                                           value="0.9" 
+                                           class="number-input"
+                                           oninput="updateTargetPnL(this.value)">
+                                    <div class="arrow-buttons">
+                                        <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
+                                        <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
                                     </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">🔄 Nombre de positions simultanées</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="botLimitInput" 
-                                                   min="2" 
-                                                   max="25" 
-                                                   step="1" 
-                                                   value="2" 
-                                                   class="number-input"
-                                                   oninput="updateBotLimit(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementBotLimit()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
-                                            </div>
-                                        </div>
+                                    <span class="pnl-unit">%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="config-item">
+                                <div class="config-label">🔄 Nombre de positions simultanées</div>
+                                <div class="number-input-container">
+                                    <input type="number" 
+                                           id="botLimitInput" 
+                                           min="2" 
+                                           max="25" 
+                                           step="1" 
+                                           value="10" 
+                                           class="number-input"
+                                           oninput="updateBotLimit(this.value)">
+                                    <div class="arrow-buttons">
+                                        <button class="arrow-btn" onclick="incrementBotLimit()">▲</button>
+                                        <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
                                     </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">⏱️ Temps max position (heures)</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="maxTimeInput" 
-                                                   min="3" 
-                                                   max="48" 
-                                                   step="1" 
-                                                   value="24" 
-                                                   class="number-input"
-                                                   oninput="updateMaxTime(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementMaxTime()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementMaxTime()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">h</span>
-                                        </div>
+                                </div>
+                            </div>
+                            
+                            <div class="config-item">
+                                <div class="config-label">⏱️ Temps max position (heures)</div>
+                                <div class="number-input-container">
+                                    <input type="number" 
+                                           id="maxTimeInput" 
+                                           min="3" 
+                                           max="48" 
+                                           step="1" 
+                                           value="4" 
+                                           class="number-input"
+                                           oninput="updateMaxTime(this.value)">
+                                    <div class="arrow-buttons">
+                                        <button class="arrow-btn" onclick="incrementMaxTime()">▲</button>
+                                        <button class="arrow-btn" onclick="decrementMaxTime()">▼</button>
                                     </div>
+                                    <span class="pnl-unit">h</span>
+                                </div>
+                            </div>
                                 </div>
                             </div>
                             
