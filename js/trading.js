@@ -680,18 +680,19 @@ async function openPosition(symbol, selectedPair) {
         
         const currentPrice = selectedPair.price;
         
-        // 🔧 CORRECTION IMPORTANTE: Pour Bitget USDT-FUTURES, size = valeur en USDT, pas quantité de tokens
-        // Chaque contrat = 1 USDT, donc size doit être la valeur de la position en USDT
-        // La quantité réelle sera calculée automatiquement par Bitget
-        // Bitget peut exiger que size soit un nombre entier ou avec précision limitée
-        const sizeInUSDT = Math.floor(positionValue); // Arrondir à l'entier inférieur pour être sûr
+        // 🔧 CORRECTION CRITIQUE: Pour Bitget USDT-FUTURES, size = valeur NOTIONNELLE (avec levier)
+        // positionValue = marge allouée (capital sans levier)
+        // size = valeur notionnelle de la position = positionValue * leverage
+        // Exemple: 100 USDT marge × levier 5x = 500 USDT de size
+        const notionalValue = positionValue * leverage;
+        const sizeInUSDT = Math.floor(notionalValue); // Arrondir à l'entier inférieur
         
-        // Pour référence, calculer la quantité de tokens (mais ne pas l'envoyer comme size)
-        const quantity = (positionValue / currentPrice).toFixed(6);
+        // Pour référence, calculer la quantité de tokens
+        const quantity = (notionalValue / currentPrice).toFixed(6);
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-        log(`💰 Prix: ${currentPrice} | Valeur: ${positionValue.toFixed(2)} USDT → Size: ${sizeInUSDT} USDT | Quantité tokens: ${quantity} (Levier x${leverage})`, 'INFO');
-        log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
+        log(`💰 Prix: ${currentPrice} | Marge: ${positionValue.toFixed(2)} USDT × ${leverage}x = ${notionalValue.toFixed(2)} USDT notionnel → Size: ${sizeInUSDT}`, 'INFO');
+        log(`📊 Quantité tokens: ${quantity} | Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
         // 🔧 CORRECTION: Validation des paramètres d'ordre
         if (!symbol || typeof symbol !== 'string') {
@@ -699,9 +700,10 @@ async function openPosition(symbol, selectedPair) {
             return false;
         }
         
-        // 🔧 CORRECTION: Valider que la taille est suffisante (minimum généralement 5 USDT pour Bitget)
+        // 🔧 CORRECTION: Valider que la taille notionnelle est suffisante (minimum 5 USDT pour Bitget)
         if (!sizeInUSDT || isNaN(sizeInUSDT) || sizeInUSDT < 5) {
-            log(`❌ Taille position invalide ou trop petite: ${sizeInUSDT} USDT (minimum: 5 USDT, positionValue: ${positionValue})`, 'ERROR');
+            log(`❌ Taille position invalide ou trop petite: ${sizeInUSDT} USDT notionnel (minimum: 5 USDT)`, 'ERROR');
+            log(`   Détails: Marge ${positionValue.toFixed(2)} × Levier ${leverage} = ${notionalValue.toFixed(2)} → ${sizeInUSDT} après arrondi`, 'ERROR');
             return false;
         }
         
@@ -739,8 +741,10 @@ async function openPosition(symbol, selectedPair) {
             console.error('🔍 Détails erreur ouverture position:');
             console.error('   Symbol:', symbol);
             console.error('   Prix actuel:', currentPrice);
-            console.error('   Valeur position:', positionValue, 'USDT');
-            console.error('   Size envoyé:', orderData.size, `(${typeof orderData.size})`);
+            console.error('   Marge allouée:', positionValue, 'USDT');
+            console.error('   Levier:', leverage, 'x');
+            console.error('   Valeur notionnelle:', notionalValue, 'USDT');
+            console.error('   Size envoyé à Bitget:', orderData.size, `(${typeof orderData.size})`);
             console.error('   Code erreur API:', orderResult?.code);
             console.error('   Message API:', orderResult?.msg || orderResult?.message);
             console.error('   Order data complet:', orderData);
