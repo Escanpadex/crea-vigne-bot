@@ -4,7 +4,6 @@ const API_BASE = 'https://api.crea-vigne.fr/api';
 
 // Bot state variables
 let botRunning = false;
-let currentBalance = 0; // Pour le balance tracker
 let volumeScanInterval = null;
 let tradingLoopInterval = null;
 let statsInterval = null;
@@ -29,67 +28,18 @@ let botStats = {
     totalLossAmount: 0
 };
 
-// 🚫 EXCLUSION: Actions tokenisées (stocks) disponibles sur Bitget
-// Ces instruments causent des problèmes et doivent être exclus du trading automatique
-// Liste complète fournie par l'utilisateur
-const EXCLUDED_STOCK_TOKENS = [
-    // Actions tech & cryptos
-    'LINKUSDT', 'LINK',
-    'NVDAXUSDT', 'NVDAX',
-    'NVDAUSDT', 'NVDAon',
-    'AAPLXUSDT', 'AAPLX', 'AAPLon',
-    'GOOGLXUSDT', 'GOOGLX', 'GOOGLon',
-    'TSLAUSDT', 'TSLAon',
-    'METAXUSDT', 'METAX', 'METAon',
-    'MSFTUSDT', 'MSFTon',
-    'PLTRXUSDT', 'PLTRX',
-    'AMDUSDT', 'AMDon',
-    'OPENXUSDT', 'OPENX',
-    'INTCUSDT', 'INTCon',
-    'CSCOUSDT', 'CSCOon',
-    'IBMUSDT', 'IBMon',
-    
-    // Finance & banques
-    'COINXUSDT', 'COINX',
-    'HOODXUSDT', 'HOODX',
-    'JPMUSDT', 'JPMon',
-    
-    // ETFs & indices
-    'SPYXUSDT', 'SPYX',
-    'QQQXUSDT', 'QQQX',
-    'TQQQXUSDT', 'TQQQX',
-    'ITOTUSDT', 'ITOTon',
-    'IWNUSDT', 'IWNon',
-    'DFDVUSDT', 'DFDVx',
-    'GLDXUSDT', 'GLDX',
-    
-    // Autres actions
-    'CRCLXUSDT', 'CRCLX',
-    'LMTUSDT', 'LMTon',
-    'LLYUSDT', 'LLYon',
-    'KOUSDT', 'KOon',
-    'PFEUSDT', 'PFEon',
-    'PGUSDT', 'PGon',
-    'NVOUSDT', 'NVOon',
-    'PEPUSDT', 'PEPon',
-    'TMUSDT', 'TMon',
-    'WMTUSDT', 'WMTon',
-    'CVXUSDT', 'CVXon'
-];
-
 // Configuration object
 let config = {
     apiKey: '',
     secretKey: '',
     passphrase: '',
-    capitalPercent: 50,
-    leverage: 5,
+    capitalPercent: 5,
+    leverage: 2,
     trailingStop: 1.0,
     cooldownMinutes: 30,
-    targetPnL: 0.9,                 // 🆕 NOUVEAU: Objectif PnL configurable (0.9% par défaut)
-    maxBotPositions: 10,            // 🆕 NOUVEAU: Limite configurable des positions bot (10 par défaut)
-    maxPositionTimeHours: 4,        // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (4h par défaut)
-    excludedSymbols: EXCLUDED_STOCK_TOKENS, // 🚫 NOUVEAU: Symboles à exclure (actions tokenisées)
+    targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
+    maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
+    maxPositionTimeHours: 24,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 24h)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
         maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)

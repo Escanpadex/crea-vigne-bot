@@ -8,9 +8,7 @@ const LOGGER_CONFIG = {
     maxLogs: 300, // Nombre maximum de logs conservés
     enableConsole: true, // Afficher aussi dans la console
     includeTimestamp: true,
-    includeDetails: true,
-    // Fenêtre de déduplication des fermetures (par défaut: 6 heures)
-    closeDedupMs: 6 * 60 * 60 * 1000
+    includeDetails: true
 };
 
 // Classe pour gérer les logs de positions
@@ -101,16 +99,13 @@ class PositionLogger {
 
     // Ajouter un log de fermeture de position
     logPositionClose(position, closeDetails = {}) {
-        // 🔧 NOUVEAU: Éviter les doublons robustement (par id si dispo, sinon symbole+entrée) sur une fenêtre étendue
+        // 🔧 NOUVEAU: Éviter les doublons en vérifiant si cette fermeture existe déjà (même symbole dans les 60 dernières secondes)
         const now = Date.now();
-        const closeKey = position?.id ? `id:${position.id}` : `sym:${position.symbol}|entry:${position.entryPrice}`;
         const recentDuplicate = this.logs.find(log => 
             log.type === 'POSITION_CLOSE' &&
-            (
-                (log.closeKey && log.closeKey === closeKey) ||
-                (!log.closeKey && log.symbol === position.symbol && log.entryPrice === position.entryPrice)
-            ) &&
-            (now - new Date(log.timestamp).getTime()) < LOGGER_CONFIG.closeDedupMs
+            log.symbol === position.symbol &&
+            log.entryPrice === position.entryPrice &&
+            (now - new Date(log.timestamp).getTime()) < 60000 // Dans les 60 dernières secondes
         );
         
         if (recentDuplicate) {
@@ -133,7 +128,6 @@ class PositionLogger {
             duration: closeDetails.duration || this.calculateDuration(position.timestamp),
             closeReason: closeDetails.reason || 'UNKNOWN',
             isBotManaged: position.isBotManaged,
-            closeKey,
             details: {
                 targetPnL: position.targetPnL,
                 highestPrice: position.highestPrice,

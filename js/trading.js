@@ -163,16 +163,11 @@ async function getPositivePairs() {
                 const hasVolume = volume > 100000; // Volume en USDT
                 const isUSDT = ticker.symbol && ticker.symbol.includes('USDT');
                 
-                // 🚫 EXCLUSION: Actions tokenisées (stocks)
-                const isNotExcluded = !config.excludedSymbols || !config.excludedSymbols.includes(ticker.symbol);
-                
-                if (isInRange && hasVolume && isUSDT && isNotExcluded) {
+                if (isInRange && hasVolume && isUSDT) {
                     log(`✅ Paire valide: ${ticker.symbol} (+${change24hPercent.toFixed(2)}%, Vol: ${formatNumber(volume)})`, 'DEBUG');
-                } else if (isInRange && hasVolume && isUSDT && !isNotExcluded) {
-                    log(`🚫 Paire exclue (action tokenisée): ${ticker.symbol} (+${change24hPercent.toFixed(2)}%)`, 'DEBUG');
                 }
                 
-                return isInRange && hasVolume && isUSDT && isNotExcluded;
+                return isInRange && hasVolume && isUSDT;
             })
             .map(ticker => ({
                 symbol: ticker.symbol, // Garder le format original
@@ -290,8 +285,7 @@ function selectRandomPositivePair(excludeSymbols = []) {
         !openedSymbols.includes(pair.symbol) &&  // 🎯 NOUVEAU: Pas déjà ouverte
         !excludeSymbols.includes(pair.symbol) && 
         !isPairInCooldown(pair.symbol) &&
-        !isTradedPairInCooldown(pair.symbol) && // 🆕 Cooldown 12h pour paires déjà tradées
-        (!config.excludedSymbols || !config.excludedSymbols.includes(pair.symbol)) // 🚫 Exclure les actions tokenisées
+        !isTradedPairInCooldown(pair.symbol) // 🆕 Cooldown 12h pour paires déjà tradées
     );
     
     if (availablePairs.length === 0) {
@@ -576,8 +570,6 @@ async function aggregateDataFromLowerTimeframe(symbol, lowerTimeframe, targetTim
 }
 
 function calculatePositionSize() {
-    // 🎯 CORRECTION: Toujours utiliser le solde actuel (qui évolue) pour adapter les tailles de positions
-    // Le solde doit être rafraîchi avant chaque appel à cette fonction
     const availableBalance = balance.totalEquity || balance.available || 1000;
     const percent = config.capitalPercent || 10;
     const positionValue = availableBalance * (percent / 100);
@@ -589,33 +581,6 @@ function calculatePositionSize() {
 
 function hasOpenPosition(symbol) {
     return openPositions.some(pos => pos.symbol === symbol && pos.status === 'OPEN');
-}
-
-// 🔧 CORRECTION: Obtenir la valeur initiale normalisée pour le calcul PnL
-function getInitialValueForPnL(position) {
-    // Priorité 1: quantity × entryPrice (valeur exacte de la position)
-    if (typeof position.quantity === 'number' && position.quantity > 0 && position.entryPrice > 0) {
-        return position.quantity * position.entryPrice;
-    }
-    // Priorité 2: initialMargin si disponible
-    if (typeof position.initialMargin === 'number' && position.initialMargin > 0) {
-        return position.initialMargin;
-    }
-    // Priorité 3: size / leverage pour retrouver la marge initiale
-    if (position.size > 0 && position.leverage > 0) {
-        return position.size / position.leverage;
-    }
-    // Fallback: size directement
-    if (position.size > 0) {
-        return position.size;
-    }
-    return 0;
-}
-
-// 🔧 CORRECTION: Formatter le pourcentage sans afficher -0.0%
-function formatPercent(x) {
-    const s = x.toFixed(1);
-    return s === '-0.0' ? '0.0' : s;
 }
 
 // 🆕 NOUVELLE FONCTION: Vérifier si on peut ouvrir une nouvelle position
@@ -653,12 +618,6 @@ function canOpenNewPosition(symbol) {
 }
 
 async function openPosition(symbol, selectedPair) {
-    // 🚫 PROTECTION: Vérifier si la paire est une action tokenisée
-    if (config.excludedSymbols && config.excludedSymbols.includes(symbol)) {
-        log(`🚫 ${symbol}: Action tokenisée exclue - Ouverture annulée`, 'WARNING');
-        return false;
-    }
-    
     // 🎯 NOUVELLE VÉRIFICATION: Utiliser la fonction de vérification centralisée
     const canOpen = canOpenNewPosition(symbol);
     
@@ -672,13 +631,6 @@ async function openPosition(symbol, selectedPair) {
     const availableSlots = getMaxBotPositions() - botPositionsCount;
     log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${getMaxBotPositions()} bot, ${openPositions.length} total)`, 'INFO');
     
-    // 🎯 CORRECTION CRITIQUE: Rafraîchir le solde AVANT de calculer la taille de position
-    // Cela garantit que les tailles s'adaptent au solde actuel (qui évolue)
-    if (typeof refreshBalance === 'function') {
-        await refreshBalance();
-        log(`💰 Solde rafraîchi avant calcul: ${balance.totalEquity.toFixed(2)} USDT`, 'DEBUG');
-    }
-    
     const positionValue = calculatePositionSize();
     
     try {
@@ -688,20 +640,11 @@ async function openPosition(symbol, selectedPair) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         const currentPrice = selectedPair.price;
-        
-        // 🔧 CORRECTION CRITIQUE: Pour Bitget USDT-FUTURES, size = valeur NOTIONNELLE (avec levier)
-        // positionValue = marge allouée (capital sans levier)
-        // size = valeur notionnelle de la position = positionValue * leverage
-        // Exemple: 100 USDT marge × levier 5x = 500 USDT de size
-        const notionalValue = positionValue * leverage;
-        const sizeInUSDT = Math.floor(notionalValue); // Arrondir à l'entier inférieur
-        
-        // Pour référence, calculer la quantité de tokens
-        const quantity = (notionalValue / currentPrice).toFixed(6);
+        const quantity = (positionValue / currentPrice).toFixed(6);
         
         log(`🔄 Ouverture position LONG ${symbol}...`, 'INFO');
-        log(`💰 Prix: ${currentPrice} | Marge: ${positionValue.toFixed(2)} USDT × ${leverage}x = ${notionalValue.toFixed(2)} USDT notionnel → Size: ${sizeInUSDT}`, 'INFO');
-        log(`📊 Quantité tokens: ${quantity} | Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
+        log(`💰 Prix: ${currentPrice} | Quantité: ${quantity} | Valeur: ${positionValue.toFixed(2)} USDT (Levier x${leverage})`, 'INFO');
+        log(`🎯 Raison: Paire positive 24h (+${selectedPair.change24h.toFixed(2)}%)`, 'INFO');
         
         // 🔧 CORRECTION: Validation des paramètres d'ordre
         if (!symbol || typeof symbol !== 'string') {
@@ -709,10 +652,8 @@ async function openPosition(symbol, selectedPair) {
             return false;
         }
         
-        // 🔧 CORRECTION: Valider que la taille notionnelle est suffisante (minimum 5 USDT pour Bitget)
-        if (!sizeInUSDT || isNaN(sizeInUSDT) || sizeInUSDT < 5) {
-            log(`❌ Taille position invalide ou trop petite: ${sizeInUSDT} USDT notionnel (minimum: 5 USDT)`, 'ERROR');
-            log(`   Détails: Marge ${positionValue.toFixed(2)} × Levier ${leverage} = ${notionalValue.toFixed(2)} → ${sizeInUSDT} après arrondi`, 'ERROR');
+        if (!quantity || isNaN(parseFloat(quantity)) || parseFloat(quantity) <= 0) {
+            log(`❌ Quantité invalide: ${quantity}`, 'ERROR');
             return false;
         }
         
@@ -721,11 +662,10 @@ async function openPosition(symbol, selectedPair) {
             productType: "USDT-FUTURES",
             marginMode: "isolated",
             marginCoin: "USDT",
-            size: String(sizeInUSDT), // 🔧 CORRECTION: Valeur en USDT (nombre entier), pas quantité de tokens
+            size: String(quantity), // 🔧 CORRECTION: Forcer en string
             side: "buy",
             tradeSide: "open",
             orderType: "market",
-            force: "gtc", // 🔧 CORRECTION: Paramètre requis pour les ordres Bitget (Good Till Cancel)
             clientOid: `bot_${Date.now()}_${symbol}` // 🔧 Préfixe bot pour différencier
         };
         
@@ -735,7 +675,6 @@ async function openPosition(symbol, selectedPair) {
         log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
         log(`   Prix: ${currentPrice} (${typeof currentPrice})`, 'DEBUG');
         log(`   Valeur position: ${positionValue}$`, 'DEBUG');
-        log(`   Données complètes: ${JSON.stringify(orderData)}`, 'DEBUG');
         
         const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -743,38 +682,16 @@ async function openPosition(symbol, selectedPair) {
         });
         
         if (!orderResult || orderResult.code !== '00000') {
-            const errorMsg = orderResult?.msg || orderResult?.message || orderResult?.raw || orderResult?.code || 'Erreur inconnue';
-            log(`❌ Échec ouverture position ${symbol}: ${errorMsg}`, 'ERROR');
+            log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || orderResult?.code || 'Erreur inconnue'}`, 'ERROR');
             
             // 🔧 DIAGNOSTIC: Log de l'erreur complète
-            console.error('🔍 Détails erreur ouverture position:');
-            console.error('   Symbol:', symbol);
-            console.error('   Prix actuel:', currentPrice);
-            console.error('   Marge allouée:', positionValue, 'USDT');
-            console.error('   Levier:', leverage, 'x');
-            console.error('   Valeur notionnelle:', notionalValue, 'USDT');
-            console.error('   Size envoyé à Bitget:', orderData.size, `(${typeof orderData.size})`);
-            console.error('   Code erreur API:', orderResult?.code);
-            console.error('   Message API:', orderResult?.msg || orderResult?.message);
-            console.error('   Order data complet:', orderData);
-            console.error('   Réponse API complète:', orderResult);
-            
             if (orderResult) {
                 log(`🔍 Réponse API complète:`, 'ERROR');
-                log(`   Code: ${orderResult.code || 'N/A'}`, 'ERROR');
-                log(`   Message: ${orderResult.msg || orderResult.message || 'N/A'}`, 'ERROR');
+                log(`   Code: ${orderResult.code}`, 'ERROR');
+                log(`   Message: ${orderResult.msg}`, 'ERROR');
                 if (orderResult.data) {
                     log(`   Data: ${JSON.stringify(orderResult.data)}`, 'ERROR');
                 }
-                if (orderResult.raw) {
-                    log(`   Raw Response: ${orderResult.raw.substring(0, 500)}`, 'ERROR');
-                }
-            }
-            
-            // 🔧 CORRECTION: Arrêter la boucle si erreur 400 (Bad Request) pour éviter spam
-            if (orderResult?.code === '400' || orderResult?.code === '40017' || (orderResult?.msg && orderResult.msg.includes('400'))) {
-                log(`⚠️ Erreur 400 détectée - Arrêt de l'ouverture séquentielle pour éviter spam`, 'WARNING');
-                return false; // Le système de compteur dans main.js gérera l'arrêt
             }
             
             return false;
@@ -896,20 +813,16 @@ async function createEmergencyStopLoss(position, stopPrice) {
     }
 }
 
-let tpMonitorRunning = false;
-
 // 🎯 FONCTION MODIFIÉE: Surveillance PnL et fermeture automatique UNIQUEMENT pour les positions du bot
 async function monitorPnLAndClose() {
     if (!botRunning || openPositions.length === 0) return;
-    if (tpMonitorRunning) return;
-    tpMonitorRunning = true;
     
     // 🧹 OPTIMISATION: Nettoyer la console périodiquement
     autoCleanConsole();
     
     try {
         // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
-        const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true && pos.isClosing !== true && pos.isClosed !== true);
+        const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
         
         // 🎯 ÉTAPE 1: Identifier toutes les positions à fermer (sans attendre)
         const positionsToClose = [];
@@ -918,29 +831,35 @@ async function monitorPnLAndClose() {
             let pnlPercent = 0;
             let dataSource = 'UNKNOWN';
             
-            // 🔧 CORRECTION CRITIQUE: Toujours utiliser getCurrentPrice en priorité pour cohérence avec l'affichage
-            // L'unrealizedPnL de l'API peut inclure le levier ou être en retard
-            const currentPrice = await getCurrentPrice(position.symbol);
-            if (currentPrice && currentPrice > 0 && position.entryPrice > 0) {
-                // Calculer le PnL en pourcentage (variation de prix sans levier)
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                position.currentPrice = currentPrice;
-                dataSource = 'CALCULATED_PRICE';
-            } else if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-                // Fallback: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
+            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
+                // Calculer le pourcentage depuis unrealizedPnL (plus fiable)
                 const initialValue = position.quantity * position.entryPrice;
                 pnlPercent = (position.unrealizedPnL / initialValue) * 100;
                 dataSource = 'API_UNREALIZED_PNL';
-                log(`⚠️ ${position.symbol}: Utilisation fallback unrealizedPnL - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'WARNING');
+                // Log réduit: seulement toutes les 5 minutes
+                if (!position.lastApiPnLLog || Date.now() - position.lastApiPnLLog > 300000) {
+                    log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
+                    position.lastApiPnLLog = Date.now();
+                }
             } else {
-                log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL valide`, 'WARNING');
-                continue;
+                // Fallback: essayer getCurrentPrice
+                const currentPrice = await getCurrentPrice(position.symbol);
+                if (!currentPrice) {
+                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL`, 'WARNING');
+                    continue;
+                }
+                
+                // Calculer le PnL en pourcentage
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                position.currentPrice = currentPrice;
+                dataSource = 'CALCULATED';
             }
             
             position.pnlPercent = pnlPercent;
             
             // Mettre à jour le prix le plus haut (seulement si on a un prix actuel)
-            if (dataSource === 'CALCULATED_PRICE' && position.currentPrice > position.highestPrice) {
+            if (dataSource === 'CALCULATED' && position.currentPrice > position.highestPrice) {
                 position.highestPrice = position.currentPrice;
             }
             
@@ -959,8 +878,6 @@ async function monitorPnLAndClose() {
                 const grossPnL = position.size * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
-                // Marquer la position comme en fermeture pour éviter tout retraitement
-                position.isClosing = true;
                 positionsToClose.push({
                     position,
                     pnlPercent,
@@ -981,10 +898,7 @@ async function monitorPnLAndClose() {
                 if (!position.tpConfirmationStartTime) {
                     // Premier passage au-dessus du TP : démarrer le chrono
                     position.tpConfirmationStartTime = Date.now();
-                    log(`⏱️ ${position.symbol}: TP atteint (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%) - Chrono 3 sec démarré [Source: ${dataSource}]`, 'INFO');
-                    if (currentPrice) {
-                        log(`   Prix: ${position.entryPrice.toFixed(6)} → ${currentPrice.toFixed(6)}`, 'INFO');
-                    }
+                    log(`⏱️ ${position.symbol}: TP atteint (+${pnlPercent.toFixed(2)}%) - Chrono 3 sec démarré pour confirmation`, 'INFO');
                     continue; // Passer à la prochaine position
                 }
                 
@@ -993,14 +907,14 @@ async function monitorPnLAndClose() {
                 if (elapsedTime < 3) {
                     // Toujours en attente de confirmation (log seulement toutes les secondes)
                     if (!position.lastConfirmationLog || Date.now() - position.lastConfirmationLog > 1000) {
-                        log(`⏳ ${position.symbol}: Confirmation TP ${(3 - elapsedTime).toFixed(1)}s (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%)`, 'DEBUG');
+                        log(`⏳ ${position.symbol}: Confirmation TP en cours... ${(3 - elapsedTime).toFixed(1)}s restantes (+${pnlPercent.toFixed(2)}%)`, 'DEBUG');
                         position.lastConfirmationLog = Date.now();
                     }
                     continue;
                 }
                 
                 // 3 secondes écoulées ET toujours >= TP : OK pour fermer
-                log(`✅ ${position.symbol}: TP confirmé (+${pnlPercent.toFixed(3)}% ≥ +${position.targetPnL}%) [Source: ${dataSource}]`, 'SUCCESS');
+                log(`✅ ${position.symbol}: TP confirmé après 3 sec (+${pnlPercent.toFixed(2)}% ≥ +${position.targetPnL}%)`, 'SUCCESS');
                 
                 // 💰 Calculer les frais d'entrée (0.06% maker/taker fee sur Bitget)
                 const entryFee = position.size * 0.0006;
@@ -1009,8 +923,6 @@ async function monitorPnLAndClose() {
                 const grossPnL = position.size * (pnlPercent / 100);
                 const realizedPnL = grossPnL - totalFees;
                 
-                // Marquer la position comme en fermeture pour éviter tout retraitement
-                position.isClosing = true;
                 positionsToClose.push({
                     position,
                     pnlPercent,
@@ -1037,19 +949,14 @@ async function monitorPnLAndClose() {
                 }
             }
             
-            // removed per-position delay to improve TP reactivity
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         // 🎯 ÉTAPE 2: Retirer IMMÉDIATEMENT les positions à fermer de la liste (avant l'API)
         // Cela évite les tentatives de fermeture multiples si le monitoring se déclenche pendant la fermeture
         if (positionsToClose.length > 0) {
             positionsToClose.forEach(data => {
-                // S'assurer que la position est marquée et supprimée localement
-                data.position.isClosing = true;
-                let index = openPositions.findIndex(p => p.id === data.position.id);
-                if (index === -1) {
-                    index = openPositions.findIndex(p => p.symbol === data.position.symbol && p.entryPrice === data.position.entryPrice);
-                }
+                const index = openPositions.findIndex(p => p.id === data.position.id);
                 if (index !== -1) {
                     openPositions.splice(index, 1);
                 }
@@ -1094,20 +1001,12 @@ async function monitorPnLAndClose() {
                                 console.warn('⚠️ Erreur logging fermeture position:', logError);
                             }
                         }
-                        // Marquer la position comme fermée pour éviter tout retraitement
-                        data.position.isClosed = true;
-                        data.position.isClosing = false;
-                        data.position.closedAt = Date.now();
                         
                         // NOTE: Position déjà retirée de openPositions à l'étape 2 (ligne 958)
                     } else {
                         log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
-                        // En cas d'échec, réautoriser le retraitement et réinsérer si absente
-                        data.position.isClosing = false;
-                        const exists = openPositions.find(p => p.id === data.position.id);
-                        if (!exists) {
-                            openPositions.push(data.position);
-                        }
+                        // En cas d'échec, remettre la position dans openPositions pour réessayer plus tard
+                        openPositions.push(data.position);
                         log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
                     }
                     
@@ -1141,8 +1040,6 @@ async function monitorPnLAndClose() {
         
     } catch (error) {
         log(`❌ Erreur surveillance PnL: ${error.message}`, 'ERROR');
-    } finally {
-        tpMonitorRunning = false;
     }
 }
 
@@ -1307,34 +1204,10 @@ async function updatePositionsPnL(verbose = false) {
                     // 🔧 AMÉLIORATION: Mise à jour complète des données
                     const newPrice = parseFloat(apiPos.markPrice || 0);
                     const newUnrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
-                    
-                    // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
-                    // Pour LONG: profit si prix monte, donc (newPrice - entryPrice) / entryPrice * 100
-                    // Pour SHORT: profit si prix baisse, donc (entryPrice - newPrice) / entryPrice * 100
-                    const isShort = (localPos.side || '').toString().toUpperCase() === 'SHORT';
-                    let newPnlPercentage = localPos.pnlPercentage || 0; // Préserver le pourcentage existant par défaut
-                    
-                    if (localPos.entryPrice > 0 && newPrice > 0 && newPrice !== localPos.entryPrice) {
-                        // Calculer seulement si les prix sont valides et différents
-                        if (isShort) {
-                            newPnlPercentage = ((localPos.entryPrice - newPrice) / localPos.entryPrice) * 100;
-                        } else {
-                            newPnlPercentage = ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100;
-                        }
-                    } else if (localPos.entryPrice > 0 && newPrice > 0 && newPrice === localPos.entryPrice) {
-                        // Si les prix sont identiques mais qu'il y a un unrealizedPL non nul, préserver le pourcentage existant
-                        if (newUnrealizedPnL !== 0 && localPos.pnlPercentage !== undefined && localPos.pnlPercentage !== null) {
-                            newPnlPercentage = localPos.pnlPercentage;
-                        } else {
-                            newPnlPercentage = 0; // Vraiment pas de variation
-                        }
-                    } else if (localPos.pnlPercentage !== undefined && localPos.pnlPercentage !== null) {
-                        // 🔧 CORRECTION: Si les données ne sont pas encore disponibles, préserver le pourcentage existant
-                        newPnlPercentage = localPos.pnlPercentage;
-                    }
+                    const newPnlPercentage = localPos.entryPrice > 0 ? ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100 : 0;
                     
                     // 🔧 CORRECTION: Toujours mettre à jour si currentPrice n'est pas défini ou si les données ont changé significativement
-                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice) && localPos.currentPrice > 0;
+                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice);
                     const priceChanged = !currentPriceDefined || Math.abs(localPos.currentPrice - newPrice) > 0.0001;
                     const pnlChanged = Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01;
                     
@@ -1382,32 +1255,6 @@ async function updatePositionsPnL(verbose = false) {
 function updatePositionsDisplay() {
     // 🎯 FONCTION AMÉLIORÉE: Mettre à jour l'affichage de TOUTES les positions (pas de limite)
     log(`🔄 updatePositionsDisplay() appelé avec ${openPositions.length} positions`, 'DEBUG');
-    
-    // 🚫 NETTOYAGE: Éliminer les doublons dans openPositions (même symbole)
-    const beforeCleanup = openPositions.length;
-    const uniqueMap = new Map();
-    
-    // Garder seulement la position la plus récente pour chaque symbole
-    openPositions.forEach(pos => {
-        if (!uniqueMap.has(pos.symbol)) {
-            uniqueMap.set(pos.symbol, pos);
-        } else {
-            // Comparer les timestamps et garder la plus récente
-            const existing = uniqueMap.get(pos.symbol);
-            const existingTime = new Date(existing.timestamp).getTime();
-            const currentTime = new Date(pos.timestamp).getTime();
-            
-            if (currentTime > existingTime) {
-                uniqueMap.set(pos.symbol, pos);
-            }
-        }
-    });
-    
-    openPositions = Array.from(uniqueMap.values());
-    
-    if (beforeCleanup !== openPositions.length) {
-        log(`🧹 Nettoyage doublons: ${beforeCleanup} → ${openPositions.length} positions (${beforeCleanup - openPositions.length} doublons supprimés)`, 'INFO');
-    }
     
     const positionCountEl = document.getElementById('positionCount');
     const positionsListEl = document.getElementById('positionsList');
@@ -1486,27 +1333,12 @@ function updatePositionsDisplay() {
         </div>
     `;
     } else {
-        // 🚫 DÉDUPLICATION: Éliminer les doublons par symbole (garder la plus récente)
-        const uniquePositions = [];
-        const seenSymbols = new Set();
-        
-        // Parcourir en ordre inverse pour garder les positions les plus récentes
-        for (let i = openPositions.length - 1; i >= 0; i--) {
-            const pos = openPositions[i];
-            if (!seenSymbols.has(pos.symbol)) {
-                uniquePositions.unshift(pos);
-                seenSymbols.add(pos.symbol);
-            } else {
-                log(`⚠️ Doublon détecté et ignoré pour l'affichage: ${pos.symbol}`, 'DEBUG');
-            }
-        }
-        
         // 🎯 AFFICHAGE COMPACT PERMANENT (demande utilisateur - plus lisible et concis)
         const maxDisplayed = config.displaySettings?.maxPositionsDisplayed || 50;
-        const displayedPositions = uniquePositions.slice(0, maxDisplayed);
-        const hiddenCount = uniquePositions.length - maxDisplayed;
+        const displayedPositions = openPositions.slice(0, maxDisplayed);
+        const hiddenCount = openPositions.length - maxDisplayed;
         
-        log(`📊 Affichage COMPACT de ${displayedPositions.length} positions${hiddenCount > 0 ? ` (${hiddenCount} masquées)` : ''}${openPositions.length !== uniquePositions.length ? ` (${openPositions.length - uniquePositions.length} doublons filtrés)` : ''}`, 'DEBUG');
+        log(`📊 Affichage COMPACT de ${displayedPositions.length} positions${hiddenCount > 0 ? ` (${hiddenCount} masquées)` : ''}`, 'DEBUG');
         
         const positionsHTML = displayedPositions.map((position, index) => {
             // Calculer le temps écoulé avec gestion des erreurs
@@ -1569,60 +1401,53 @@ function updatePositionsDisplay() {
             }
             
             // Calculer le PnL actuel avec gestion des données manquantes
+            const currentPrice = position.currentPrice || position.entryPrice;
             let pnlPercent = 0;
             let pnlDollar = 0;
+
+            // 🔧 CORRECTION MAJEURE: Logique de calcul PnL corrigée
             let dataSource = 'UNKNOWN';
 
-            // 🔧 CORRECTION: Pourcentage = variation de PRIX (sans levier), Dollar = PnL réel de la position
-            
-            // 🎯 PRIORITÉ 1: Utiliser le pourcentage stocké s'il existe et est valide
-            if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
-                pnlPercent = position.pnlPercentage;
-                dataSource = 'STORED_PERCENTAGE';
-            } else {
-                // 🎯 PRIORITÉ 2: Calculer depuis les prix si disponible
-                let currentPrice = position.entryPrice; // Fallback par défaut
-                
-                if (typeof position.currentPrice === 'number' && position.currentPrice > 0) {
-                    currentPrice = position.currentPrice;
-                } else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) && position.entryPrice > 0) {
-                    // Reconstruire le prix depuis le pourcentage si currentPrice non dispo
-                    const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
-                    if (isShort) {
-                        currentPrice = position.entryPrice * (1 - position.pnlPercentage / 100);
-                    } else {
-                        currentPrice = position.entryPrice * (1 + position.pnlPercentage / 100);
-                    }
-                }
-                
-                // Calculer le pourcentage depuis la variation de prix du token (sans levier)
-                // Pour LONG: profit si prix monte, donc (currentPrice - entryPrice) / entryPrice * 100
-                // Pour SHORT: profit si prix baisse, donc (entryPrice - currentPrice) / entryPrice * 100
-                if (currentPrice > 0 && position.entryPrice > 0 && currentPrice !== position.entryPrice) {
-                    const isShort = (position.side || '').toString().toUpperCase() === 'SHORT';
-                    if (isShort) {
-                        pnlPercent = ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
-                    } else {
-                        pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                    }
-                    dataSource = 'CALCULATED_FROM_PRICE';
-                } else {
-                    // Si les prix sont identiques ou invalides, utiliser le pourcentage stocké même s'il est 0
-                    pnlPercent = typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage) ? position.pnlPercentage : 0;
-                    dataSource = 'FALLBACK';
-                }
-            }
-
-            // Pour le dollar PnL : utiliser unrealizedPnL de l'API si disponible, sinon calculer
+            // 1. Priorité absolue à unrealizedPnL depuis l'API (valeur exacte)
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL)) {
                 pnlDollar = position.unrealizedPnL;
                 dataSource = 'API_UNREALIZED_PNL';
+                
+                // 🔧 CORRECTION: Calculer le pourcentage basé sur la valeur initiale de la position
+                // La valeur initiale = quantity * entryPrice (plus précis que position.size qui peut être la valeur actuelle)
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlPercent = (pnlDollar / initialValue) * 100;
+                } else if (position.size && position.size > 0) {
+                    // Fallback si quantity n'est pas disponible
+                    pnlPercent = (pnlDollar / position.size) * 100;
+                }
             }
-            // Sinon calculer depuis la variation de prix × la valeur initiale normalisée
+            // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
+            else if (typeof position.pnlPercentage === 'number' && !isNaN(position.pnlPercentage)) {
+                pnlPercent = position.pnlPercentage;
+                dataSource = 'API_PERCENTAGE';
+                
+                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlDollar = (initialValue * pnlPercent) / 100;
+                } else if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                }
+            }
+            // 3. Calcul de secours basé sur les prix actuels
             else {
-                const initialValue = getInitialValueForPnL(position);
-                pnlDollar = initialValue > 0 ? (initialValue * pnlPercent) / 100 : 0;
+                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
                 dataSource = 'CALCULATED';
+                
+                // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
+                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    const initialValue = position.quantity * position.entryPrice;
+                    pnlDollar = (initialValue * pnlPercent) / 100;
+                } else if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                }
             }
 
             // Log discret pour debug (toutes les 60 secondes par position)
@@ -1695,7 +1520,7 @@ function updatePositionsDisplay() {
                         font-size: 12px;
                         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                     ">
-                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : (pnlPercent >= 0 ? '+' : '') + formatPercent(pnlPercent) + '%'})
+                        ${isNaN(pnlDollar) ? 'N/A' : pnlSign + '$' + pnlDollar.toFixed(1)} (${isNaN(pnlPercent) ? 'N/A' : pnlSign + pnlPercent.toFixed(1) + '%'})
                     </div>
                 </div>
             `;
@@ -1789,71 +1614,18 @@ async function importExistingPositions() {
                     const side = apiPos.holdSide ? apiPos.holdSide.toUpperCase() : 'LONG';
                     const total = parseFloat(apiPos.total || 0); // Valeur totale de la position
                     const markPrice = parseFloat(apiPos.markPrice || 0);
-                    // 🔧 CORRECTION CRITIQUE: Ne pas utiliser markPrice comme fallback pour averageOpenPrice
-                    // Si averageOpenPrice n'existe pas, chercher dans d'autres champs possibles
-                    // Log tous les champs disponibles pour debug
-                    if (!apiPos.averageOpenPrice && apiPos.openPriceAvg === undefined) {
-                        log(`🔍 Champs disponibles pour ${apiPos.symbol}: ${Object.keys(apiPos).join(', ')}`, 'DEBUG');
-                    }
-                    let averageOpenPrice = parseFloat(apiPos.averageOpenPrice || apiPos.openPriceAvg || apiPos.openPrice || 0);
-                    // Si toujours 0, essayer de calculer depuis total et size
-                    if (averageOpenPrice === 0 && total > 0 && markPrice > 0) {
-                        // Essayer de trouver le prix d'entrée depuis d'autres sources
-                        const size = parseFloat(apiPos.size || 0);
-                        if (size > 0) {
-                            averageOpenPrice = total / size;
-                        }
-                    }
-                    // Si toujours 0, utiliser markPrice mais logger un avertissement
-                    if (averageOpenPrice === 0 && markPrice > 0) {
-                        log(`⚠️ averageOpenPrice non trouvé pour ${apiPos.symbol}, utilisation de markPrice comme fallback`, 'WARNING');
-                        averageOpenPrice = markPrice;
-                    }
+                    const averageOpenPrice = parseFloat(apiPos.averageOpenPrice || markPrice);
                     const unrealizedPL = parseFloat(apiPos.unrealizedPL || 0);
                     const marginSize = parseFloat(apiPos.marginSize || 0); // Marge utilisée
                     
-                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, averageOpenPrice=${apiPos.averageOpenPrice}, unrealizedPL=${apiPos.unrealizedPL}, marginSize=${apiPos.marginSize}`, 'DEBUG');
+                    log(`🔍 Données position ${apiPos.symbol}: holdSide=${apiPos.holdSide}, total=${apiPos.total}, markPrice=${apiPos.markPrice}, marginSize=${apiPos.marginSize}`, 'DEBUG');
                     
                     // 🤖 TOUTES LES POSITIONS SONT AUTOMATIQUES (demande utilisateur)
-                    // 🔧 CORRECTION: Calculer le pourcentage de variation de prix (sans levier)
-                    // Pour LONG: profit si prix monte, donc (markPrice - averageOpenPrice) / averageOpenPrice * 100
-                    const isShort = side === 'SHORT';
-                    let priceChangePercent = 0;
-                    
-                    // Vérifier que les prix sont valides et différents
-                    if (averageOpenPrice > 0 && markPrice > 0 && averageOpenPrice !== markPrice) {
-                        if (isShort) {
-                            priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
-                        } else {
-                            priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
-                        }
-                        log(`✅ Calcul pourcentage ${apiPos.symbol}: ${priceChangePercent.toFixed(4)}% (entry: ${averageOpenPrice}, current: ${markPrice})`, 'DEBUG');
-                    } else {
-                        // Si les prix ne sont pas disponibles ou identiques, essayer de calculer depuis unrealizedPL
-                        if (unrealizedPL !== 0 && averageOpenPrice > 0 && marginSize > 0) {
-                            // Approximer le pourcentage depuis unrealizedPL (sans levier)
-                            // unrealizedPL = marge * variation_prix_pourcentage / 100 (approximativement)
-                            const leverage = parseFloat(apiPos.leverage || 1);
-                            const notionalValue = marginSize * leverage;
-                            if (notionalValue > 0) {
-                                // Variation de prix approximative = unrealizedPL / valeur notionnelle (sans levier)
-                                const priceVariation = unrealizedPL / (marginSize * averageOpenPrice);
-                                priceChangePercent = priceVariation * 100;
-                                log(`⚠️ Calcul pourcentage ${apiPos.symbol} depuis unrealizedPL: ${priceChangePercent.toFixed(4)}% (fallback)`, 'DEBUG');
-                            }
-                        }
-                        if (priceChangePercent === 0) {
-                            log(`⚠️ Impossible de calculer le pourcentage pour ${apiPos.symbol} - markPrice=${markPrice}, averageOpenPrice=${averageOpenPrice}`, 'WARNING');
-                        }
-                    }
-                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
                         side: side,
-                        size: marginSize, // 🔧 CORRECTION: Conserver la marge initiale pour cohérence PnL
-                        notional: marginSize * parseFloat(apiPos.leverage || 1), // Exposition totale
-                        initialMargin: marginSize, // 🔧 AJOUT: Marge initiale explicite pour calculs PnL
+                        size: marginSize * parseFloat(apiPos.leverage || 1), // 🔧 CORRECTION: Taille réelle = marge × levier
                         quantity: parseFloat(apiPos.size || total / markPrice), // 🔧 AMÉLIORATION: Utiliser apiPos.size si disponible
                         entryPrice: averageOpenPrice,
                         leverage: parseFloat(apiPos.leverage || 1), // 🔧 AJOUT: Sauvegarder le levier
@@ -1863,9 +1635,9 @@ async function importExistingPositions() {
                         stopLossId: null,
                         currentStopPrice: null,
                         highestPrice: markPrice,
-                        currentPrice: markPrice, // 🔧 IMPORTANT: Prix actuel pour affichage immédiat
-                        unrealizedPnL: unrealizedPL, // 🔧 PnL en $ depuis l'API
-                        pnlPercentage: priceChangePercent, // 🔧 Variation de prix (sans levier) pour affichage - CORRIGÉ pour SHORT
+                        currentPrice: markPrice,
+                        unrealizedPnL: unrealizedPL,
+                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0), // 🔧 Target PnL arrondi
                         reason: '🤖 Position gérée par le bot',
                         lastPnLLog: 0, // 🔧 AJOUT: Pour éviter le spam de logs PnL
@@ -1916,17 +1688,9 @@ async function importExistingPositions() {
 
                 // 🔧 CORRECTION: Mise à jour IMMÉDIATE des PnL après import (sans délai)
                 log('📊 Mise à jour immédiate des prix en temps réel...', 'INFO');
-                await updatePositionsPnL(true); // Mise à jour SYNCHRONE des PnL avec verbose activé
+                await updatePositionsPnL(); // Mise à jour SYNCHRONE des PnL
                 updatePositionsDisplay(); // Refresh immédiat de l'affichage
                 log('✅ Données temps réel mises à jour après import', 'SUCCESS');
-
-                // 🔧 AJOUT: Forcer une deuxième mise à jour après un court délai pour s'assurer que les prix sont bien récupérés
-                setTimeout(async () => {
-                    log('🔄 Deuxième vérification des prix après import...', 'DEBUG');
-                    await updatePositionsPnL(true); // Verbose activé pour debug
-                    updatePositionsDisplay();
-                    log('✅ Deuxième mise à jour des prix terminée', 'DEBUG');
-                }, 1000);
                 
                 // Vérification immédiate et différée de l'affichage
                 const positionCountEl = document.getElementById('positionCount');
@@ -2345,17 +2109,6 @@ window.debugImportDetailed = async function() {
                     console.log(`   UnrealizedPL: ${unrealizedPL}`);
                     console.log(`   MarginSize: ${marginSize}, Leverage: ${leverage}`);
                     
-                    // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
-                    const isShort = side === 'SHORT';
-                    let priceChangePercent = 0;
-                    if (averageOpenPrice > 0 && markPrice > 0) {
-                        if (isShort) {
-                            priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
-                        } else {
-                            priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
-                        }
-                    }
-                    
                     const position = {
                         id: Date.now() + Math.random(),
                         symbol: apiPos.symbol,
@@ -2372,7 +2125,7 @@ window.debugImportDetailed = async function() {
                         highestPrice: markPrice,
                         currentPrice: markPrice,
                         unrealizedPnL: unrealizedPL,
-                        pnlPercentage: priceChangePercent,
+                        pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                         targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                         reason: '📥 Position importée depuis Bitget'
                     };
@@ -2667,17 +2420,6 @@ async function syncNewManualPositions() {
                 const marginSize = parseFloat(apiPos.marginSize || 0);
                 const leverage = parseFloat(apiPos.leverage || 1);
                 
-                // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
-                const isShort = side === 'SHORT';
-                let priceChangePercent = 0;
-                if (averageOpenPrice > 0 && markPrice > 0) {
-                    if (isShort) {
-                        priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
-                    } else {
-                        priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
-                    }
-                }
-                
                 const position = {
                     id: Date.now() + Math.random(),
                     symbol: apiPos.symbol,
@@ -2694,7 +2436,7 @@ async function syncNewManualPositions() {
                     highestPrice: markPrice,
                     currentPrice: markPrice,
                     unrealizedPnL: unrealizedPL,
-                    pnlPercentage: priceChangePercent,
+                    pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                     targetPnL: formatTargetPnL(config.targetPnL || 2.0),
                     reason: '👤 Position manuelle détectée automatiquement',
                     lastPnLLog: 0,
@@ -3175,17 +2917,6 @@ window.forceFullPositionRefresh = async function() {
             const marginSize = parseFloat(apiPos.marginSize || 0);
             const leverage = parseFloat(apiPos.leverage || 1);
             
-            // 🔧 CORRECTION: Calculer le pourcentage en tenant compte du type de position (LONG vs SHORT)
-            const isShort = side === 'SHORT';
-            let priceChangePercent = 0;
-            if (averageOpenPrice > 0 && markPrice > 0) {
-                if (isShort) {
-                    priceChangePercent = ((averageOpenPrice - markPrice) / averageOpenPrice) * 100;
-                } else {
-                    priceChangePercent = ((markPrice - averageOpenPrice) / averageOpenPrice) * 100;
-                }
-            }
-            
             const position = {
                 id: Date.now() + Math.random(),
                 symbol: apiPos.symbol,
@@ -3202,7 +2933,7 @@ window.forceFullPositionRefresh = async function() {
                 highestPrice: markPrice,
                 currentPrice: markPrice,
                 unrealizedPnL: unrealizedPL,
-                pnlPercentage: priceChangePercent,
+                pnlPercentage: averageOpenPrice > 0 ? ((markPrice - averageOpenPrice) / averageOpenPrice) * 100 : 0,
                 reason: 'Position importée (refresh complet)',
                 isBotManaged: false // Marquer comme manuel par défaut
             };

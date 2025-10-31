@@ -24,36 +24,16 @@ async function makeRequest(endpoint, options = {}) {
         
         const responseClone = response.clone();
         let data = null;
-        let responseText = null;
-        
         try {
-            responseText = await response.text();
-            if (responseText) {
-                try {
-                    data = JSON.parse(responseText);
-                } catch (parseError) {
-                    // Si ce n'est pas du JSON, garder le texte brut
-                    log(`⚠️ Réponse API non-JSON reçue: ${responseText.substring(0, 200)}`, 'WARNING');
-                    data = { raw: responseText };
-                }
-            }
-        } catch (readError) {
-            log(`Erreur lecture réponse API: ${readError.message}`, 'ERROR');
+            data = await responseClone.json();
+        } catch (parseError) {
+            log(`Erreur API: Réponse non JSON (${parseError.message})`, 'ERROR');
         }
 
         if (!response.ok) {
             const statusInfo = `${response.status} ${response.statusText}`;
-            const errorMessage = data?.msg || data?.message || (typeof data === 'string' ? data : JSON.stringify(data)) || responseText || 'No response body';
-            log(`❌ Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
-            
-            // 🔧 DEBUG: Log complet de l'erreur pour diagnostiquer
-            console.error('🔍 Détails erreur API:');
-            console.error('   Endpoint:', endpoint);
-            console.error('   Status:', response.status, response.statusText);
-            console.error('   Code API:', data?.code);
-            console.error('   Message API:', data?.msg || data?.message);
-            console.error('   Response text:', responseText);
-            console.error('   Parsed data:', data);
+            const errorMessage = data?.msg || JSON.stringify(data) || 'No response body';
+            log(`Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
         }
 
         return data;
@@ -194,14 +174,6 @@ async function refreshBalance() {
         // 🔧 CORRECTION: Afficher le total des actifs au lieu du USDT disponible
         if (usdtBalanceEl) usdtBalanceEl.textContent = balance.totalEquity.toFixed(2);
         if (totalEquityEl) totalEquityEl.textContent = balance.totalEquity.toFixed(2);
-        
-        // 📊 NOUVEAU: Mettre à jour le solde pour le balance tracker
-        if (typeof currentBalance !== 'undefined') {
-            currentBalance = balance.totalEquity;
-        }
-        if (typeof window.currentBalance !== 'undefined') {
-            window.currentBalance = balance.totalEquity;
-        }
         
         const usedCapital = openPositions.reduce((sum, pos) => sum + pos.size, 0);
         const availableCapital = balance.totalEquity * (config.capitalPercent / 100) * config.leverage - usedCapital;
@@ -384,11 +356,7 @@ async function getAllAvailablePairs() {
             const allPairs = data.data
                 .filter(pair => {
                     const volume = parseFloat(pair.usdtVolume || 0);
-                    const hasVolume = volume > 1000000;
-                    const isUSDT = pair.symbol.endsWith('USDT');
-                    // 🚫 EXCLUSION: Actions tokenisées (stocks)
-                    const isNotExcluded = !config.excludedSymbols || !config.excludedSymbols.includes(pair.symbol);
-                    return hasVolume && isUSDT && isNotExcluded; // Volume minimum 1M + pas d'actions
+                    return volume > 1000000 && pair.symbol.endsWith('USDT'); // Volume minimum 1M
                 })
                 .map(pair => ({
                     symbol: pair.symbol,
@@ -558,9 +526,9 @@ async function getCurrentPrice(symbol) {
             // Si c'est un array, prendre le premier élément
             if (Array.isArray(tickerData) && tickerData.length > 0) {
                 tickerData = tickerData[0];
-                // Données ticker reçues
+                console.log(`🔍 Données ticker ${symbol}:`, tickerData);
             } else if (!Array.isArray(tickerData)) {
-                // Objet ticker direct reçu
+                console.log(`🔍 Données ticker ${symbol} (objet direct):`, tickerData);
             } else {
                 console.log(`❌ Array vide pour ${symbol}:`, data.data);
                 return null;
@@ -573,13 +541,13 @@ async function getCurrentPrice(symbol) {
             for (const field of priceFields) {
                 if (tickerData[field] && !isNaN(parseFloat(tickerData[field]))) {
                     price = parseFloat(tickerData[field]);
-                    // Prix trouvé
+                    console.log(`✅ Prix trouvé dans le champ '${field}': ${price}`);
                     break;
                 }
             }
             
             if (price && price > 0) {
-                // Prix récupéré avec succès
+                console.log(`✅ Prix ${symbol} trouvé: ${price}`);
                 return price;
             } else {
                 console.log(`⚠️ Prix ${symbol} invalide dans:`, tickerData);
