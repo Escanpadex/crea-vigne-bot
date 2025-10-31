@@ -576,6 +576,8 @@ async function aggregateDataFromLowerTimeframe(symbol, lowerTimeframe, targetTim
 }
 
 function calculatePositionSize() {
+    // 🎯 CORRECTION: Toujours utiliser le solde actuel (qui évolue) pour adapter les tailles de positions
+    // Le solde doit être rafraîchi avant chaque appel à cette fonction
     const availableBalance = balance.totalEquity || balance.available || 1000;
     const percent = config.capitalPercent || 10;
     const positionValue = availableBalance * (percent / 100);
@@ -669,6 +671,13 @@ async function openPosition(symbol, selectedPair) {
     const botPositionsCount = getBotManagedPositionsCount();
     const availableSlots = getMaxBotPositions() - botPositionsCount;
     log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${getMaxBotPositions()} bot, ${openPositions.length} total)`, 'INFO');
+    
+    // 🎯 CORRECTION CRITIQUE: Rafraîchir le solde AVANT de calculer la taille de position
+    // Cela garantit que les tailles s'adaptent au solde actuel (qui évolue)
+    if (typeof refreshBalance === 'function') {
+        await refreshBalance();
+        log(`💰 Solde rafraîchi avant calcul: ${balance.totalEquity.toFixed(2)} USDT`, 'DEBUG');
+    }
     
     const positionValue = calculatePositionSize();
     
