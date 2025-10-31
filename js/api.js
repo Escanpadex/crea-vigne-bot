@@ -47,13 +47,13 @@ async function makeRequest(endpoint, options = {}) {
             log(`❌ Erreur API (${statusInfo}): ${errorMessage}`, 'ERROR');
             
             // 🔧 DEBUG: Log complet de l'erreur pour diagnostiquer
-            console.error('🔍 Détails erreur API:', {
-                status: response.status,
-                statusText: response.statusText,
-                url: endpoint,
-                responseText: responseText,
-                parsedData: data
-            });
+            console.error('🔍 Détails erreur API:');
+            console.error('   Endpoint:', endpoint);
+            console.error('   Status:', response.status, response.statusText);
+            console.error('   Code API:', data?.code);
+            console.error('   Message API:', data?.msg || data?.message);
+            console.error('   Response text:', responseText);
+            console.error('   Parsed data:', data);
         }
 
         return data;

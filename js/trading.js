@@ -736,14 +736,15 @@ async function openPosition(symbol, selectedPair) {
             log(`❌ Échec ouverture position ${symbol}: ${errorMsg}`, 'ERROR');
             
             // 🔧 DIAGNOSTIC: Log de l'erreur complète
-            console.error('🔍 Détails erreur ouverture position:', {
-                symbol: symbol,
-                orderData: orderData,
-                apiResponse: orderResult,
-                quantity: quantity,
-                positionValue: positionValue,
-                currentPrice: currentPrice
-            });
+            console.error('🔍 Détails erreur ouverture position:');
+            console.error('   Symbol:', symbol);
+            console.error('   Prix actuel:', currentPrice);
+            console.error('   Valeur position:', positionValue, 'USDT');
+            console.error('   Size envoyé:', orderData.size, `(${typeof orderData.size})`);
+            console.error('   Code erreur API:', orderResult?.code);
+            console.error('   Message API:', orderResult?.msg || orderResult?.message);
+            console.error('   Order data complet:', orderData);
+            console.error('   Réponse API complète:', orderResult);
             
             if (orderResult) {
                 log(`🔍 Réponse API complète:`, 'ERROR');
