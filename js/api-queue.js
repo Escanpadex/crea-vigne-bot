@@ -179,7 +179,7 @@ async function getPricesForAllPositions(positions) {
             if (pos.symbol) {
                 prices[pos.symbol] = {
                     price: parseFloat(pos.markPrice || pos.indexPrice || 0),
-                    unrealizedPnL: parseFloat(pos.unrealizedPnL || 0),
+                    unrealizedPnL: parseFloat(pos.unrealizedPL || 0),  // 🔧 FIX: unrealizedPL (pas PnL) depuis l'API Bitget
                     timestamp: Date.now()
                 };
             }
