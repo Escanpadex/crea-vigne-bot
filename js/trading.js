@@ -925,15 +925,11 @@ async function monitorPnLAndClose() {
             }
         }
         
-        // 🎯 ÉTAPE 2: Retirer IMMÉDIATEMENT les positions à fermer de la liste (avant l'API)
-        if (positionsToClose.length > 0) {
-            positionsToClose.forEach(data => {
-                const index = openPositions.findIndex(p => p.id === data.position.id);
-                if (index !== -1) {
-                    openPositions.splice(index, 1);
-                }
-            });
-        }
+        // 🎯 ÉTAPE 2: NE PAS supprimer avant confirmation API - Marquer comme "closing" instead
+        // Les positions seront supprimées APRÈS que closePosition() confirme la fermeture
+        positionsToClose.forEach(data => {
+            data.position.isClosing = true;  // Marquer comme "en cours de fermeture"
+        });
         
         // 🎯 ÉTAPE 3: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai échelonné)
         if (positionsToClose.length > 0) {
@@ -947,7 +943,7 @@ async function monitorPnLAndClose() {
                         const closed = await closePosition(data.position);
                         
                         if (closed) {
-                            // Mettre à jour les stats
+                            // 🔓 Mettre à jour les stats
                             botStats.totalClosedPositions++;
                             
                             if (data.realizedPnL > 0) {
@@ -964,17 +960,24 @@ async function monitorPnLAndClose() {
                             if (typeof addTradedPairCooldown === 'function') {
                                 addTradedPairCooldown(data.position.symbol);
                             }
+                            
+                            // 🚀 SUPPRESSION CONFIRMÉE: Retirer de openPositions SEULEMENT après succès API
+                            const index = openPositions.findIndex(p => p.id === data.position.id);
+                            if (index !== -1) {
+                                openPositions.splice(index, 1);
+                                log(`🗑️ ${data.position.symbol} supprimée de la liste locale`, 'DEBUG');
+                            }
                         } else {
                             log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
-                            // Remettre la position dans openPositions pour réessayer
-                            openPositions.push(data.position);
-                            log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
+                            // Retirer le marqueur "closing" si l'API a échoué
+                            data.position.isClosing = false;
+                            log(`🔄 ${data.position.symbol} reste ouvert pour réessai`, 'WARNING');
                         }
                         
                         resolve(closed);
                     } catch (error) {
                         log(`❌ Erreur fermeture ${data.position.symbol}: ${error.message}`, 'ERROR');
-                        openPositions.push(data.position);
+                        data.position.isClosing = false;
                         resolve(false);
                     }
                 });
@@ -1541,6 +1544,12 @@ async function importExistingPositions() {
             
             for (const apiPos of apiPositions) {
                 const exists = openPositions.find(localPos => localPos.symbol === apiPos.symbol);
+                
+                // 🚀 AMÉLIORATION: Ne pas réimporter les positions qui sont en train de se fermer
+                if (exists && exists.isClosing) {
+                    log(`🔄 ${apiPos.symbol} est en cours de fermeture - Pas de réimport`, 'DEBUG');
+                    continue;
+                }
                 
                 if (!exists) {
                     // 🔧 CORRECTION: Utiliser les bons champs de l'API Bitget
@@ -3488,3 +3497,32 @@ window.syncAndCheckPositions = syncAndCheckPositions;
 window.formatTargetPnL = formatTargetPnL;
 
 console.log('✅ trading.js chargé: Stats tracking anti-double-comptage + Arrondi targetPnL + Exports globaux configurés');
+
+// ✅ Exporter les fonctions
+window.getPositivePairs = getPositivePairs;
+window.selectRandomPositivePair = selectRandomPositivePair;
+window.openPosition = openPosition;
+window.monitorPnLAndClose = monitorPnLAndClose;
+window.closePositionFlash = closePositionFlash;
+
+// 🧹 FONCTION DE NETTOYAGE: Enlever les positions marquées "isClosing" qui traînent
+window.cleanClosingPositions = function() {
+    const beforeCount = openPositions.length;
+    
+    // Enlever les positions marquées "isClosing" qui devraient être fermées
+    openPositions = openPositions.filter(pos => {
+        if (pos.isClosing) {
+            log(`🗑️ Nettoyage: ${pos.symbol} supprimée (était en cours de fermeture)`, 'WARNING');
+            return false;  // Supprimer
+        }
+        return true;  // Garder
+    });
+    
+    const afterCount = openPositions.length;
+    if (beforeCount !== afterCount) {
+        log(`🧹 Nettoyage effectué: ${beforeCount - afterCount} position(s) supprimée(s)`, 'SUCCESS');
+        updatePositionsDisplay();
+    }
+    
+    return beforeCount - afterCount;
+};
