@@ -3505,6 +3505,9 @@ window.openPosition = openPosition;
 window.monitorPnLAndClose = monitorPnLAndClose;
 window.closePositionFlash = closePositionFlash;
 
+// 🔗 ALIAS: Créer un alias closePosition vers closePositionFlash
+window.closePosition = window.closePositionFlash;
+
 // 🧹 FONCTION DE NETTOYAGE: Enlever les positions marquées "isClosing" qui traînent
 window.cleanClosingPositions = function() {
     const beforeCount = openPositions.length;
