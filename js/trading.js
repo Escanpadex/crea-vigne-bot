@@ -824,16 +824,32 @@ async function monitorPnLAndClose() {
         // 🔧 CORRECTION: Ne surveiller que les positions gérées par le bot
         const botManagedPositions = openPositions.filter(pos => pos.isBotManaged === true);
         
-        // 🎯 ÉTAPE 1: Identifier toutes les positions à fermer (sans attendre)
+        if (botManagedPositions.length === 0) return;
+        
+        // 🚀 OPTIMISATION CRITIQUE: Récupérer les prix de TOUTES les positions en UNE SEULE requête
+        // Au lieu de faire 8-10 appels individuels, on en fait 1 seul !
+        if (typeof window.updateAllPositionsPnLBatch === 'function') {
+            await window.updateAllPositionsPnLBatch(botManagedPositions);
+        } else {
+            // Fallback si le système de queue n'est pas chargé
+            log('⚠️ updateAllPositionsPnLBatch non disponible - Fallback utilisé', 'WARNING');
+            for (const position of botManagedPositions) {
+                const currentPrice = await getCurrentPrice(position.symbol);
+                if (currentPrice) {
+                    position.currentPrice = currentPrice;
+                }
+            }
+        }
+        
+        // 🎯 ÉTAPE 1: Identifier toutes les positions à fermer
         const positionsToClose = [];
         
         for (const position of botManagedPositions) {
             let pnlPercent = 0;
             let dataSource = 'UNKNOWN';
             
-            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL de l'API si getCurrentPrice échoue
+            // 🔧 AMÉLIORATION: Utiliser unrealizedPnL et currentPrice (maintenant à jour)
             if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-                // Calculer le pourcentage depuis unrealizedPnL (plus fiable)
                 const initialValue = position.quantity * position.entryPrice;
                 pnlPercent = (position.unrealizedPnL / initialValue) * 100;
                 dataSource = 'API_UNREALIZED_PNL';
@@ -842,54 +858,13 @@ async function monitorPnLAndClose() {
                     log(`📊 ${position.symbol}: PnL depuis API - ${position.unrealizedPnL.toFixed(2)}$ (${pnlPercent.toFixed(2)}%)`, 'DEBUG');
                     position.lastApiPnLLog = Date.now();
                 }
+            } else if (position.currentPrice && position.entryPrice) {
+                // Fallback: utiliser le prix actuel récupéré
+                pnlPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                dataSource = 'CURRENT_PRICE';
             } else {
-                // Fallback: essayer getCurrentPrice
-                const currentPrice = await getCurrentPrice(position.symbol);
-                if (!currentPrice) {
-                    log(`⚠️ ${position.symbol}: Impossible de récupérer le prix ET pas de unrealizedPnL`, 'WARNING');
-                    continue;
-                }
-                
-                // Calculer le PnL en pourcentage
-                pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
-                position.currentPrice = currentPrice;
-                dataSource = 'CALCULATED';
-            }
-            
-            position.pnlPercent = pnlPercent;
-            
-            // Mettre à jour le prix le plus haut (seulement si on a un prix actuel)
-            if (dataSource === 'CALCULATED' && position.currentPrice > position.highestPrice) {
-                position.highestPrice = position.currentPrice;
-            }
-            
-            // ⏱️ NOUVEAU: Vérifier si la position dépasse le temps maximum
-            const positionAge = Date.now() - new Date(position.timestamp).getTime();
-            const maxTimeMs = config.maxPositionTimeHours * 60 * 60 * 1000;
-            
-            if (positionAge >= maxTimeMs) {
-                // Position trop ancienne, fermeture automatique
-                log(`⏱️ ${position.symbol}: Temps maximum dépassé (${config.maxPositionTimeHours}h) - Fermeture automatique`, 'WARNING');
-                
-                // Calculer les frais
-                const entryFee = position.size * 0.0006;
-                const exitFee = position.size * 0.0006;
-                const totalFees = entryFee + exitFee;
-                const grossPnL = position.size * (pnlPercent / 100);
-                const realizedPnL = grossPnL - totalFees;
-                
-                positionsToClose.push({
-                    position,
-                    pnlPercent,
-                    grossPnL,
-                    totalFees,
-                    realizedPnL,
-                    currentPrice: position.currentPrice || position.entryPrice,
-                    reason: 'TIMEOUT'
-                });
-                
-                log(`⏱️ ${position.symbol}: Fermeture timeout après ${config.maxPositionTimeHours}h | PnL: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% | Net: ${realizedPnL >= 0 ? '+' : ''}$${realizedPnL.toFixed(2)}`, 'WARNING');
-                continue; // Passer à la prochaine position
+                // Pas assez de données - passer à la prochaine
+                continue;
             }
             
             // 🎯 DÉTECTION: Cette position doit-elle être fermée par TP ?
@@ -942,18 +917,15 @@ async function monitorPnLAndClose() {
                     delete position.tpConfirmationStartTime;
                 }
                 
-                // Log de suivi (moins fréquent pour éviter le spam avec surveillance 1s)
+                // Log de suivi (moins fréquent pour éviter le spam)
                 if (Date.now() - (position.lastPnLLog || 0) > 60000) { // Toutes les 60 secondes
                     log(`📊 ${position.symbol}: PnL ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (Objectif: +${position.targetPnL}%)`, 'DEBUG');
                     position.lastPnLLog = Date.now();
                 }
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         // 🎯 ÉTAPE 2: Retirer IMMÉDIATEMENT les positions à fermer de la liste (avant l'API)
-        // Cela évite les tentatives de fermeture multiples si le monitoring se déclenche pendant la fermeture
         if (positionsToClose.length > 0) {
             positionsToClose.forEach(data => {
                 const index = openPositions.findIndex(p => p.id === data.position.id);
@@ -963,54 +935,48 @@ async function monitorPnLAndClose() {
             });
         }
         
-        // 🎯 ÉTAPE 3: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai entre chaque)
+        // 🎯 ÉTAPE 3: Fermer toutes les positions identifiées EN PARALLÈLE (avec délai échelonné)
         if (positionsToClose.length > 0) {
-            log(`🚀 Fermeture de ${positionsToClose.length} position(s) en parallèle...`, 'INFO');
-            
-            // Lancer toutes les fermetures en parallèle avec un délai échelonné
+
             const closePromises = positionsToClose.map((data, index) => {
                 return new Promise(async (resolve) => {
-                    // Délai échelonné: 0ms, 1000ms, 2000ms, 3000ms, etc. (pour éviter le rate limit 429)
+                    // Délai échelonné: 0ms, 1000ms, 2000ms, 3000ms, etc.
                     await new Promise(r => setTimeout(r, index * 1000));
                     
-                    const closed = await closePositionFlash(data.position);
-                    if (closed) {
-                        const reasonText = data.reason === 'TIMEOUT' ? 'TIMEOUT' : 'TP ATTEINT';
-                        const emoji = data.reason === 'TIMEOUT' ? '⏱️' : '✅';
+                    try {
+                        const closed = await closePosition(data.position);
                         
-                        log(`${emoji} Position fermée avec succès: ${data.position.symbol} | Taille: $${data.position.size.toFixed(2)} | PnL réalisé: ${data.realizedPnL >= 0 ? '+' : ''}$${data.realizedPnL.toFixed(2)} (${data.pnlPercent >= 0 ? '+' : ''}${data.pnlPercent.toFixed(2)}%) | Raison: ${reasonText}`, 'SUCCESS');
-                        
-                        // Ajouter cooldown d'1 minute (pour éviter re-ouverture immédiate)
-                        addPositionCooldown(data.position.symbol);
-                        
-                        // 🎯 CORRECTION: Utiliser le PnL NET (avec frais déduits) pour les stats
-                        countClosedPosition(data.position, data.realizedPnL, 'monitorPnLAndClose');
-                        
-                        // 📝 LOGGER: Enregistrer la fermeture de position
-                        if (window.positionLogger) {
-                            try {
-                                window.positionLogger.logPositionClose(data.position, {
-                                    exitPrice: data.currentPrice,
-                                    pnlDollar: data.realizedPnL,
-                                    pnlPercent: data.pnlPercent,
-                                    reason: data.reason || 'TARGET_PNL_REACHED',
-                                    grossPnL: data.grossPnL,
-                                    totalFees: data.totalFees
-                                });
-                            } catch (logError) {
-                                console.warn('⚠️ Erreur logging fermeture position:', logError);
+                        if (closed) {
+                            // Mettre à jour les stats
+                            botStats.totalClosedPositions++;
+                            
+                            if (data.realizedPnL > 0) {
+                                botStats.winningPositions++;
+                                botStats.totalWinAmount += data.realizedPnL;
+                            } else {
+                                botStats.losingPositions++;
+                                botStats.totalLossAmount += data.realizedPnL;
                             }
+                            
+                            log(`✅ Position fermée: ${data.position.symbol} - PnL net: ${data.realizedPnL >= 0 ? '+' : ''}$${data.realizedPnL.toFixed(2)}`, 'SUCCESS');
+                            
+                            // Mettre à jour le cooldown 12h
+                            if (typeof addTradedPairCooldown === 'function') {
+                                addTradedPairCooldown(data.position.symbol);
+                            }
+                        } else {
+                            log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
+                            // Remettre la position dans openPositions pour réessayer
+                            openPositions.push(data.position);
+                            log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
                         }
                         
-                        // NOTE: Position déjà retirée de openPositions à l'étape 2 (ligne 958)
-                    } else {
-                        log(`❌ Échec fermeture position ${data.position.symbol}`, 'ERROR');
-                        // En cas d'échec, remettre la position dans openPositions pour réessayer plus tard
+                        resolve(closed);
+                    } catch (error) {
+                        log(`❌ Erreur fermeture ${data.position.symbol}: ${error.message}`, 'ERROR');
                         openPositions.push(data.position);
-                        log(`🔄 ${data.position.symbol} remis dans la liste pour réessai`, 'WARNING');
+                        resolve(false);
                     }
-                    
-                    resolve(closed);
                 });
             });
             
@@ -1021,7 +987,7 @@ async function monitorPnLAndClose() {
             if (successCount > 0) {
                 log(`✅ ${successCount}/${positionsToClose.length} position(s) fermée(s) avec succès`, 'SUCCESS');
                 
-                // 🚀 NOUVEAU: Redémarrer l'ouverture séquentielle après fermeture (1 minute de cooldown)
+                // 🚀 NOUVEAU: Redémarrer l'ouverture séquentielle après fermeture
                 const botPositionsAfterClose = getBotManagedPositionsCount();
                 const availableSlots = getMaxBotPositions() - botPositionsAfterClose;
                 if (availableSlots > 0) {
@@ -1189,64 +1155,31 @@ async function updatePositionsPnL(verbose = false) {
         // Log seulement en mode verbose pour éviter le spam
         if (verbose) log('🔄 Mise à jour des PnL des positions...', 'DEBUG');
         
-        const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
-        
-        if (result && result.code === '00000' && result.data) {
-            const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
-            if (verbose) log(`📊 ${apiPositions.length} positions actives reçues de l'API`, 'DEBUG');
-            
-            let updatedCount = 0;
-            let hasSignificantChanges = false;
-            
-            openPositions.forEach(localPos => {
-                const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
-                if (apiPos) {
-                    // 🔧 AMÉLIORATION: Mise à jour complète des données
-                    const newPrice = parseFloat(apiPos.markPrice || 0);
-                    const newUnrealizedPnL = parseFloat(apiPos.unrealizedPL || 0);
-                    const newPnlPercentage = localPos.entryPrice > 0 ? ((newPrice - localPos.entryPrice) / localPos.entryPrice) * 100 : 0;
-                    
-                    // 🔧 CORRECTION: Toujours mettre à jour si currentPrice n'est pas défini ou si les données ont changé significativement
-                    const currentPriceDefined = typeof localPos.currentPrice === 'number' && !isNaN(localPos.currentPrice);
-                    const priceChanged = !currentPriceDefined || Math.abs(localPos.currentPrice - newPrice) > 0.0001;
-                    const pnlChanged = Math.abs((localPos.pnlPercentage || 0) - newPnlPercentage) > 0.01;
-                    
-                    // Détecter les changements significatifs (>0.5% PnL)
-                    if (Math.abs(newPnlPercentage - (localPos.pnlPercentage || 0)) > 0.5) {
-                        hasSignificantChanges = true;
-                    }
-
-                    if (priceChanged || pnlChanged || !currentPriceDefined) {
-                        localPos.currentPrice = newPrice;
-                        localPos.unrealizedPnL = newUnrealizedPnL;
-                        localPos.pnlPercentage = newPnlPercentage;
-
-                        // Mettre à jour le prix le plus haut si nécessaire
-                        if (newPrice > (localPos.highestPrice || 0)) {
-                            localPos.highestPrice = newPrice;
-                        }
-
-                        updatedCount++;
-                        // Log seulement pour les changements significatifs ou en mode verbose
-                        if (verbose || hasSignificantChanges || !currentPriceDefined || positionUpdateDebug) {
-                            log(`📊 ${localPos.symbol}: Prix ${newPrice.toFixed(4)} | PnL ${newPnlPercentage >= 0 ? '+' : ''}${newPnlPercentage.toFixed(2)}% (${newUnrealizedPnL >= 0 ? '+' : ''}$${newUnrealizedPnL.toFixed(2)}) ${!currentPriceDefined ? '(INITIAL)' : '(UPDATE)'}`, 'DEBUG');
-                        }
-                    }
-                } else {
-                    log(`⚠️ Position ${localPos.symbol} non trouvée dans l'API - Position peut-être fermée`, 'WARNING');
-                }
-            });
-            
-            if (updatedCount > 0) {
-                // Log seulement si changements significatifs ou en mode verbose
-                if (verbose || hasSignificantChanges) {
-                    log(`✅ ${updatedCount} position(s) mise(s) à jour${hasSignificantChanges ? ' avec changements significatifs' : ''}`, 'DEBUG');
-                }
-                updatePositionsDisplay(); // Mettre à jour l'affichage seulement si nécessaire
-            }
+        // 🚀 OPTIMISATION CRITIQUE: Utiliser le système de batch au lieu de requêtes individuelles
+        if (typeof window.updateAllPositionsPnLBatch === 'function') {
+            await window.updateAllPositionsPnLBatch(openPositions);
+            if (verbose) log(`✅ ${openPositions.length} position(s) mise(s) à jour via batch`, 'DEBUG');
         } else {
-            log('⚠️ Erreur récupération positions pour mise à jour PnL', 'WARNING');
+            // Fallback ancien système si queue pas disponible
+            log('⚠️ updateAllPositionsPnLBatch non disponible - Fallback utilisé', 'WARNING');
+            const result = await makeRequest('/bitget/api/v2/mix/position/all-position?productType=USDT-FUTURES');
+            
+            if (result && result.code === '00000' && result.data) {
+                const apiPositions = result.data.filter(pos => parseFloat(pos.total) > 0);
+                if (verbose) log(`📊 ${apiPositions.length} positions actives reçues de l'API`, 'DEBUG');
+                
+                openPositions.forEach(localPos => {
+                    const apiPos = apiPositions.find(pos => pos.symbol === localPos.symbol);
+                    if (apiPos) {
+                        localPos.currentPrice = parseFloat(apiPos.markPrice || apiPos.indexPrice || 0);
+                        localPos.unrealizedPnL = parseFloat(apiPos.unrealizedPnL || 0);
+                    }
+                });
+            }
         }
+        
+        updatePositionsDisplay();
+        
     } catch (error) {
         log(`❌ Erreur mise à jour PnL: ${error.message}`, 'ERROR');
     }
