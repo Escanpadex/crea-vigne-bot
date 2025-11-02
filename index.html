@@ -101,7 +101,7 @@
                                 <!-- Paramètres fixes pour la nouvelle stratégie -->
                                 <input type="number" id="capitalPercent" value="50">
                                 <input type="number" id="trailingStop" value="2">
-                                <select id="leverage"><option value="2" selected>2x</option></select>
+                                <select id="leverage"><option value="5" selected>5x</option></select>
                             </div>
                             
                             <!-- Configuration Stratégie - Design amélioré -->
@@ -138,7 +138,7 @@
                                                    min="2" 
                                                    max="5" 
                                                    step="1" 
-                                                   value="2" 
+                                                   value="5" 
                                                    class="number-input"
                                                    oninput="updateLeverage(this.value)">
                                             <div class="arrow-buttons">
@@ -157,7 +157,7 @@
                                                    min="0.2" 
                                                    max="3.0" 
                                                    step="0.05" 
-                                                   value="2.0" 
+                                                   value="0.90" 
                                                    class="number-input"
                                                    oninput="updateTargetPnL(this.value)">
                                             <div class="arrow-buttons">
@@ -176,7 +176,7 @@
                                                    min="2" 
                                                    max="25" 
                                                    step="1" 
-                                                   value="2" 
+                                                   value="8" 
                                                    class="number-input"
                                                    oninput="updateBotLimit(this.value)">
                                             <div class="arrow-buttons">
@@ -194,7 +194,7 @@
                                                    min="3" 
                                                    max="48" 
                                                    step="1" 
-                                                   value="24" 
+                                                   value="4" 
                                                    class="number-input"
                                                    oninput="updateMaxTime(this.value)">
                                             <div class="arrow-buttons">
@@ -225,7 +225,7 @@
                                         <div class="position-icon">🤖</div>
                                         <div class="position-info">
                                             <div class="position-label">Bot</div>
-                                            <div class="position-count" id="botPositionsCount">0/2</div>
+                                            <div class="position-count" id="botPositionsCount">0/8</div>
                                         </div>
                                     </div>
                                     
@@ -289,6 +289,8 @@
     <script src="js/utils.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/api-queue.js"></script>
+    <script src="js/monitoring.js"></script>
     <script src="js/position-logger.js"></script>
     <script src="js/trading.js"></script>
     <script src="js/main.js"></script>
