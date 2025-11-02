@@ -1346,14 +1346,14 @@ function updatePositionsDisplay() {
                 pnlDollar = position.unrealizedPnL;
                 dataSource = 'API_UNREALIZED_PNL';
                 
-                // 🔧 CORRECTION: Calculer le pourcentage basé sur la valeur initiale de la position
-                // La valeur initiale = quantity * entryPrice (plus précis que position.size qui peut être la valeur actuelle)
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                // 🔧 CORRECTION: Calculer le pourcentage basé sur la marge (size en USDT)
+                // size = valeur réelle de la position en USDT (marge × levier)
+                if (position.size && position.size > 0) {
+                    pnlPercent = (pnlDollar / position.size) * 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                    // Fallback si size n'est pas disponible
                     const initialValue = position.quantity * position.entryPrice;
                     pnlPercent = (pnlDollar / initialValue) * 100;
-                } else if (position.size && position.size > 0) {
-                    // Fallback si quantity n'est pas disponible
-                    pnlPercent = (pnlDollar / position.size) * 100;
                 }
             }
             // 2. Sinon utiliser pnlPercentage depuis l'API et recalculer le dollar
@@ -1361,12 +1361,12 @@ function updatePositionsDisplay() {
                 pnlPercent = position.pnlPercentage;
                 dataSource = 'API_PERCENTAGE';
                 
-                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la valeur initiale
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                // 🔧 CORRECTION: Calculer le PnL dollar basé sur la marge
+                if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
                     const initialValue = position.quantity * position.entryPrice;
                     pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
                 }
             }
             // 3. Calcul de secours basé sur les prix actuels
@@ -1374,12 +1374,12 @@ function updatePositionsDisplay() {
                 pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * 100;
                 dataSource = 'CALCULATED';
                 
-                // 🔧 CORRECTION: Utiliser la valeur initiale pour le calcul dollar
-                if (position.quantity && position.entryPrice && position.entryPrice > 0) {
+                // 🔧 CORRECTION: Utiliser la marge pour le calcul dollar
+                if (position.size && position.size > 0) {
+                    pnlDollar = (position.size * pnlPercent) / 100;
+                } else if (position.quantity && position.entryPrice && position.entryPrice > 0) {
                     const initialValue = position.quantity * position.entryPrice;
                     pnlDollar = (initialValue * pnlPercent) / 100;
-                } else if (position.size && position.size > 0) {
-                    pnlDollar = (position.size * pnlPercent) / 100;
                 }
             }
 
