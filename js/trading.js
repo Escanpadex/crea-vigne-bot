@@ -1608,6 +1608,15 @@ async function importExistingPositions() {
                 log(`✅ ${imported} position(s) importée(s) avec succès!`, 'SUCCESS');
                 log(`📊 État final après import: ${openPositions.length}/${getMaxBotPositions()} positions actives`, 'INFO');
                 
+                // 🚀 OPTIMISATION: Charger les données PnL via le batch system
+                log('🔄 Chargement des données PnL via batch system...', 'INFO');
+                if (typeof window.updateAllPositionsPnLBatch === 'function') {
+                    await window.updateAllPositionsPnLBatch(openPositions);
+                    log('✅ Données PnL mises à jour via batch', 'SUCCESS');
+                } else {
+                    log('⚠️ Batch PnL non disponible - Utilisation fallback', 'WARNING');
+                }
+                
                 // Log détaillé des positions importées
                 openPositions.forEach((pos, idx) => {
                     const pnl = pos.pnlPercentage || 0;
