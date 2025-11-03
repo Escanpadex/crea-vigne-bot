@@ -1138,22 +1138,31 @@ body.dark-mode {
 }
 
 /* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
+.status-cooldown-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
 .status-section {
-    grid-column: 2;
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
 .cooldown-section {
-    grid-column: 1;
-    grid-row: 2;
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 @media (max-width: 1200px) {
-    .status-section {
-        grid-column: 1 / -1;
-    }
-    .cooldown-section {
-        grid-column: 1 / -1;
-        grid-row: auto;
+    .status-cooldown-wrapper {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1188,7 +1197,6 @@ body.dark-mode {
     background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     border-radius: 12px;
     padding: 16px;
-    margin-bottom: 16px;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
