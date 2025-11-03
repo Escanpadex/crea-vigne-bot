@@ -1137,6 +1137,26 @@ body.dark-mode {
     gap: 10px;
 }
 
+/* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
+.status-section {
+    grid-column: 2;
+}
+
+.cooldown-section {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+@media (max-width: 1200px) {
+    .status-section {
+        grid-column: 1 / -1;
+    }
+    .cooldown-section {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+}
+
 .stat-row {
     display: flex;
     justify-content: space-between;
