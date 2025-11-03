@@ -136,9 +136,9 @@
                                             <input type="number" 
                                                    id="leverageInput" 
                                                    min="2" 
-                                                   max="5" 
+                                                   max="10" 
                                                    step="1" 
-                                                   value="5" 
+                                                   value="10" 
                                                    class="number-input"
                                                    oninput="updateLeverage(this.value)">
                                             <div class="arrow-buttons">
@@ -430,7 +430,7 @@
             
             // Validation des limites
             if (leverage < 2) leverage = 2;
-            if (leverage > 5) leverage = 5;
+            if (leverage > 10) leverage = 10; // Changed from 5 to 10
             
             // Mettre à jour la configuration
             config.leverage = leverage;
@@ -448,7 +448,7 @@
         function incrementLeverage() {
             const input = document.getElementById('leverageInput');
             let value = parseInt(input.value) + 1;
-            if (value > 5) value = 5;
+            if (value > 10) value = 10; // Changed from 5 to 10
             updateLeverage(value);
         }
         
