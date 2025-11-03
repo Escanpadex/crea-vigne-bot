@@ -227,51 +227,53 @@
                             </div>
                             
                             <!-- Statut Bot - Design amélioré -->
-                            <div class="status-section">
-                                <div class="section-header">
-                                    <h4>📊 État du Bot</h4>
-                                </div>
-                                
-                                <div class="status-main">
-                                    <div class="status-indicator">
-                                        <div class="status-dot" id="botStatusDot"></div>
-                                        <span id="currentScanPair" class="status-text">En attente de démarrage...</span>
+                            <div class="status-cooldown-wrapper">
+                                <!-- 🆕 Tuile des paires en cooldown avec compte à rebours -->
+                                <div class="cooldown-section">
+                                    <div class="section-header">
+                                        <h4 id="cooldownTitle">⏰ Paires en Cooldown (6h)</h4>
+                                    </div>
+                                    <div class="cooldown-list" id="cooldownList">
+                                        <div style="text-align: center; color: #ccc; padding: 20px;">
+                                            Aucune paire en cooldown
+                                        </div>
                                     </div>
                                 </div>
-                                
-                                <!-- 🆕 Statistiques détaillées du scan -->
-                                <div class="scan-statistics">
-                                    <div class="stat-row">
-                                        <span class="stat-label">📈 Paires valides :</span>
-                                        <span class="stat-value" id="validPairsCount">--</span>
+
+                                <div class="status-section">
+                                    <div class="section-header">
+                                        <h4>📊 État du Bot</h4>
                                     </div>
-                                    <div class="stat-row">
-                                        <span class="stat-label">  • (5-15%) total:</span>
-                                        <span class="stat-value" id="validPairsTotal">--</span>
+                                    
+                                    <div class="status-main">
+                                        <div class="status-indicator">
+                                            <div class="status-dot" id="botStatusDot"></div>
+                                            <span id="currentScanPair" class="status-text">En attente de démarrage...</span>
+                                        </div>
                                     </div>
-                                    <div class="stat-row">
-                                        <span class="stat-label">  • (5-15%) cooldown ❄️:</span>
-                                        <span class="stat-value" id="validPairsCooldown">--</span>
-                                    </div>
-                                    <div class="stat-row">
-                                        <span class="stat-label">  • (5-15%) disponibles:</span>
-                                        <span class="stat-value" id="validPairsAvailable">--</span>
-                                    </div>
-                                    <div class="stat-row">
-                                        <span class="stat-label">⏱️ Dernière analyse:</span>
-                                        <span class="stat-value" id="lastAnalysisTime">--</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 🆕 Tuile des paires en cooldown avec compte à rebours -->
-                            <div class="cooldown-section">
-                                <div class="section-header">
-                                    <h4 id="cooldownTitle">⏰ Paires en Cooldown (6h)</h4>
-                                </div>
-                                <div class="cooldown-list" id="cooldownList">
-                                    <div style="text-align: center; color: #ccc; padding: 20px;">
-                                        Aucune paire en cooldown
+                                    
+                                    <!-- 🆕 Statistiques détaillées du scan -->
+                                    <div class="scan-statistics">
+                                        <div class="stat-row">
+                                            <span class="stat-label">📈 Paires valides :</span>
+                                            <span class="stat-value" id="validPairsCount">--</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span class="stat-label">  • (5-15%) total:</span>
+                                            <span class="stat-value" id="validPairsTotal">--</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span class="stat-label">  • (5-15%) cooldown ❄️:</span>
+                                            <span class="stat-value" id="validPairsCooldown">--</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span class="stat-label">  • (5-15%) disponibles:</span>
+                                            <span class="stat-value" id="validPairsAvailable">--</span>
+                                        </div>
+                                        <div class="stat-row">
+                                            <span class="stat-label">⏱️ Dernière analyse:</span>
+                                            <span class="stat-value" id="lastAnalysisTime">--</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
