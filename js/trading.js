@@ -878,9 +878,9 @@ async function monitorPnLAndClose() {
             let dataSource = 'UNKNOWN';
             
             // 🔧 AMÉLIORATION: Utiliser unrealizedPnL et currentPrice (maintenant à jour)
-            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-                const initialValue = position.quantity * position.entryPrice;
-                pnlPercent = (position.unrealizedPnL / initialValue) * 100;
+            if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.size) {
+                // 🔧 FIX CRITIQUE: Diviser par la MARGE investie (position.size), pas la valeur nominale totale!
+                pnlPercent = (position.unrealizedPnL / position.size) * 100;
                 dataSource = 'API_UNREALIZED_PNL';
                 // Log réduit: seulement toutes les 5 minutes
                 if (!position.lastApiPnLLog || Date.now() - position.lastApiPnLLog > 300000) {
@@ -3627,11 +3627,11 @@ window.diagnoseTPClosing = async function(symbol = null) {
         let currentPnLPercent = 0;
         let dataSource = 'UNKNOWN';
         
-        if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
-            const initialValue = position.quantity * position.entryPrice;
-            currentPnLPercent = (position.unrealizedPnL / initialValue) * 100;
+        if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.size) {
+            // 🔧 FIX CRITIQUE: Diviser par la MARGE investie (position.size), pas la valeur nominale!
+            currentPnLPercent = (position.unrealizedPnL / position.size) * 100;
             dataSource = 'API_UNREALIZED_PNL';
-            console.log(`   Unrealized PnL: $${position.unrealizedPnL.toFixed(2)}`);
+            console.log(`   Unrealized PnL: $${position.unrealizedPnL.toFixed(2)} / Margin: $${position.size.toFixed(2)}`);
         } else if (position.currentPrice && position.entryPrice) {
             currentPnLPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
             dataSource = 'CURRENT_PRICE_CALC';
