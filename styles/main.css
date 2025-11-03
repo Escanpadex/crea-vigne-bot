@@ -1163,6 +1163,65 @@ body.dark-mode {
     border-radius: 4px;
 }
 
+/* 🆕 Styles pour la tuile des paires en cooldown */
+.cooldown-section {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.cooldown-section .section-header {
+    margin-bottom: 12px;
+}
+
+.cooldown-section .section-header h4 {
+    color: #ffffff;
+    margin: 0;
+    font-size: 14px;
+}
+
+.cooldown-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.cooldown-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cooldown-symbol {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.cooldown-timer {
+    font-size: 12px;
+    color: #bfdbfe;
+}
+
+.cooldown-timer-bar {
+    background: rgba(0, 0, 0, 0.2);
+    height: 2px;
+    margin-top: 6px;
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.cooldown-timer-fill {
+    background: #60a5fa;
+    height: 100%;
+    border-radius: 1px;
+}
+
 .positions-summary {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
