@@ -1140,7 +1140,7 @@ body.dark-mode {
 /* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
 .status-cooldown-wrapper {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 16px;
     margin-bottom: 16px;
 }
@@ -1550,5 +1550,45 @@ body.dark-mode {
     
     .number-input-container {
         flex-wrap: wrap;
+    }
+}
+
+/* 🆕 Wrapper pour positionner Positions Actives + Cooldown côte à côte */
+.positions-cooldown-wrapper {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
+.status-cooldown-wrapper {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* 🆕 Grille pour positionner État du Bot et Cooldown côte à côte */
+.status-section {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.cooldown-section {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+@media (max-width: 1200px) {
+    .positions-cooldown-wrapper {
+        grid-template-columns: 1fr;
+    }
+    .status-cooldown-wrapper {
+        grid-template-columns: 1fr;
     }
 }
