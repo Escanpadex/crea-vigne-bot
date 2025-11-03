@@ -277,38 +277,51 @@ function selectRandomPositivePair(excludeSymbols = []) {
     
     // 🔧 PROTECTION ANTI-DOUBLON: Récupérer toutes les paires déjà ouvertes
     const openedSymbols = openPositions.map(pos => pos.symbol);
-    // Log réduit pour économiser la mémoire (commenté car déjà visible dans les logs suivants)
-    // log(`🔍 Paires déjà ouvertes: ${openedSymbols.join(', ') || 'Aucune'}`, 'DEBUG');
     
-    // Filtrer les paires disponibles en excluant celles déjà ouvertes
-    const availablePairs = positivePairs.filter(pair => 
-        !openedSymbols.includes(pair.symbol) &&  // 🎯 NOUVEAU: Pas déjà ouverte
-        !excludeSymbols.includes(pair.symbol) && 
-        !isPairInCooldown(pair.symbol) &&
-        !isTradedPairInCooldown(pair.symbol) // 🆕 Cooldown 12h pour paires déjà tradées
-    );
+    // 🆕 FILTRE COOLDOWN: Exclure les paires en cooldown 12h
+    const now = Date.now();
+    const cooldownSymbols = Array.from(tradedPairsCooldown?.entries() || [])
+        .filter(([symbol, endTime]) => endTime > now)
+        .map(([symbol]) => symbol);
+    
+    log(`🔍 Filtrage: ${openedSymbols.length} ouvertes + ${cooldownSymbols.length} en cooldown + ${excludeSymbols.length} exclues`, 'DEBUG');
+    
+    // 🎯 FILTRE STRICT: Paires valides (5-15%), pas exclues, pas en cooldown, avec volume
+    const availablePairs = (positivePairs || []).filter(pair => {
+        const change = pair.change24h || 0;
+        const isInRange = change >= 5 && change <= 15; // 🔧 FIX: Strict 5-15% uniquement
+        const isNotOpened = !openedSymbols.includes(pair.symbol);
+        const isNotExcluded = !excludeSymbols.includes(pair.symbol);
+        const isNotInCooldown = !cooldownSymbols.includes(pair.symbol);
+        const hasVolume = (pair.volume24h || 0) > 1000000;
+        
+        return isInRange && isNotOpened && isNotExcluded && isNotInCooldown && hasVolume;
+    });
+    
+    log(`📊 Paires valides trouvées: ${availablePairs.length} (parmi ${positivePairs?.length || 0} positives)`, 'DEBUG');
     
     if (availablePairs.length === 0) {
-        log('⚠️ Aucune paire disponible - Toutes les paires sont soit ouvertes, soit en cooldown', 'WARNING');
-        log(`📊 Paires dans la fourchette (+5% à +20%): ${positivePairs.length}`, 'INFO');
-        log(`📊 Paires déjà ouvertes: ${openedSymbols.length}`, 'INFO');
-        log(`📊 Slots bot disponibles: ${availableSlots}/${getMaxBotPositions()}`, 'INFO');
+        log('⚠️ Aucune paire valide disponible pour ouverture!', 'WARNING');
+        log(`   Critères: 5-15% + pas ouvertes + pas en cooldown + volume >1M`, 'INFO');
+        log(`   Paires ouvertes: ${openedSymbols.join(', ') || 'Aucune'}`, 'DEBUG');
+        log(`   En cooldown 12h: ${cooldownSymbols.slice(0, 3).join(', ')}${cooldownSymbols.length > 3 ? ` (+${cooldownSymbols.length - 3} autres)` : ''}`, 'DEBUG');
+        log(`   Slots bot disponibles: ${availableSlots}/${getMaxBotPositions()}`, 'INFO');
         
-        // 🎯 NOUVEAU: Si pas assez de paires, le bot attend
-        if (positivePairs.length < getMaxBotPositions()) {
-            log(`🔴 Pas assez de paires dans la fourchette (+5% à +20%): ${positivePairs.length} disponibles pour ${getMaxBotPositions()} positions`, 'WARNING');
-            log('⏳ Le bot attend que de nouvelles paires entrent dans la fourchette +5% à +20%...', 'INFO');
+        // 🎯 Afficher les paires hors fourchette pour diagnostic
+        const tooLow = (positivePairs || []).filter(p => p.change24h < 5).length;
+        const tooHigh = (positivePairs || []).filter(p => p.change24h > 15).length;
+        if (tooLow + tooHigh > 0) {
+            log(`   Hors fourchette: ${tooLow} trop basses (<5%), ${tooHigh} trop hautes (>15%)`, 'DEBUG');
         }
         
         return null;
     }
     
-    // Sélection aléatoire pondérée par la performance 24h
-    const randomIndex = Math.floor(Math.random() * Math.min(availablePairs.length, 20)); // Top 20 pour plus de diversité
+    // Sélection aléatoire parmi les paires valides
+    const randomIndex = Math.floor(Math.random() * availablePairs.length);
     const selectedPair = availablePairs[randomIndex];
     
-    log(`🎲 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}% sur 24h)`, 'SUCCESS');
-    log(`📊 ${availablePairs.length} paires disponibles (${openedSymbols.length} déjà ouvertes)`, 'INFO');
+    log(`🎯 Paire sélectionnée: ${selectedPair.symbol} (+${selectedPair.change24h.toFixed(2)}%) | ${availablePairs.length} valides disponibles`, 'SUCCESS');
     
     return selectedPair;
 }
