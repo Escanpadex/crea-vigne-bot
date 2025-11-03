@@ -896,6 +896,23 @@ async function monitorPnLAndClose() {
                 continue;
             }
             
+            // 🔍 DIAGNOSTIC: Vérifier les valeurs de TP et PnL
+            const targetPnL = position.targetPnL;
+            const tpDefined = typeof targetPnL === 'number' && !isNaN(targetPnL);
+            const pnlValid = typeof pnlPercent === 'number' && !isNaN(pnlPercent);
+            
+            // 🎯 DEBUG: Log de diagnostic tous les 30 secondes pour les positions sans TP
+            if (!position.lastDiagnosticLog || Date.now() - position.lastDiagnosticLog > 30000) {
+                if (!tpDefined) {
+                    log(`🚨 ${position.symbol}: targetPnL UNDEFINED! (value=${targetPnL}) - TP ne sera JAMAIS atteint!`, 'ERROR');
+                } else if (!pnlValid) {
+                    log(`🚨 ${position.symbol}: pnlPercent INVALID! (value=${pnlPercent}) - Impossible de calculer PnL!`, 'ERROR');
+                } else {
+                    log(`🔍 ${position.symbol}: PnL=${pnlPercent.toFixed(2)}% vs TP=${targetPnL}% (comparison: ${pnlPercent >= targetPnL ? 'WILL_CLOSE' : 'WAITING'})`, 'DEBUG');
+                }
+                position.lastDiagnosticLog = Date.now();
+            }
+            
             // 🎯 DÉTECTION: Cette position doit-elle être fermée par TP ?
             if (pnlPercent >= position.targetPnL) {
                 // 🕐 NOUVEAU: Système de confirmation avec délai de 3 secondes
@@ -3573,3 +3590,110 @@ window.cleanClosingPositions = function() {
     
     return beforeCount - afterCount;
 };
+
+// 🔍 FONCTION DE DIAGNOSTIC: Déboguer les problèmes de TP
+window.diagnoseTPClosing = async function(symbol = null) {
+    console.log('🔍 ===== DIAGNOSTIC TP CLOSING =====');
+    console.log(`Timestamp: ${new Date().toISOString()}`);
+    console.log(`Bot running: ${botRunning}`);
+    console.log(`PnL Monitoring: ${typeof pnlMonitoringInterval !== 'undefined' && pnlMonitoringInterval ? '✅ ACTIVE' : '❌ INACTIVE'}`);
+    console.log(`Config targetPnL: ${config.targetPnL}%`);
+    console.log('');
+    
+    if (!openPositions || openPositions.length === 0) {
+        console.log('❌ Aucune position ouverte');
+        return;
+    }
+    
+    const botPositions = openPositions.filter(pos => pos.isBotManaged === true);
+    console.log(`📊 Positions totales: ${openPositions.length} (🤖 Bot: ${botPositions.length})`);
+    console.log('');
+    
+    for (const position of botPositions) {
+        if (symbol && position.symbol !== symbol) continue;
+        
+        console.log(`\n📈 ${position.symbol}:`);
+        console.log(`   Entry Price: ${position.entryPrice}`);
+        console.log(`   Current Price: ${position.currentPrice || 'NOT SET'}`);
+        console.log(`   Size (Margin): $${position.size}`);
+        console.log(`   Quantity: ${position.quantity}`);
+        console.log('');
+        
+        // Vérifier targetPnL
+        const tpDefined = typeof position.targetPnL === 'number' && !isNaN(position.targetPnL);
+        console.log(`   🎯 Target PnL: ${tpDefined ? `✅ ${position.targetPnL}%` : `🚨 UNDEFINED (${position.targetPnL})`}`);
+        
+        // Calculer le PnL actuel
+        let currentPnLPercent = 0;
+        let dataSource = 'UNKNOWN';
+        
+        if (typeof position.unrealizedPnL === 'number' && !isNaN(position.unrealizedPnL) && position.quantity && position.entryPrice) {
+            const initialValue = position.quantity * position.entryPrice;
+            currentPnLPercent = (position.unrealizedPnL / initialValue) * 100;
+            dataSource = 'API_UNREALIZED_PNL';
+            console.log(`   Unrealized PnL: $${position.unrealizedPnL.toFixed(2)}`);
+        } else if (position.currentPrice && position.entryPrice) {
+            currentPnLPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
+            dataSource = 'CURRENT_PRICE_CALC';
+        }
+        
+        console.log(`   📊 Current PnL: ${currentPnLPercent.toFixed(3)}% (${dataSource})`);
+        console.log('');
+        
+        // Vérifier la comparaison
+        if (tpDefined) {
+            const shouldClose = currentPnLPercent >= position.targetPnL;
+            console.log(`   🔍 Comparison: ${currentPnLPercent.toFixed(3)}% >= ${position.targetPnL}% ? ${shouldClose ? '✅ YES (SHOULD CLOSE)' : '❌ NO (WAITING)'}`);
+            
+            if (shouldClose && !position.tpConfirmationStartTime) {
+                console.log(`   ⏱️ TP Confirmation: Not started`);
+            } else if (shouldClose && position.tpConfirmationStartTime) {
+                const elapsedSec = (Date.now() - position.tpConfirmationStartTime) / 1000;
+                console.log(`   ⏱️ TP Confirmation: ${elapsedSec.toFixed(1)}s elapsed (need 3s)`);
+            } else {
+                console.log(`   ⏱️ TP Confirmation: N/A (TP not reached)`);
+            }
+        } else {
+            console.log(`   ❌ CRITICAL: targetPnL is undefined - Position will NEVER close on TP!`);
+            console.log(`   🔧 FIX: Manual close or check position creation`);
+        }
+        
+        console.log(`   Is Closing: ${position.isClosing ? '⏳ YES' : '❌ NO'}`);
+        console.log(`   Bot Managed: ${position.isBotManaged ? '🤖 YES' : '❌ NO'}`);
+    }
+    
+    console.log('\n🔍 ===== END DIAGNOSTIC =====');
+};
+
+// 🔧 ALIAS pour faciliter l'accès
+window.checkTP = window.diagnoseTPClosing;
+
+// 🔧 FONCTION DE FIX: Réparer les positions sans targetPnL défini
+window.fixMissingTargetPnL = function() {
+    console.log('🔧 Réparation des positions sans targetPnL...');
+    let fixed = 0;
+    
+    for (const position of openPositions) {
+        const tpDefined = typeof position.targetPnL === 'number' && !isNaN(position.targetPnL);
+        
+        if (!tpDefined) {
+            position.targetPnL = config.targetPnL || 2.0;
+            fixed++;
+            console.log(`✅ ${position.symbol}: TP assigné à ${position.targetPnL}%`);
+        }
+    }
+    
+    if (fixed > 0) {
+        console.log(`✅ ${fixed} position(s) réparée(s)`);
+        // Relancer monitorPnLAndClose immédiatement
+        if (typeof monitorPnLAndClose === 'function') {
+            monitorPnLAndClose().catch(e => console.error('Erreur lors de monitorPnLAndClose:', e));
+        }
+    } else {
+        console.log('ℹ️ Aucune position à réparer - Tous les targetPnL sont définis');
+    }
+    
+    return fixed;
+};
+
+console.log('✅ Trading system loaded');
