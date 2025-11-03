@@ -44,190 +44,52 @@
                         <div>
                             <h4 class="section-title section-success">📊 Stratégie de Trading</h4>
                             
-                            <!-- Positions Actives - Design Sexy -->
-                            <div class="panel panel-accent">
-                                <!-- Header avec icône animée et PNL total -->
-                                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                    <!-- Gauche : Icône + Titre -->
-                                    <div style="display: flex; align-items: center;">
-                                        <div style="background: rgba(255,255,255,0.06); border-radius: 50%; padding: 8px; margin-right: 10px;">
-                                            <span style="font-size: 18px;">⚡</span>
+                            <!-- 🆕 Wrapper pour Positions Actives + Cooldown côte à côte -->
+                            <div class="positions-cooldown-wrapper">
+                                <!-- Positions Actives - Design Sexy -->
+                                <div class="panel panel-accent">
+                                    <!-- Header avec icône animée et PNL total -->
+                                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                        <!-- Gauche : Icône + Titre -->
+                                        <div style="display: flex; align-items: center;">
+                                            <div style="background: rgba(255,255,255,0.06); border-radius: 50%; padding: 8px; margin-right: 10px;">
+                                                <span style="font-size: 18px;">⚡</span>
+                                            </div>
+                                            <div>
+                                                <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Positions Actives</h3>
+                                                <div style="font-size: 12px; color: var(--muted);">
+                                                    <span id="positionCount">0</span> position(s) active(s)
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 style="margin: 0; font-size: 16px; font-weight: bold;">Positions Actives</h3>
-                                            <div style="font-size: 12px; color: var(--muted);">
-                                                <span id="positionCount">0</span> position(s) active(s)
+                                        
+                                        <!-- Droite : PNL Total en Live -->
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 11px; color: var(--muted); margin-bottom: 2px;">PNL Total</div>
+                                            <div id="totalPnLDisplay" style="
+                                                font-size: 16px;
+                                                font-weight: bold;
+                                                padding: 6px 12px;
+                                                border-radius: 8px;
+                                                background: rgba(107, 114, 128, 0.2);
+                                                color: #9ca3af;
+                                                min-width: 100px;
+                                                text-align: center;
+                                            ">
+                                                $0.00
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <!-- Droite : PNL Total en Live -->
-                                    <div style="text-align: right;">
-                                        <div style="font-size: 11px; color: var(--muted); margin-bottom: 2px;">PNL Total</div>
-                                        <div id="totalPnLDisplay" style="
-                                            font-size: 16px;
-                                            font-weight: bold;
-                                            padding: 6px 12px;
-                                            border-radius: 8px;
-                                            background: rgba(107, 114, 128, 0.2);
-                                            color: #9ca3af;
-                                            min-width: 100px;
-                                            text-align: center;
-                                        ">
-                                            $0.00
+                                    <!-- Liste des positions -->
+                                    <div id="positionsList" class="panel-inner">
+                                        <div style="text-align: center; color: var(--muted); font-style: italic; padding: 20px;">
+                                            <span style="font-size: 14px;">💤 Aucune position active</span><br>
+                                            <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <!-- Liste des positions -->
-                                <div id="positionsList" class="panel-inner">
-                                    <div style="text-align: center; color: var(--muted); font-style: italic; padding: 20px;">
-                                        <span style="font-size: 14px;">💤 Aucune position active</span><br>
-                                        <span style="font-size: 11px; margin-top: 5px; display: block;">En attente d'opportunités...</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Section Paramètres -->
-                        <div>
-                            <h4 class="section-title section-info">⚙️ Paramètres de Trading</h4>
-                            
-                            <!-- Champs API cachés mais fonctionnels + paramètres fixes -->
-                            <div style="display: none;">
-                                <input type="password" id="apiKey" value="bg_63a0c59f5cdb1dce7e405a400d81b081">
-                                <input type="password" id="secretKey" value="96528623d3ece2284b6eef752c801ed09d03dc95551c7be459a3a2e8b5abd388">
-                                <input type="password" id="passphrase" value="Charmant16320">
-                                <!-- Paramètres fixes pour la nouvelle stratégie -->
-                                <input type="number" id="capitalPercent" value="50">
-                                <input type="number" id="trailingStop" value="2">
-                                <select id="leverage"><option value="5" selected>5x</option></select>
-                            </div>
-                            
-                            <!-- Configuration Stratégie - Design amélioré -->
-                            <div class="config-section">
-                                <div class="section-header">
-                                    <h4>⚙️ Configuration de Trading</h4>
-                                </div>
-                                
-                                <div class="config-grid">
-                                    <div class="config-item">
-                                        <div class="config-label">💰 Capital par trade</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="capitalPercentInput" 
-                                                   min="10" 
-                                                   max="90" 
-                                                   step="5" 
-                                                   value="50" 
-                                                   class="number-input"
-                                                   oninput="updateCapitalPercent(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementCapitalPercent()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementCapitalPercent()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">%</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">📈 Levier</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="leverageInput" 
-                                                   min="2" 
-                                                   max="10" 
-                                                   step="1" 
-                                                   value="10" 
-                                                   class="number-input"
-                                                   oninput="updateLeverage(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementLeverage()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementLeverage()">▼</button>
-                                            </div>
-                                            <span class="leverage-unit">x</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">🎯 Objectif PnL</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="targetPnLInput" 
-                                                   min="0.2" 
-                                                   max="3.0" 
-                                                   step="0.05" 
-                                                   value="0.90" 
-                                                   class="number-input"
-                                                   oninput="updateTargetPnL(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">%</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">🔄 Nombre de positions simultanées</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="botLimitInput" 
-                                                   min="2" 
-                                                   max="25" 
-                                                   step="1" 
-                                                   value="8" 
-                                                   class="number-input"
-                                                   oninput="updateBotLimit(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementBotLimit()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">⏱️ Temps max position (heures)</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="maxTimeInput" 
-                                                   min="3" 
-                                                   max="48" 
-                                                   step="1" 
-                                                   value="4" 
-                                                   class="number-input"
-                                                   oninput="updateMaxTime(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementMaxTime()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementMaxTime()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">h</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-item">
-                                        <div class="config-label">❄️ Cooldown TP (heures)</div>
-                                        <div class="number-input-container">
-                                            <input type="number" 
-                                                   id="cooldownHoursInput" 
-                                                   min="1" 
-                                                   max="24" 
-                                                   step="1" 
-                                                   value="6" 
-                                                   class="number-input"
-                                                   oninput="updateCooldownHours(this.value)">
-                                            <div class="arrow-buttons">
-                                                <button class="arrow-btn" onclick="incrementCooldownHours()">▲</button>
-                                                <button class="arrow-btn" onclick="decrementCooldownHours()">▼</button>
-                                            </div>
-                                            <span class="pnl-unit">h</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Statut Bot - Design amélioré -->
-                            <div class="status-cooldown-wrapper">
                                 <!-- 🆕 Tuile des paires en cooldown avec compte à rebours -->
                                 <div class="cooldown-section">
                                     <div class="section-header">
@@ -239,65 +101,206 @@
                                         </div>
                                     </div>
                                 </div>
-
-                                <div class="status-section">
-                                    <div class="section-header">
-                                        <h4>📊 État du Bot</h4>
-                                    </div>
-                                    
-                                    <div class="status-main">
-                                        <div class="status-indicator">
-                                            <div class="status-dot" id="botStatusDot"></div>
-                                            <span id="currentScanPair" class="status-text">En attente de démarrage...</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 🆕 Statistiques détaillées du scan -->
-                                    <div class="scan-statistics">
-                                        <div class="stat-row">
-                                            <span class="stat-label">📈 Paires valides :</span>
-                                            <span class="stat-value" id="validPairsCount">--</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span class="stat-label">  • (5-15%) total:</span>
-                                            <span class="stat-value" id="validPairsTotal">--</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span class="stat-label">  • (5-15%) cooldown ❄️:</span>
-                                            <span class="stat-value" id="validPairsCooldown">--</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span class="stat-label">  • (5-15%) disponibles:</span>
-                                            <span class="stat-value" id="validPairsAvailable">--</span>
-                                        </div>
-                                        <div class="stat-row">
-                                            <span class="stat-label">⏱️ Dernière analyse:</span>
-                                            <span class="stat-value" id="lastAnalysisTime">--</span>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
-
-                            <!-- Statistiques Performance - Design amélioré -->
-                            <div class="stats-section">
-                                <div class="section-header">
-                                    <h4>📈 Performance</h4>
+                            
+                            <!-- Section Paramètres -->
+                            <div>
+                                <h4 class="section-title section-info">⚙️ Paramètres de Trading</h4>
+                                
+                                <!-- Champs API cachés mais fonctionnels + paramètres fixes -->
+                                <div style="display: none;">
+                                    <input type="password" id="apiKey" value="bg_63a0c59f5cdb1dce7e405a400d81b081">
+                                    <input type="password" id="secretKey" value="96528623d3ece2284b6eef752c801ed09d03dc95551c7be459a3a2e8b5abd388">
+                                    <input type="password" id="passphrase" value="Charmant16320">
+                                    <!-- Paramètres fixes pour la nouvelle stratégie -->
+                                    <input type="number" id="capitalPercent" value="50">
+                                    <input type="number" id="trailingStop" value="2">
+                                    <select id="leverage"><option value="5" selected>5x</option></select>
                                 </div>
                                 
-                                <div class="performance-grid">
-                                    <div class="perf-item success">
-                                        <div class="perf-icon">✅</div>
-                                        <div class="perf-info">
-                                            <div class="perf-label">Gagnantes</div>
-                                            <div class="perf-value" id="winningPositions">0 (+0$)</div>
-                                        </div>
+                                <!-- Configuration Stratégie - Design amélioré -->
+                                <div class="config-section">
+                                    <div class="section-header">
+                                        <h4>⚙️ Configuration de Trading</h4>
                                     </div>
                                     
-                                    <div class="perf-item danger">
-                                        <div class="perf-icon">❌</div>
-                                        <div class="perf-info">
-                                            <div class="perf-label">Perdantes</div>
-                                            <div class="perf-value" id="losingPositions">0 (-0$)</div>
+                                    <div class="config-grid">
+                                        <div class="config-item">
+                                            <div class="config-label">💰 Capital par trade</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="capitalPercentInput" 
+                                                       min="10" 
+                                                       max="90" 
+                                                       step="5" 
+                                                       value="50" 
+                                                       class="number-input"
+                                                       oninput="updateCapitalPercent(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementCapitalPercent()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementCapitalPercent()">▼</button>
+                                                </div>
+                                                <span class="pnl-unit">%</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="config-item">
+                                            <div class="config-label">📈 Levier</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="leverageInput" 
+                                                       min="2" 
+                                                       max="10" 
+                                                       step="1" 
+                                                       value="10" 
+                                                       class="number-input"
+                                                       oninput="updateLeverage(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementLeverage()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementLeverage()">▼</button>
+                                                </div>
+                                                <span class="leverage-unit">x</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="config-item">
+                                            <div class="config-label">🎯 Objectif PnL</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="targetPnLInput" 
+                                                       min="0.2" 
+                                                       max="3.0" 
+                                                       step="0.05" 
+                                                       value="0.90" 
+                                                       class="number-input"
+                                                       oninput="updateTargetPnL(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementTargetPnL()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementTargetPnL()">▼</button>
+                                                </div>
+                                                <span class="pnl-unit">%</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="config-item">
+                                            <div class="config-label">🔄 Nombre de positions simultanées</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="botLimitInput" 
+                                                       min="2" 
+                                                       max="25" 
+                                                       step="1" 
+                                                       value="8" 
+                                                       class="number-input"
+                                                       oninput="updateBotLimit(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementBotLimit()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementBotLimit()">▼</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="config-item">
+                                            <div class="config-label">⏱️ Temps max position (heures)</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="maxTimeInput" 
+                                                       min="3" 
+                                                       max="48" 
+                                                       step="1" 
+                                                       value="4" 
+                                                       class="number-input"
+                                                       oninput="updateMaxTime(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementMaxTime()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementMaxTime()">▼</button>
+                                                </div>
+                                                <span class="pnl-unit">h</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="config-item">
+                                            <div class="config-label">❄️ Cooldown TP (heures)</div>
+                                            <div class="number-input-container">
+                                                <input type="number" 
+                                                       id="cooldownHoursInput" 
+                                                       min="1" 
+                                                       max="24" 
+                                                       step="1" 
+                                                       value="6" 
+                                                       class="number-input"
+                                                       oninput="updateCooldownHours(this.value)">
+                                                <div class="arrow-buttons">
+                                                    <button class="arrow-btn" onclick="incrementCooldownHours()">▲</button>
+                                                    <button class="arrow-btn" onclick="decrementCooldownHours()">▼</button>
+                                                </div>
+                                                <span class="pnl-unit">h</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Statut Bot - Design amélioré -->
+                                <div class="status-cooldown-wrapper">
+                                    <div class="status-section">
+                                        <div class="section-header">
+                                            <h4>📊 État du Bot</h4>
+                                        </div>
+                                        
+                                        <div class="status-main">
+                                            <div class="status-indicator">
+                                                <div class="status-dot" id="botStatusDot"></div>
+                                                <span id="currentScanPair" class="status-text">En attente de démarrage...</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 🆕 Statistiques détaillées du scan -->
+                                        <div class="scan-statistics">
+                                            <div class="stat-row">
+                                                <span class="stat-label">📈 Paires valides :</span>
+                                                <span class="stat-value" id="validPairsCount">--</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">  • (5-15%) total:</span>
+                                                <span class="stat-value" id="validPairsTotal">--</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">  • (5-15%) cooldown ❄️:</span>
+                                                <span class="stat-value" id="validPairsCooldown">--</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">  • (5-15%) disponibles:</span>
+                                                <span class="stat-value" id="validPairsAvailable">--</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">⏱️ Dernière analyse:</span>
+                                                <span class="stat-value" id="lastAnalysisTime">--</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Statistiques Performance - Design amélioré -->
+                                <div class="stats-section">
+                                    <div class="section-header">
+                                        <h4>📈 Performance</h4>
+                                    </div>
+                                    
+                                    <div class="performance-grid">
+                                        <div class="perf-item success">
+                                            <div class="perf-icon">✅</div>
+                                            <div class="perf-info">
+                                                <div class="perf-label">Gagnantes</div>
+                                                <div class="perf-value" id="winningPositions">0 (+0$)</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="perf-item danger">
+                                            <div class="perf-icon">❌</div>
+                                            <div class="perf-info">
+                                                <div class="perf-label">Perdantes</div>
+                                                <div class="perf-value" id="losingPositions">0 (-0$)</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
