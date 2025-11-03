@@ -21,11 +21,11 @@ class BotHealthMonitor {
         this.startMonitoring();
     }
     
-    // 🔄 Vérifier la santé toutes les 30 secondes
+    // 🔄 Vérifier la santé toutes les 30 minutes (au lieu de 30 secondes)
     startMonitoring() {
         setInterval(() => {
             this.checkHealth();
-        }, 30000);
+        }, 1800000); // 30 minutes = 1800000 ms
     }
     
     // 🏥 Vérifier l'état global
@@ -75,12 +75,12 @@ class BotHealthMonitor {
         if (warnings.length > 0) {
             const logLevel = health === 'DEGRADED' ? 'ERROR' : 'WARNING';
             warnings.forEach(w => log(w, logLevel));
+            // Afficher le dashboard complet en cas de problème
+            this.displayDashboard(stats, health);
         } else if (health === 'HEALTHY') {
-            log(`✅ Système sain - Queue: ${stats.queueSize}/50 | Requests: ${stats.totalRequests} | Errors: ${stats.totalErrors} | Cache: ${stats.cacheSize}`, 'DEBUG');
+            // ✅ HEALTHYY: Affichage simplifié, une seule ligne par 30 minutes
+            log(`✅ BOT HEALTH CHECK - Système sain | Queue: ${stats.queueSize}/50 | Requêtes: ${stats.totalRequests} | Erreurs: ${stats.totalErrors}`, 'DEBUG');
         }
-        
-        // Afficher le tableau de bord
-        this.displayDashboard(stats, health);
     }
     
     // 📊 Afficher un dashboard dans la console

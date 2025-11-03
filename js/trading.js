@@ -631,6 +631,13 @@ async function openPosition(symbol, selectedPair) {
     const availableSlots = getMaxBotPositions() - botPositionsCount;
     log(`📊 Ouverture position bot ${symbol} - ${availableSlots} slots bot disponibles (${botPositionsCount}/${getMaxBotPositions()} bot, ${openPositions.length} total)`, 'INFO');
     
+    // 🔍 NOUVEAU: Vérifier la performance 24h (5-15%)
+    if (selectedPair.change24h < 5 || selectedPair.change24h > 15) {
+        log(`⚠️ ${symbol}: Performance 24h HORS FOURCHETTE (${selectedPair.change24h.toFixed(2)}%) - Hors de [5%, 15%] - POSITION NON OUVERTE`, 'WARNING');
+        log(`🔍 DIAGNOSTIC: Cela explique peut-être l'erreur 400 - La paire n'est plus dans les critères`, 'INFO');
+        return false;
+    }
+    
     const positionValue = calculatePositionSize();
     
     try {
@@ -657,6 +664,13 @@ async function openPosition(symbol, selectedPair) {
             return false;
         }
         
+        // 🔍 NOUVEAU: Valider la quantité (must be > 0 and within Bitget limits)
+        const quantityValue = parseFloat(quantity);
+        if (quantityValue < 0.000001) { // Bitget minimum
+            log(`❌ Quantité trop petite: ${quantity} (minimum: 0.000001)`, 'ERROR');
+            return false;
+        }
+        
         const orderData = {
             symbol: symbol,
             productType: "USDT-FUTURES",
@@ -672,9 +686,13 @@ async function openPosition(symbol, selectedPair) {
         // 🔧 DIAGNOSTIC: Log des données d'ordre pour debug
         log(`🔍 Données ordre ${symbol}:`, 'DEBUG');
         log(`   Symbol: ${orderData.symbol}`, 'DEBUG');
-        log(`   Size: ${orderData.size} (${typeof orderData.size})`, 'DEBUG');
-        log(`   Prix: ${currentPrice} (${typeof currentPrice})`, 'DEBUG');
+        log(`   Size: ${orderData.size} (type: ${typeof orderData.size})`, 'DEBUG');
+        log(`   Side: ${orderData.side}`, 'DEBUG');
+        log(`   TradeSide: ${orderData.tradeSide}`, 'DEBUG');
+        log(`   OrderType: ${orderData.orderType}`, 'DEBUG');
+        log(`   Prix actuel: ${currentPrice}`, 'DEBUG');
         log(`   Valeur position: ${positionValue}$`, 'DEBUG');
+        log(`   Fourchette 24h: +${selectedPair.change24h.toFixed(2)}% (OK - dans [5%, 15%])`, 'DEBUG');
         
         const orderResult = await makeRequest('/bitget/api/v2/mix/order/place-order', {
             method: 'POST',
@@ -684,13 +702,24 @@ async function openPosition(symbol, selectedPair) {
         if (!orderResult || orderResult.code !== '00000') {
             log(`❌ Échec ouverture position ${symbol}: ${orderResult?.msg || orderResult?.code || 'Erreur inconnue'}`, 'ERROR');
             
-            // 🔧 DIAGNOSTIC: Log de l'erreur complète
+            // 🔧 DIAGNOSTIC DÉTAILLÉ: Log de l'erreur complète avec diagnostic
             if (orderResult) {
-                log(`🔍 Réponse API complète:`, 'ERROR');
-                log(`   Code: ${orderResult.code}`, 'ERROR');
+                log(`🔍 DIAGNOSTIC ERREUR API:`, 'ERROR');
+                log(`   Code erreur: ${orderResult.code}`, 'ERROR');
                 log(`   Message: ${orderResult.msg}`, 'ERROR');
+                
+                // Diagnostic spécifique pour erreur 400
+                if (orderResult.code === '400' || orderResult.code === 400) {
+                    log(`🔴 Erreur 400 (Bad Request) - Vérifications:`, 'ERROR');
+                    log(`   ✓ Symbol: ${symbol} (valide)`, 'ERROR');
+                    log(`   ✓ Size: ${orderData.size} (doit être > 0)`, 'ERROR');
+                    log(`   ✓ Pair range 24h: +${selectedPair.change24h.toFixed(2)}% (dans [5-15%])`, 'ERROR');
+                    log(`   ✓ Le symbole existe-t-il sur Bitget?`, 'ERROR');
+                    log(`   💡 Possibilités: Paire suspendue, paramètres invalides, ou clés API`, 'ERROR');
+                }
+                
                 if (orderResult.data) {
-                    log(`   Data: ${JSON.stringify(orderResult.data)}`, 'ERROR');
+                    log(`   Détails: ${JSON.stringify(orderResult.data)}`, 'ERROR');
                 }
             }
             
@@ -955,6 +984,21 @@ async function monitorPnLAndClose() {
                             }
                             
                             log(`✅ Position fermée: ${data.position.symbol} - PnL net: ${data.realizedPnL >= 0 ? '+' : ''}$${data.realizedPnL.toFixed(2)}`, 'SUCCESS');
+                            
+                            // 📝 LOGGER: Enregistrer la fermeture automatique
+                            if (window.positionLogger) {
+                                try {
+                                    const pnlPercent = ((data.currentPrice - data.position.entryPrice) / data.position.entryPrice) * 100;
+                                    window.positionLogger.logPositionClose(data.position, {
+                                        exitPrice: data.currentPrice,
+                                        pnlDollar: data.realizedPnL,
+                                        pnlPercent: pnlPercent,
+                                        reason: 'TARGET_REACHED'
+                                    });
+                                } catch (logError) {
+                                    console.warn('⚠️ Erreur logging fermeture automatique:', logError);
+                                }
+                            }
                             
                             // Mettre à jour le cooldown 12h
                             if (typeof addTradedPairCooldown === 'function') {

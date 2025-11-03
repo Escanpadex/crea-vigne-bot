@@ -34,7 +34,7 @@ let config = {
     secretKey: '',
     passphrase: '',
     capitalPercent: 5,
-    leverage: 2,
+    leverage: 10,  // 🔧 CHANGEMENT: Levier par défaut passé de 2 à 10
     trailingStop: 1.0,
     cooldownMinutes: 30,
     targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
