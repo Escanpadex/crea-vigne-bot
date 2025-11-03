@@ -242,12 +242,20 @@
                                 <!-- 🆕 Statistiques détaillées du scan -->
                                 <div class="scan-statistics">
                                     <div class="stat-row">
-                                        <span class="stat-label">📈 Paires valides (5-15%):</span>
+                                        <span class="stat-label">📈 Paires valides :</span>
                                         <span class="stat-value" id="validPairsCount">--</span>
                                     </div>
                                     <div class="stat-row">
-                                        <span class="stat-label">⏰ Paires en cooldown:</span>
-                                        <span class="stat-value" id="cooldownPairsCount">--</span>
+                                        <span class="stat-label">  • (5-15%) total:</span>
+                                        <span class="stat-value" id="validPairsTotal">--</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">  • (5-15%) cooldown ❄️:</span>
+                                        <span class="stat-value" id="validPairsCooldown">--</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">  • (5-15%) disponibles:</span>
+                                        <span class="stat-value" id="validPairsAvailable">--</span>
                                     </div>
                                     <div class="stat-row">
                                         <span class="stat-label">⏱️ Dernière analyse:</span>
@@ -259,7 +267,7 @@
                             <!-- 🆕 Tuile des paires en cooldown avec compte à rebours -->
                             <div class="cooldown-section">
                                 <div class="section-header">
-                                    <h4>⏰ Paires en Cooldown (12h)</h4>
+                                    <h4 id="cooldownTitle">⏰ Paires en Cooldown (6h)</h4>
                                 </div>
                                 <div class="cooldown-list" id="cooldownList">
                                     <div style="text-align: center; color: #ccc; padding: 20px;">
@@ -523,11 +531,50 @@
             if (cooldownHours < 1) cooldownHours = 1;
             if (cooldownHours > 24) cooldownHours = 24;
             
+            // 🆕 IMPORTANTE: Recalculer les cooldowns existants basé sur la nouvelle durée
+            const oldCooldownHours = config.takeProfitCooldownHours || 6;
+            if (cooldownHours !== oldCooldownHours && typeof tradedPairsCooldown !== 'undefined') {
+                const now = Date.now();
+                const scaleFactor = cooldownHours / oldCooldownHours;
+                
+                // Parcourir tous les cooldowns existants
+                Array.from(tradedPairsCooldown.entries()).forEach(([symbol, endTime]) => {
+                    if (endTime > now) {
+                        // Calculer le temps restant avec l'ancienne durée
+                        const remainingMs = endTime - now;
+                        
+                        // Appliquer le facteur d'échelle
+                        const newRemainingMs = remainingMs * scaleFactor;
+                        
+                        // Calculer la nouvelle fin
+                        const newEndTime = now + newRemainingMs;
+                        
+                        // Mettre à jour
+                        tradedPairsCooldown.set(symbol, newEndTime);
+                    }
+                });
+                
+                if (typeof log === 'function') {
+                    log(`🔄 Cooldowns existants recalculés (${oldCooldownHours}h → ${cooldownHours}h)`, 'INFO');
+                }
+            }
+            
             // Mettre à jour la configuration
             config.takeProfitCooldownHours = cooldownHours;
             
             // Mettre à jour l'input
             document.getElementById('cooldownHoursInput').value = cooldownHours;
+            
+            // Mettre à jour le titre et l'affichage de la tuile cooldown
+            const cooldownTitle = document.getElementById('cooldownTitle');
+            if (cooldownTitle) {
+                cooldownTitle.textContent = `⏰ Paires en Cooldown (${cooldownHours}h)`;
+            }
+            
+            // Rafraîchir l'affichage des cooldowns immédiatement
+            if (typeof updateBotStatusDisplay === 'function') {
+                updateBotStatusDisplay();
+            }
             
             // Log de confirmation
             if (typeof log === 'function') {
