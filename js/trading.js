@@ -704,23 +704,42 @@ async function openPosition(symbol, selectedPair) {
             
             // 🔧 DIAGNOSTIC DÉTAILLÉ: Log de l'erreur complète avec diagnostic
             if (orderResult) {
-                log(`🔍 DIAGNOSTIC ERREUR API:`, 'ERROR');
-                log(`   Code erreur: ${orderResult.code}`, 'ERROR');
-                log(`   Message: ${orderResult.msg}`, 'ERROR');
+                log(`🔍 DIAGNOSTIC ERREUR API - CONTEXTE COMPLET:`, 'ERROR');
+                log(`   📍 Symbole: ${symbol}`, 'ERROR');
+                log(`   💰 Code erreur: ${orderResult.code}`, 'ERROR');
+                log(`   📝 Message erreur: ${orderResult.msg || 'N/A'}`, 'ERROR');
+                
+                // Afficher les paramètres de l'ordre
+                log(`🔍 PARAMÈTRES DE L'ORDRE:`, 'ERROR');
+                log(`   • Symbol: ${orderData.symbol}`, 'ERROR');
+                log(`   • Size: ${orderData.size} (type: ${typeof orderData.size})`, 'ERROR');
+                log(`   • Side: ${orderData.side}`, 'ERROR');
+                log(`   • Order Type: ${orderData.orderType}`, 'ERROR');
+                log(`   • Margin Mode: ${orderData.marginMode}`, 'ERROR');
+                log(`   • Product Type: ${orderData.productType}`, 'ERROR');
                 
                 // Diagnostic spécifique pour erreur 400
                 if (orderResult.code === '400' || orderResult.code === 400) {
-                    log(`🔴 Erreur 400 (Bad Request) - Vérifications:`, 'ERROR');
-                    log(`   ✓ Symbol: ${symbol} (valide)`, 'ERROR');
-                    log(`   ✓ Size: ${orderData.size} (doit être > 0)`, 'ERROR');
-                    log(`   ✓ Pair range 24h: +${selectedPair.change24h.toFixed(2)}% (dans [5-15%])`, 'ERROR');
-                    log(`   ✓ Le symbole existe-t-il sur Bitget?`, 'ERROR');
-                    log(`   💡 Possibilités: Paire suspendue, paramètres invalides, ou clés API`, 'ERROR');
+                    log(`🔴 ERREUR 400 (Bad Request) - ANALYSE DÉTAILLÉE:`, 'ERROR');
+                    log(`   🔸 Pair Performance: +${selectedPair?.change24h?.toFixed(2) || 'N/A'}% (intervalle valide: 5-15%)`, 'ERROR');
+                    log(`   🔸 Prix actuel: ${currentPrice} USDT`, 'ERROR');
+                    log(`   🔸 Quantité: ${quantity}`, 'ERROR');
+                    log(`   🔸 Valeur position: ${positionValue.toFixed(2)} USDT`, 'ERROR');
+                    log(`   🔸 Levier: ${config.leverage || 2}x`, 'ERROR');
+                    log(`   🔸 Capital %: ${config.capitalPercent || 5}%`, 'ERROR');
+                    log(`   💡 Causes possibles:`, 'ERROR');
+                    log(`      1) Pair suspendue sur Bitget`, 'ERROR');
+                    log(`      2) Quantité invalide (< minimum ou > maximum)`, 'ERROR');
+                    log(`      3) Solde insuffisant (${(balance.totalEquity || 0).toFixed(2)} USDT disponible)`, 'ERROR');
+                    log(`      4) Paramètres API manquants ou invalides`, 'ERROR');
+                    log(`      5) Clés API invalides ou permissions insuffisantes`, 'ERROR');
                 }
                 
                 if (orderResult.data) {
-                    log(`   Détails: ${JSON.stringify(orderResult.data)}`, 'ERROR');
+                    log(`📋 Données API retournées: ${JSON.stringify(orderResult.data)}`, 'ERROR');
                 }
+            } else {
+                log(`❌ ERREUR API: Pas de réponse retournée (timeout probable)`, 'ERROR');
             }
             
             return false;
