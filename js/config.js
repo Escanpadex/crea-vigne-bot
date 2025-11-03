@@ -40,6 +40,7 @@ let config = {
     targetPnL: 2.0,                 // 🆕 NOUVEAU: Objectif PnL configurable (2% par défaut)
     maxBotPositions: 2,             // 🆕 NOUVEAU: Limite configurable des positions bot (2-5)
     maxPositionTimeHours: 24,       // 🆕 NOUVEAU: Temps maximum d'ouverture d'une position en heures (3-48h, défaut: 24h)
+    takeProfitCooldownHours: 6,     // 🆕 NOUVEAU: Durée du cooldown après TP (1-24h, défaut: 6h)
     // 🎯 NOUVEAUX PARAMÈTRES: Affichage des positions
     displaySettings: {
         maxPositionsDisplayed: 50,      // Nombre maximum de positions affichées (défaut: 50)

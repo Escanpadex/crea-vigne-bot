@@ -2,6 +2,49 @@
 console.log('📁 Loading trading.js...');
 console.log('Assuming utils.js is loaded: using shared MACD functions');
 
+// 🧹 OPTIMISATION: Garder seulement les 30 derniers messages dans la console
+const MAX_CONSOLE_LOGS = 30;
+let consoleLogBuffer = [];
+let originalConsoleLog = console.log;
+
+// Intercepter console.log pour maintenir un buffer de 30 logs
+console.log = function(...args) {
+    // Appeler le vrai console.log
+    originalConsoleLog.apply(console, args);
+    
+    // Ajouter au buffer
+    consoleLogBuffer.push(args.join(' '));
+    
+    // Garder seulement les 30 derniers
+    if (consoleLogBuffer.length > MAX_CONSOLE_LOGS) {
+        consoleLogBuffer.shift(); // Supprimer le plus ancien
+    }
+};
+
+// Fonction pour afficher les logs du buffer (pour debug)
+window.showConsoleBuffer = function() {
+    originalConsoleLog('📋 === DERNIERS 30 LOGS ===');
+    consoleLogBuffer.forEach((log, i) => {
+        originalConsoleLog(`${i + 1}. ${log}`);
+    });
+    originalConsoleLog('=== FIN ===');
+};
+
+// Fonction pour exporter les logs
+window.exportConsoleLogs = function() {
+    const text = consoleLogBuffer.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `console_logs_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    originalConsoleLog('✅ Logs exportés');
+};
+
 // 🧹 OPTIMISATION: Nettoyer la console toutes les 10 minutes pour éviter la surcharge mémoire
 let lastConsoleClear = Date.now();
 function autoCleanConsole() {
@@ -1201,9 +1244,10 @@ function isPairInCooldown(symbol) {
 
 // 🆕 AMÉLIORATION: Ajouter un cooldown 12h pour les paires déjà tradées
 function addTradedPairCooldown(symbol) {
-    const cooldownEnd = Date.now() + (12 * 60 * 60 * 1000); // 12 heures
+    const cooldownHours = config.takeProfitCooldownHours || 6; // Utiliser la config, défaut 6h
+    const cooldownEnd = Date.now() + (cooldownHours * 60 * 60 * 1000);
     tradedPairsCooldown.set(symbol, cooldownEnd);
-    log(`⏰ Cooldown 12h activé pour ${symbol} (paire tradée)`, 'INFO');
+    log(`⏰ Cooldown ${cooldownHours}h activé pour ${symbol} (paire tradée, TP atteint)`, 'INFO');
 }
 
 // 🆕 AMÉLIORATION: Vérifier si une paire tradée est en cooldown 12h
