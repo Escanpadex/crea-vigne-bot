@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Trading Bitget - Interface Minimaliste</title>
+    <link rel="stylesheet" href="styles/minimal.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- MENU TOP -->
+        <div class="top-menu">
+            <div class="menu-title">Bot Trading Bitget - Stratégie Paires Positives</div>
+            <div class="menu-status">
+                <span class="status-label">État :</span>
+                <span id="botStatus" class="status-value">ARRÊTÉ</span>
+                <span class="separator">|</span>
+                <span class="balance-label">Solde :</span>
+                <span id="usdtBalance" class="balance-value">-- USDT</span>
+                <span class="separator">|</span>
+                <div class="connection-status">
+                    <span id="connectionDot" class="status-dot"></span>
+                    <span id="connectionText">Déconnecté</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN LAYOUT: 2 Colonnes -->
+        <div class="main-layout">
+            <!-- COLONNE GAUCHE: Positions et Cooldown -->
+            <div class="left-column">
+                <!-- Section Positions Actives -->
+                <div class="panel">
+                    <div class="panel-title">⚡ Positions Actives</div>
+                    <div id="positionsList" class="positions-container">
+                        <div class="empty-state">Aucune position active</div>
+                    </div>
+                    <div class="panel-footer">
+                        <span>Total PnL :</span>
+                        <span id="totalPnL" class="value">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Section Paires en Cooldown -->
+                <div class="panel">
+                    <div class="panel-title">❄️ Paires en Cooldown</div>
+                    <div id="cooldownList" class="cooldown-container">
+                        <div class="empty-state">Aucune paire en cooldown</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLONNE DROITE: Configuration et Statistiques -->
+            <div class="right-column">
+                <!-- Section Configuration de Trading -->
+                <div class="panel">
+                    <div class="panel-title">⚙️ Configuration de Trading</div>
+                    <div class="config-grid">
+                        <div class="config-row">
+                            <label>Capital par trade</label>
+                            <div class="input-group">
+                                <input type="number" id="capitalPercent" min="10" max="90" step="5" value="50">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label>Levier</label>
+                            <div class="input-group">
+                                <input type="number" id="leverage" min="2" max="10" step="1" value="10">
+                                <span class="unit">x</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label>Objectif PnL</label>
+                            <div class="input-group">
+                                <input type="number" id="targetPnL" min="0.2" max="3" step="0.05" value="0.90">
+                                <span class="unit">%</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label>Positions simultanées</label>
+                            <div class="input-group">
+                                <input type="number" id="maxBotPositions" min="2" max="25" step="1" value="8">
+                                <span class="unit"></span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label>Temps max position</label>
+                            <div class="input-group">
+                                <input type="number" id="maxTimeHours" min="3" max="48" step="1" value="4">
+                                <span class="unit">h</span>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <label>Cooldown TP</label>
+                            <div class="input-group">
+                                <input type="number" id="cooldownHours" min="1" max="24" step="1" value="6">
+                                <span class="unit">h</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section État du Bot -->
+                <div class="panel">
+                    <div class="panel-title">📊 État du Bot</div>
+                    <div class="stats-grid">
+                        <div class="stat-row">
+                            <span class="stat-label">Paires valides :</span>
+                            <span class="stat-value" id="validPairsCount">--</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Paires disponibles :</span>
+                            <span class="stat-value" id="validPairsAvailable">--</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Dernière analyse :</span>
+                            <span class="stat-value" id="lastAnalysisTime">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section Performance -->
+                <div class="panel">
+                    <div class="panel-title">📈 Performance</div>
+                    <div class="perf-grid">
+                        <div class="perf-item success">
+                            <div class="perf-icon">✅</div>
+                            <div class="perf-info">
+                                <div class="perf-label">Gagnantes</div>
+                                <div class="perf-value" id="winningPositions">0</div>
+                            </div>
+                        </div>
+                        <div class="perf-item danger">
+                            <div class="perf-icon">❌</div>
+                            <div class="perf-info">
+                                <div class="perf-label">Perdantes</div>
+                                <div class="perf-value" id="losingPositions">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRE DE CONTROLE (Bottom) -->
+        <div class="control-bar">
+            <button class="btn btn-primary" onclick="connectAPI()">🔌 Connecter API</button>
+            <button class="btn btn-success" onclick="startBot()" id="startBtn">▶️ Démarrer</button>
+            <button class="btn btn-danger" onclick="stopBot()" id="stopBtn" disabled>⏹️ Arrêter</button>
+            <button class="btn btn-secondary" onclick="downloadLogs()">📥 Télécharger Logs</button>
+            <button class="btn btn-secondary" onclick="toggleAdvanced()">⚡ Avancé</button>
+        </div>
+
+        <!-- SECTION AVANCÉE (masquée par défaut) -->
+        <div id="advancedSection" class="panel panel-advanced" style="display: none; margin-top: 10px;">
+            <div class="panel-title">⚙️ Configuration Avancée</div>
+            <div class="advanced-grid">
+                <div class="config-row">
+                    <label>Clé API (masquée)</label>
+                    <input type="password" id="apiKey" value="●●●●●●●●●●●●" readonly>
+                </div>
+                <div class="config-row">
+                    <label>Clé Secrète (masquée)</label>
+                    <input type="password" id="secretKey" value="●●●●●●●●●●●●" readonly>
+                </div>
+                <div class="config-row">
+                    <label>Passphrase (masquée)</label>
+                    <input type="password" id="passphrase" value="●●●●●●●●●●●●" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div id="logsPanel" class="panel panel-logs">
+            <div class="panel-title">📋 Logs</div>
+            <div id="logsList" class="logs-container"></div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/api-queue.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/trading.js"></script>
+    <script src="js/monitoring.js"></script>
+    <script src="js/position-logger.js"></script>
+    <script src="js/main.js"></script>
+    
+    <script>
+        // UI Minimale - Fonctions de base
+        function connectAPI() {
+            console.log('Connexion API...');
+            alert('En développement');
+        }
+
+        function startBot() {
+            const btn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            document.getElementById('botStatus').textContent = 'ACTIF';
+            document.getElementById('botStatus').style.color = '#00aa00';
+            btn.disabled = true;
+            stopBtn.disabled = false;
+            console.log('Bot démarré');
+        }
+
+        function stopBot() {
+            const btn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            document.getElementById('botStatus').textContent = 'ARRÊTÉ';
+            document.getElementById('botStatus').style.color = '#aa0000';
+            btn.disabled = false;
+            stopBtn.disabled = true;
+            console.log('Bot arrêté');
+        }
+
+        function downloadLogs() {
+            console.log('Téléchargement des logs...');
+            alert('En développement');
+        }
+
+        function toggleAdvanced() {
+            const section = document.getElementById('advancedSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Initialisation au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Interface minimale chargée');
+        });
+    </script>
+</body>
+</html>
+
